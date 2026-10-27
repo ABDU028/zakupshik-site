@@ -4033,44 +4033,50 @@ const leaveIntro = () => { store.set('snab_intro_seen', true); go(profile ? 'hom
 $('#introGo').addEventListener('click', leaveIntro);
 $('#introSkip').addEventListener('click', leaveIntro);
 $('#aboutBtn').addEventListener('click', () => go('intro'));
-function renderTariffs() {
-  $('#tAir').value = tariffs?.air_kg ?? '';
-  $('#tAutoKg').value = tariffs?.auto_kg ?? '';
-  $('#tAutoM3').value = tariffs?.auto_m3 ?? '';
-  $('#sCny').value = rates?.cny ?? '';
+// soft = пришло обновление из базы: не трогаем поля, которые менеджер уже начал менять
+const setVal = (id, v, soft) => { const el = document.getElementById(id); if (!el) return; if (soft && el.dataset.dirty) return; if (el.type === 'checkbox') el.checked = !!v; else el.value = v ?? ''; };
+document.addEventListener('input', (e) => { if (e.target.closest?.('#tarForm,#setForm,#remForm')) e.target.dataset.dirty = '1'; });
+const clearDirty = (form) => form.querySelectorAll('[data-dirty]').forEach((el) => delete el.dataset.dirty);
+function renderTariffs(soft) {
+  setVal('tAir', tariffs?.air_kg, soft); setVal('tAutoKg', tariffs?.auto_kg, soft); setVal('tAutoM3', tariffs?.auto_m3, soft);
+  setVal('sCny', rates?.cny, soft);
   $('#sCnyAt').textContent = rates?.updatedAt ? 'Обновлён: ' + fmtTime(rates.updatedAt) : '';
-  $('#sPhone').value = contacts?.phone ?? '';
-  $('#sWa').value = contacts?.whatsapp ?? '';
-  renderReminders();
+  setVal('sPhone', contacts?.phone, soft); setVal('sWa', contacts?.whatsapp, soft);
+  renderReminders(soft);
 }
-let reminders = null;
-function renderReminders() {
+function renderReminders(soft) {
   const r = reminders || {};
-  $('#rKpOn').checked = r.kp?.on !== false; $('#rKp').value = r.kp?.text || '';
-  $('#rAfterOn').checked = r.after?.on !== false; $('#rAfter').value = r.after?.text || '';
-  $('#rIdleOn').checked = r.idle?.on !== false; $('#rIdle').value = r.idle?.text || '';
-  $('#rSeaOn').checked = !!r.seasonal?.on; $('#rSea').value = r.seasonal?.text || ''; $('#rSeaDate').value = r.seasonal?.date || '';
+  setVal('rKpOn', r.kp?.on !== false, soft); setVal('rKp', r.kp?.text || '', soft);
+  setVal('rAfterOn', r.after?.on !== false, soft); setVal('rAfter', r.after?.text || '', soft);
+  setVal('rIdleOn', r.idle?.on !== false, soft); setVal('rIdle', r.idle?.text || '', soft);
+  setVal('rSeaOn', !!r.seasonal?.on, soft); setVal('rSea', r.seasonal?.text || '', soft); setVal('rSeaDate', r.seasonal?.date || '', soft);
 }
 $('#remForm').addEventListener('submit', async (e) => {
   e.preventDefault();
   const v = (id) => $('#' + id).value.trim();
   const r = { kp: { on: $('#rKpOn').checked, text: v('rKp') }, after: { on: $('#rAfterOn').checked, text: v('rAfter') }, idle: { on: $('#rIdleOn').checked, text: v('rIdle') }, seasonal: { on: $('#rSeaOn').checked, text: v('rSea'), date: v('rSeaDate') } };
   if (r.seasonal.on && (!r.seasonal.text || !r.seasonal.date)) { toast('Для сезонного напоминания укажите день и текст'); return; }
-  try { await db.doc('settings/reminders').set(r); reminders = r; toast('Напоминания сохранены'); } catch { toast('Не сохранилось. Попробуйте ещё раз.'); }
+  try { reminders = r; await db.doc('settings/reminders').set(r); clearDirty($('#remForm')); toast('Напоминания сохранены'); } catch { toast('Не сохранилось. Попробуйте ещё раз.'); }
 });
 $('#setForm').addEventListener('submit', async (e) => {
   e.preventDefault();
   try {
-    await db.doc('settings/rates').set({ cny: num($('#sCny').value), updatedAt: Date.now() });
-    await db.doc('settings/contacts').set({ phone: $('#sPhone').value.trim(), whatsapp: $('#sWa').value.trim() });
-    toast('Сохранено');
+    const cny = num($('#sCny').value);
+    if (!cny) { toast('Укажите курс юаня'); return; }
+    rates = { cny, updatedAt: Date.now() };
+    contacts = { phone: $('#sPhone').value.trim(), whatsapp: $('#sWa').value.trim() };
+    await db.doc('settings/rates').set(rates);
+    await db.doc('settings/contacts').set(contacts);
+    clearDirty($('#setForm')); renderTariffs();
+    for (const k of Object.keys(kpDrafts)) delete kpDrafts[k];
+    toast('Сохранено. Курс ' + cny + ' ₸ будет в новых КП');
   } catch { toast('Не сохранилось. Попробуйте ещё раз.'); }
 });
 $('#tarForm').addEventListener('submit', async (e) => {
   e.preventDefault();
   if (!db) { toast('Хранилище недоступно в этом просмотре'); return; }
   const t = { air_kg: num($('#tAir').value), auto_kg: num($('#tAutoKg').value), auto_m3: num($('#tAutoM3').value), updatedAt: Date.now() };
-  try { await db.doc('settings/tariffs').set(t); tariffs = t; toast('Тарифы сохранены'); }
+  try { tariffs = t; await db.doc('settings/tariffs').set(t); clearDirty($('#tarForm')); toast('Тарифы сохранены'); }
   catch { toast('Не сохранилось. Попробуйте ещё раз.'); }
 });
 
@@ -4095,10 +4101,10 @@ renderSpec();
   if (current === 'admin') startAdmin();
   if (current === 'profile') renderProfile();
   subscribeMine();
-  if (db) db.doc('settings/tariffs').onSnapshot((s) => { tariffs = s.exists ? s.data() : null; if (current === 'tariffs') renderTariffs(); }, () => {});
-  if (db) db.doc('settings/rates').onSnapshot((s) => { if (s.exists) rates = s.data(); if (current === 'tariffs') renderTariffs(); }, () => {});
-  if (db) db.doc('settings/contacts').onSnapshot((s) => { if (s.exists) contacts = s.data(); if (current === 'tariffs') renderTariffs(); }, () => {});
-  if (db) db.doc('settings/reminders').onSnapshot((s) => { if (s.exists) reminders = s.data(); if (current === 'tariffs') renderReminders(); }, () => {});
+  if (db) db.doc('settings/tariffs').onSnapshot((s) => { tariffs = s.exists ? s.data() : null; if (current === 'tariffs') renderTariffs(true); }, () => {});
+  if (db) db.doc('settings/rates').onSnapshot((s) => { if (s.exists) rates = s.data(); if (current === 'tariffs') renderTariffs(true); }, () => {});
+  if (db) db.doc('settings/contacts').onSnapshot((s) => { if (s.exists) contacts = s.data(); if (current === 'tariffs') renderTariffs(true); }, () => {});
+  if (db) db.doc('settings/reminders').onSnapshot((s) => { if (s.exists) reminders = s.data(); if (current === 'tariffs') renderTariffs(true); }, () => {});
   if (db && uid && !profile) {
     try { const p = await db.doc('data/users/' + uid + '/profile').get(); if (p.exists) { profile = p.data(); store.set('snab_profile', profile); if (current === 'onb') go('home'); } } catch {}
   } else if (profile) saveProfileRemote();
