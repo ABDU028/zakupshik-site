@@ -200,6 +200,101 @@ textarea.input{height:auto;min-height:88px;padding:12px 14px;resize:vertical}
 .kp-f .two{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
 .reasons{display:flex;flex-wrap:wrap;gap:8px}
 
+/* v3: новая раскладка заявки */
+.btn-green{background:#2FB36D;color:#06210F}
+.t-orange{background:#F59E0B;color:#2A1A00}
+.t-green{background:#2FB36D;color:#06210F}
+.linkbtn{border:0;background:none;padding:0;color:var(--accent);font-weight:800;font-size:inherit;text-decoration:underline;cursor:pointer}
+.atabs button.hot-red{border:1.5px solid #EF4444;color:var(--red-fg);background:var(--red-bg)}
+.atabs button.hot-red .cnt{background:#EF4444;color:#fff}
+.atabs button.hot-orange{border:1.5px solid #F59E0B;background:var(--yellow-bg);color:var(--yellow-fg)}
+.atabs button.hot-orange .cnt{background:#F59E0B;color:#2A1A00}
+.atabs .fmore{min-height:40px;border-radius:20px;border:1px solid var(--line);background:var(--surface);color:var(--muted);font-weight:700;font-size:13px;padding:0 12px}
+.ar.zr{align-items:stretch}
+.zr-top{display:flex;justify-content:space-between;gap:8px;align-items:center}
+.zr-top b{flex:1;min-width:0}
+.ar.zr small.urgent{color:var(--red-fg);font-weight:800}
+.ar.paid{border:2px solid #2FB36D;background:var(--green-bg);padding:11px}
+.ar.wait{border:2px solid #F59E0B;background:var(--yellow-bg);padding:11px}
+.ar.paid.sel,.ar.wait.sel{outline:2px solid var(--accent);outline-offset:2px}
+.zhead{display:flex;flex-direction:column;gap:14px;margin-bottom:14px;border:1px solid var(--line)}
+.zhead.paid{border:2px solid #2FB36D}
+.zhead.wait{border:2px solid #F59E0B}
+.zhead-row{display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+.zhead-l{flex:1;min-width:260px;display:flex;flex-direction:column;gap:6px}
+.zhead-r{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.zsub{font-size:14px;color:var(--muted);font-weight:600}
+.zdates{font-size:12.5px;color:var(--muted)}
+.zsteps{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.zsteps li{display:flex;flex-direction:column;gap:6px;min-width:0}
+.zsteps .bar{height:6px;border-radius:3px;background:var(--surface-2)}
+.zsteps .lbl{font-size:11.5px;font-weight:700;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.zsteps li.done .bar{background:#2FB36D}
+.zsteps li.cur .bar{background:var(--accent)}
+.zsteps li.cur .lbl{color:var(--accent);font-weight:800}
+.zrow{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(340px,460px);gap:14px;align-items:start}
+@media (max-width:1250px){.zrow{grid-template-columns:minmax(0,1fr)}}
+.zchat{padding:0;display:flex;flex-direction:column;border:1px solid var(--line);overflow:hidden}
+.zchat-h{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:12px 16px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.zmsgs{height:min(62vh,640px);overflow-y:auto;padding:14px 16px;display:flex;flex-direction:column;gap:10px}
+.zmsgs>*{flex-shrink:0}
+.zsmall{font-size:12.5px;color:var(--muted)}
+.zb{position:relative;max-width:78%;padding:9px 12px;border-radius:16px;display:flex;flex-direction:column;gap:4px;font-size:15px;line-height:1.45;white-space:pre-wrap;overflow-wrap:anywhere}
+.zb .who{font-size:11.5px;font-weight:800;opacity:.75}
+.zb .zt{align-self:flex-end;font-size:11px;opacity:.75;white-space:nowrap}
+.zb.cl{align-self:flex-start;background:var(--surface-2);border-bottom-left-radius:6px}
+.zb.mg{align-self:flex-end;background:var(--accent);color:var(--on-accent);border-bottom-right-radius:6px}
+.zb.ai{align-self:flex-end;background:#D9DCDF;color:#15191E;border-bottom-right-radius:6px}
+.ztick{font-weight:800;letter-spacing:-2px;margin-left:2px}
+.ztick.read{color:#2F7BEA}
+.zb.mg .ztick.read{color:#0B3D91}
+.zphoto{width:180px;height:180px;object-fit:cover;border-radius:12px;cursor:zoom-in}
+.zsys{align-self:center;font-size:12px;font-weight:700;color:var(--muted);background:var(--surface-2);padding:6px 12px;border-radius:12px;text-align:center;max-width:90%;position:relative}
+.zdeleted{font-size:13px;font-style:italic;color:var(--muted);padding:6px 12px;border:1px dashed var(--line);border-radius:12px}
+.zdeleted.cl{align-self:flex-start}.zdeleted.mg{align-self:flex-end}
+.zcard{position:relative;align-self:flex-end;width:min(100%,460px);border:1.5px solid var(--line);border-radius:16px;background:var(--surface);padding:12px 14px;display:flex;flex-direction:column;gap:8px}
+.zcard.kp{border:2px solid var(--accent)}
+.zcard.ink{background:var(--ink);color:var(--on-ink);border-color:var(--ink)}
+.zcard.ink .zsmall{color:inherit;opacity:.8}
+.zcard.old{opacity:.6}
+.zcard.blue{background:var(--blue-bg);color:var(--blue-fg);border-color:transparent}
+.zcard.exact{border:2px solid #2F7BEA}
+.zc-h{display:flex;justify-content:space-between;gap:8px;align-items:baseline}
+.zc-h .zt{font-size:11.5px;color:var(--muted)}
+.zv{display:flex;gap:10px;align-items:center;padding:4px;border-radius:10px}
+.zv.on{background:var(--green-bg)}
+.zv-m{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
+.zv-n{font-weight:700;font-size:14px}
+.zv-m small{font-size:12px;color:var(--muted)}
+.zthumb{width:44px;height:44px;border-radius:10px;object-fit:cover;flex-shrink:0;background:var(--surface-2)}
+.zrow2{display:flex;justify-content:space-between;gap:10px;font-size:13.5px}
+.zrow2.tot{font-size:15px;font-weight:800}
+.zfoot{margin:2px -14px -12px;padding:8px 14px;font-size:13px;font-weight:800;background:var(--surface-2);color:var(--muted);border-radius:0 0 14px 14px}
+.zfoot.green{background:var(--green-bg);color:var(--green-fg)}
+.zfoot.red{background:var(--red-bg);color:var(--red-fg)}
+.zpay{align-self:center;font-size:13.5px;font-weight:800;color:var(--green-fg);background:var(--green-bg);border:1px solid #2FB36D;padding:9px 14px;border-radius:14px;position:relative}
+.zhasdel .zdel{position:absolute;top:-10px;right:-10px;width:30px;height:30px;border-radius:50%;border:1px solid var(--line);background:var(--surface);color:var(--red-fg);display:none;align-items:center;justify-content:center;box-shadow:var(--shadow)}
+.zhasdel:hover .zdel,.zhasdel:focus-within .zdel{display:flex}
+@media (hover:none){.zhasdel .zdel{display:flex;opacity:.85}}
+.zside{padding:0;border:1px solid var(--line);overflow:hidden}
+.ztabs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px;padding:8px;border-bottom:1px solid var(--line)}
+.ztabs button{position:relative;min-height:40px;border:0;border-radius:10px;background:transparent;color:var(--muted);font-weight:800;font-size:13.5px}
+.ztabs button[aria-selected="true"]{background:var(--ink);color:var(--on-ink)}
+.zdot{position:absolute;top:7px;right:10px;width:8px;height:8px;border-radius:4px;background:#F59E0B}
+.ztab-body{padding:16px;display:flex;flex-direction:column;gap:12px}
+.ztab-body.flat{padding:0;gap:0}
+.ztab-body.flat > .card{border-radius:0;border-bottom:1px solid var(--line)}
+.zpayrow{display:flex;flex-direction:column;gap:6px;padding:12px 14px;border-radius:14px}
+.zpayrow.ok{border:1.5px solid #2FB36D;background:var(--green-bg)}
+.zpayrow.no{border:1.5px solid #F59E0B;background:var(--yellow-bg)}
+.zpayrow .pill{align-self:flex-start;height:38px}
+.zpayrow .linkbtn{align-self:flex-start;font-size:12.5px}
+.gtxt{color:var(--green-fg)}.otxt{color:var(--yellow-fg)}
+.zempty{padding:24px 16px;color:var(--muted);text-align:center}
+.zdlg{border:0;border-radius:20px;padding:20px;width:min(440px,92vw);background:var(--surface);color:var(--fg)}
+.zdlg::backdrop{background:rgba(0,0,0,.5)}
+.zx{white-space:pre-wrap}
+
 /* admin */
 .agrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr));gap:16px;align-items:start}
 .ar{display:flex;gap:12px;align-items:center;text-align:left;width:100%;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:12px}
@@ -593,6 +688,20 @@ body{margin:0}
         <div class="field"><label for="sWa">WhatsApp компании</label><input class="input" id="sWa" inputmode="tel" placeholder="+7 7__ ___ __ __"></div>
         <p class="hint" style="margin:0;text-align:left">Номера видят клиенты в кнопке «Связаться с менеджером».</p>
         <button class="btn btn-ink" type="submit">Сохранить</button>
+      </form>
+      <form id="remForm" class="card" style="display:flex;flex-direction:column;gap:14px;margin-top:16px">
+        <h2 style="font-size:18px">Напоминания клиентам</h2>
+        <p class="hint" style="margin:0;text-align:left">Приходят на телефон раз в день в 10:05 по Алматы, не чаще раза в неделю одному клиенту. Клиент может выключить их в профиле. Пустой текст — стандартный (на языке клиента).</p>
+        <label class="check"><input type="checkbox" id="rKpOn"> <span><b>КП без ответа 2 дня</b></span></label>
+        <div class="field"><label for="rKp">Текст</label><input class="input" id="rKp" placeholder="Менеджер подготовил предложение по заявке №…. Посмотрите, пока цены актуальны."></div>
+        <label class="check"><input type="checkbox" id="rAfterOn"> <span><b>Через месяц после получения заказа</b></span></label>
+        <div class="field"><label for="rAfter">Текст</label><input class="input" id="rAfter" placeholder="Как вам товар? Если нужно что-то ещё из Китая — найдём и привезём."></div>
+        <label class="check"><input type="checkbox" id="rIdleOn"> <span><b>Не заходил 30 дней</b></span></label>
+        <div class="field"><label for="rIdle">Текст</label><input class="input" id="rIdle" placeholder="Нужно что-то найти в Китае? Пришлите фото — подберём за день."></div>
+        <label class="check"><input type="checkbox" id="rSeaOn"> <span><b>Сезонное (всем в выбранный день)</b></span></label>
+        <div class="cg2"><div class="field"><label for="rSeaDate">День</label><input class="input" id="rSeaDate" type="date"></div><div></div></div>
+        <div class="field"><label for="rSea">Текст</label><input class="input" id="rSea" placeholder="С 10 февраля заводы Китая уходят на каникулы. Успейте заказать заранее!"></div>
+        <button class="btn btn-ink" type="submit">Сохранить напоминания</button>
       </form>
     </div>
   </section>
@@ -3033,18 +3142,18 @@ function draftFor(r) {
   if (kpDrafts[r.id]) return kpDrafts[r.id];
   const k = r.kp || {};
   const kind = SVC_KIND(r);
-  const variants = k.variants?.length ? JSON.parse(JSON.stringify(k.variants))
+  const variants = k.variants?.length ? JSON.parse(JSON.stringify(k.variants)).map((v) => ({ cny: '', qty: '1', chinaShip: '', term: '', desc: '', ...v, media: v.media || [] }))
     : [{ id: rid(), name: k.product || r.title || '', price: k.price || '', cny: '', qty: '1', chinaShip: '', term: '', desc: '', media: [] }];
   return (kpDrafts[r.id] = {
     mode: r.kp ? 'kp' : (r.status === 'approval' ? 'approval' : 'kp'),
-    variants, rate: k.rate || rates.cny || 71,
+    variants, rate: rates.cny || k.rate || 71,
     logiM: k.logi?.method || '', logiCost: k.logi?.cost || '', logiTerm: k.logi?.term || '',
     extras: k.extras || '', terms: k.terms || '', validUntil: k.validUntil || '', note: k.note || '', kind,
   });
 }
-const variantTotal = (d, v) => (d.kind === 'buyout' ? Math.round((num(v.cny) * (num(v.qty) || 1) + num(v.chinaShip)) * num(d.rate)) : num(v.price));
+const variantTotal = (d, v) => ((d.kind === 'buyout' || d.kind === 'goods') && num(v.cny) ? Math.round((num(v.cny) * (num(v.qty) || 1) + num(v.chinaShip)) * num(d.rate)) : num(v.price));
 function variantEditor(r, d, v, i, approval) {
-  const set = (key) => (e) => { v[key] = e.target.value; if (d.kind === 'buyout' && ['cny', 'qty', 'chinaShip'].includes(key)) { const el = document.getElementById('vt_' + v.id); if (el) el.textContent = '= ' + money(variantTotal(d, v)); } };
+  const set = (key) => (e) => { v[key] = e.target.value; if ((d.kind === 'buyout' || d.kind === 'goods') && ['cny', 'qty', 'chinaShip'].includes(key)) { const el = document.getElementById('vt_' + v.id); if (el) el.textContent = '= ' + money(variantTotal(d, v)); } };
   const inp = (key, label, ph, mode) => h('div', { class: 'field' }, h('label', { text: label }), h('input', { class: 'input', value: v[key] || '', placeholder: ph || '', inputmode: mode || null, oninput: set(key) }));
   const fileIn = h('input', { type: 'file', multiple: true, accept: 'image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx', hidden: true, onchange: async (e) => {
     const fs = [...e.target.files]; e.target.value = '';
@@ -3056,14 +3165,14 @@ function variantEditor(r, d, v, i, approval) {
       h('b', { text: 'Вариант ' + (i + 1) }),
       d.variants.length > 1 ? h('button', { class: 'pill', type: 'button', onclick: () => { d.variants.splice(i, 1); renderAreq(false); } }, 'Убрать') : null),
     inp('name', 'Название (оригинал, аналог, бренд, модель)', 'Например: Фара оригинал'),
-    !approval && d.kind === 'goods' ? h('div', { class: 'cg2' }, inp('price', 'Цена, ₸ (с отгрузкой из Китая)', '4 850 000', 'decimal'), inp('term', 'Срок', '15–20 дней')) : null,
+    !approval && d.kind === 'goods' ? inp('term', 'Срок', '15–20 дней') : null,
     !approval && d.kind === 'translate' ? h('div', { class: 'cg2' }, inp('price', 'Стоимость услуги, ₸', '20 000', 'decimal'), inp('term', 'Когда', 'Завтра в 11:00')) : null,
-    !approval && d.kind === 'buyout' ? h('div', { style: 'display:flex;flex-direction:column;gap:8px' },
+    !approval && (d.kind === 'buyout' || d.kind === 'goods') ? h('div', { style: 'display:flex;flex-direction:column;gap:8px' },
       h('div', { class: 'cg3' }, inp('cny', 'Цена, ¥', '25', 'decimal'), inp('qty', 'Кол-во', '1', 'decimal'), inp('chinaShip', 'Доставка по Китаю, ¥', '0', 'decimal')),
       h('b', { id: 'vt_' + v.id, style: 'color:var(--accent)', text: '= ' + money(variantTotal(d, v)) })) : null,
     h('div', { class: 'field' }, h('label', { text: approval ? 'Описание и характеристики (размеры, форма, колёса…)' : 'Описание' }),
       h('textarea', { class: 'input', placeholder: 'Размер 120×60 см, колёса резиновые, мощность 2 кВт', oninput: set('desc') }, v.desc || '')),
-    mediaView(v.media, true),
+    draftMedia(v),
     h('div', { style: 'display:flex;gap:8px;flex-wrap:wrap' },
       h('button', { class: 'pill', type: 'button', onclick: () => fileIn.click() }, '📎 Фото, видео, документы'),
       v.media.length ? h('button', { class: 'pill', type: 'button', onclick: () => { v.media = []; renderAreq(false); } }, 'Убрать файлы') : null),
@@ -3099,7 +3208,7 @@ function kpFormV2(r) {
     h('h2', { style: 'font-size:18px', text: title + (r.kp && !approval ? ' · отправлено ранее' : '') }),
     modeSwitch,
     approval ? h('div', { class: 'kp-note', text: 'Клиент увидит варианты с фото и видео и сможет выбрать подходящий или написать, что поменять. ИИ в чате молчит до отправки КП.' }) : null,
-    kind === 'buyout' && !approval ? h('div', { class: 'cg2' },
+    (kind === 'buyout' || kind === 'goods') && !approval ? h('div', { class: 'cg2' },
       h('div', { class: 'field' }, h('label', { text: 'Курс, ₸ за 1 ¥' }), h('input', { class: 'input', inputmode: 'decimal', value: d.rate, oninput: (e) => { d.rate = e.target.value; d.variants.forEach((v) => { const el = document.getElementById('vt_' + v.id); if (el) el.textContent = '= ' + money(variantTotal(d, v)); }); } })),
       h('div', { class: 'kp-note', style: 'align-self:end', text: 'Курс дня из «Настроек». Комиссию не показываем.' })) : null,
     cargoBox,
@@ -3116,11 +3225,6 @@ function kpFormV2(r) {
         h('span', {}, h('b', { text: 'ИИ-ассистент' }), h('small', { text: 'Отвечает на вопросы по КП. Цены не меняет, сложное передаёт вам.' }))),
       h('label', { for: 'modeMgr' }, h('input', { type: 'radio', name: 'mode', id: 'modeMgr', checked: r.mode === 'manager', onchange: () => patchA({ mode: 'manager' }) }),
         h('span', {}, h('b', { text: 'Веду сам' }), h('small', { text: 'ИИ молчит в этой заявке.' })))) : null,
-    r.kp && ['work', 'done'].includes(r.status) && kind !== 'translate' ? h('div', { class: 'field', style: 'border-top:1px solid var(--line);padding-top:10px' },
-      h('label', { for: 'kpExact', text: 'Точная стоимость доставки до Алматы (после склада), ₸' }),
-      h('div', { style: 'display:flex;gap:8px' },
-        h('input', { class: 'input', id: 'kpExact', inputmode: 'decimal', value: r.logiExact || '', placeholder: '298 500', style: 'flex:1;min-width:0' }),
-        h('button', { class: 'btn btn-ink', type: 'button', onclick: sendExact }, 'Сообщить клиенту'))) : null,
     h('button', { class: 'btn btn-accent btn-big', type: 'button', onclick: () => (approval ? sendApproval() : sendKpV2()) },
       approval ? 'Отправить на согласование' : !r.kp ? 'Отправить КП клиенту' : 'Отправить новое КП'));
 }
@@ -3137,14 +3241,14 @@ async function sendKpV2() {
   let variants = [];
   if (kind !== 'cargo') {
     variants = d.variants.map((v) => ({ id: v.id, name: v.name.trim(), desc: v.desc.trim(), term: (v.term || '').trim(), media: v.media,
-      cny: v.cny, qty: v.qty, chinaShip: v.chinaShip, price: kind === 'buyout' ? variantTotal(d, v) : num(v.price) }));
+      cny: v.cny, qty: v.qty, chinaShip: v.chinaShip, price: variantTotal(d, v) }));
     if (variants.some((v) => !v.price)) { toast('Укажите цену у каждого варианта'); return; }
     if (variants.some((v) => !v.name)) { toast('Укажите название у каждого варианта'); return; }
   }
   const logi = (kind === 'cargo' ? (d.logiM || areq.shipping?.key || 'auto') : d.logiM) && num(d.logiCost)
     ? { method: kind === 'cargo' ? (d.logiM || areq.shipping?.key || 'auto') : d.logiM, cost: num(d.logiCost), term: d.logiTerm.trim() } : null;
   if (kind === 'cargo' && !logi) { toast('Укажите стоимость доставки'); return; }
-  const kp = { type: kind, variants, rate: kind === 'buyout' ? num(d.rate) : null, logi, extras: d.extras.trim(),
+  const kp = { type: kind, variants, rate: kind === 'buyout' || kind === 'goods' ? num(d.rate) : null, logi, extras: d.extras.trim(),
     terms: d.terms.trim(), validUntil: d.validUntil.trim(), note: d.note.trim(), sentAt: Date.now(),
     product: kind === 'cargo' ? 'Доставка груза' : variants[0].name, price: kind === 'cargo' ? '' : String(variants[0].price) };
   const had = !!areq.kp;
@@ -3268,6 +3372,622 @@ function supportInfo(r) {
     h('div', { class: 'kp-note', text: 'Нажмите на заявку — она откроется здесь со всеми кнопками (КП, статусы, чат). Вернуться к чату — кнопка «← К чату поддержки».' }));
 }
 /* ===================== конец v2 ===================== */
+/* ===================== Закупщик v3: новая раскладка, оплаты, «нужен ответ», галочки, удаление ===================== */
+ST.new.label = 'Новая'; ST.kp.label = 'КП отправлено'; ST.waiting.label = 'Ждём ответа клиента'; ST.done.label = 'Завершена'; ST.declined.label = 'Клиент отказался'; ST.rejected.label = 'Отказали мы';
+
+// ---------- общие помощники ----------
+function fmtAgo(ms) {
+  if (!ms) return '';
+  const d = Date.now() - ms;
+  if (d < 60000) return 'только что';
+  if (d < 3600000) return Math.round(d / 60000) + ' мин назад';
+  if (d < 86400000) return Math.round(d / 3600000) + ' ч назад';
+  return fmtTime(ms);
+}
+function fmtWait(ms) { const d = Date.now() - ms; return d < 3600000 ? Math.max(1, Math.round(d / 60000)) + ' мин' : d < 86400000 ? Math.round(d / 3600000) + ' ч' : Math.round(d / 86400000) + ' дн'; }
+const hhmm = (ms) => new Date(ms).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+const liveItems = (r) => (r.thread || []).filter((m) => !m.deleted);
+function lastTalk(r) { const th = liveItems(r); for (let i = th.length - 1; i >= 0; i--) { const m = th[i]; if (m.from === 'client' || m.from === 'manager' || m.from === 'ai') return m; } return null; }
+const aiActive = (r) => r.mode === 'ai' && !!r.kp && !['approval', 'rejected'].includes(r.status) && r.service !== 'support';
+function needsReply(r) {
+  if (['rejected'].includes(r.status)) return false;
+  if (r.handoff) return true;
+  const m = lastTalk(r);
+  return !!m && m.from === 'client' && (!aiActive(r) || Date.now() - m.at > 120000);
+}
+const PAY_LABEL = { goods: 'Товар', china: 'Доставка Китай → Алматы', city: 'Доставка Алматы → город' };
+function payList(r) {
+  const kind = SVC_KIND(r);
+  const list = [];
+  if (kind !== 'cargo') list.push('goods');
+  if (kind !== 'translate') list.push('china');
+  if (r.delivery?.method === 'door' && kind !== 'translate') list.push('city');
+  return list;
+}
+function pays(r) {
+  const p = { ...(r.payments || {}) };
+  if (r.deliveryPrepaid && !p.china) p.china = { paid: true };
+  if (r.cityDelivery?.prepaid && !p.city) p.city = { paid: true };
+  if (!p.goods && ['bought', 'china', 'transit', 'almaty', 'delivery_paid', 'sent_city', 'delivered', 'received'].includes(r.stage) && SVC_KIND(r) !== 'cargo') p.goods = { paid: true };
+  if (!p.goods && r.stage === 'paid') p.goods = { paid: true };
+  return p;
+}
+function chosenIdx(r) { return r.chosenVariant != null ? Number(r.chosenVariant) : 0; }
+function payAmount(r, key) {
+  const k = r.kp || {};
+  if (key === 'goods') { const v = (k.variants || [])[chosenIdx(r)]; return num(v?.price ?? k.price); }
+  if (key === 'china') return num(r.logiExact) || num(k.logi?.cost);
+  if (key === 'city') return num(r.cityDelivery?.cost);
+  return 0;
+}
+const goodsPaid = (r) => SVC_KIND(r) === 'cargo' ? true : !!pays(r).goods?.paid;
+const awaitingPay = (r) => r.status === 'work' && r.decision === 'accept' && !goodsPaid(r);
+const fullyPaid = (r) => ['work', 'done'].includes(r.status) && goodsPaid(r) && (SVC_KIND(r) !== 'cargo' || !!pays(r).china?.paid);
+const deliveryDue = (r) => r.status === 'work' && r.stage === 'almaty' && !pays(r).china?.paid && SVC_KIND(r) !== 'translate';
+const kpViewed = (r) => !!r.kp && (r.status === 'waiting' || (r.clientReadAt && r.clientReadAt >= (r.kp.sentAt || 0)));
+function personify(t) {
+  return String(t || '').replace(/^Вы выбрали/, 'Клиент выбрал').replace(/^Вы оформили/, 'Клиент оформил').replace(/^Вы подтвердили/, 'Клиент подтвердил')
+    .replace(/^Вы записались/, 'Клиент записался').replace(/^Вы отказались/, 'Клиент отказался').replace(/^Вы запросили/, 'Клиент запросил')
+    .replace(/^Вы передумали/, 'Клиент передумал').replace(/^Вы попросили/, 'Клиент попросил').replace(/^Вы /, 'Клиент ');
+}
+
+// ---------- запись: сразу обновляем экран, не дожидаясь базы ----------
+async function pushThread(id, item, patch) {
+  try {
+    const p = { ...(patch || {}) }; delete p.thread; delete p.updatedAt;
+    const { error } = await window.SB.rpc('push_thread', { req_id: id, item: item || null, patch: Object.keys(p).length ? p : null });
+    if (error) throw error;
+    return true;
+  } catch (e) { console.error(e); toast('Не сохранилось. Проверьте связь и повторите.'); return false; }
+}
+async function refreshA() {
+  if (!areq) return;
+  try { const s = await db.doc('requests/' + areq.id).get(); if (s.exists) { areq = { id: s.id, ...s.data() }; const i = all.findIndex((x) => x.id === areq.id); if (i >= 0) all[i] = areq; renderAreq(false); renderAdminList(); renderFilters(); } } catch { /* придёт по подписке */ }
+}
+async function patchA(patch, item) {
+  if (!areq) return false;
+  const ok = await pushThread(areq.id, item || null, patch);
+  if (!ok) return false;
+  const local = { ...areq, ...(patch || {}) };
+  if (item) local.thread = (areq.thread || []).concat([item]);
+  areq = local;
+  const i = all.findIndex((x) => x.id === areq.id); if (i >= 0) all[i] = areq;
+  renderAreq(false); renderAdminList(); renderFilters();
+  setTimeout(refreshA, 1500);
+  return true;
+}
+
+// ---------- фильтры ----------
+FILTERS.splice(0, FILTERS.length,
+  ['reply', 'Нужен ответ'], ['new', 'Новые'], ['kp', 'Ждут ответа на КП'], ['pay', 'Ждут оплаты'], ['work', 'В работе'], ['done', 'Закрытые'],
+  ['approval', 'Согласование'], ['logi', 'Посчитать доставку'], ['call', 'Перезвонить'], ['almaty', 'На складе в Алматы'], ['post', 'Вопросы после покупки'], ['rejected', 'Отказали мы'], ['all', 'Все']);
+const MAIN_F = ['reply', 'new', 'kp', 'pay', 'work', 'done'];
+Object.assign(TAB_OF, { new: 'new', approval: 'approval', kp: 'kp', waiting: 'kp', delivery: 'logi', work: 'work', done: 'done', declined: 'done', rejected: 'rejected' });
+function inFilter(r, f) {
+  if (f === 'reply') return needsReply(r);
+  if (r.service === 'support') return false;
+  if (f === 'post') return postQuestion(r);
+  if (f === 'approval') return r.status === 'approval';
+  if (f === 'all') return true;
+  if (f === 'new') return r.status === 'new' || (r.status === 'approval' && !!r.approvalPick);
+  if (f === 'kp') return r.status === 'kp' || r.status === 'waiting';
+  if (f === 'pay') return awaitingPay(r) || deliveryDue(r);
+  if (f === 'logi') return r.status === 'delivery';
+  if (f === 'work') return r.status === 'work' && !awaitingPay(r);
+  if (f === 'almaty') return r.status === 'work' && r.stage === 'almaty';
+  if (f === 'call') return r.callback?.requested && !r.callback?.done;
+  if (f === 'done') return r.status === 'done' || r.status === 'declined';
+  if (f === 'rejected') return r.status === 'rejected';
+  return true;
+}
+function renderFilters() {
+  detectNews();
+  const box = $('#adminFilters');
+  const cnt = (k) => all.filter((r) => inFilter(r, k)).length;
+  const pill = (k, label) => {
+    const n = cnt(k);
+    const cls = k === 'reply' && n ? 'hot-red' : k === 'pay' && n ? 'hot-orange' : (k === 'new' && n ? 'hot' : '');
+    return h('button', { type: 'button', class: cls, 'aria-pressed': String(afilter === k), onclick: () => { afilter = k; renderFilters(); renderAdminList(); } },
+      label, h('span', { class: 'cnt', text: String(n) }));
+  };
+  const more = FILTERS.filter(([k]) => !MAIN_F.includes(k));
+  const sel = h('select', { class: 'fmore', 'aria-label': 'Другие фильтры', onchange: (e) => { if (e.target.value) { afilter = e.target.value; renderFilters(); renderAdminList(); } } },
+    h('option', { value: '', text: 'Ещё ▾', selected: MAIN_F.includes(afilter) }),
+    more.map(([k, label]) => h('option', { value: k, selected: afilter === k, text: label + ' · ' + cnt(k) })));
+  box.replaceChildren(...FILTERS.filter(([k]) => MAIN_F.includes(k)).map(([k, l]) => pill(k, l)), sel);
+}
+
+// ---------- звук и уведомления о новом ----------
+let seenMap = null, audioCtx = null;
+document.addEventListener('pointerdown', () => {
+  try { if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)(); if (audioCtx.state === 'suspended') audioCtx.resume(); } catch { /* нет звука */ }
+  try { if (window.Notification && Notification.permission === 'default') Notification.requestPermission(); } catch { /* нет уведомлений */ }
+}, { once: false, passive: true });
+function beep() {
+  try {
+    if (!audioCtx) return;
+    const t = audioCtx.currentTime;
+    [880, 1320].forEach((f, i) => { const o = audioCtx.createOscillator(); const g = audioCtx.createGain(); o.frequency.value = f; o.type = 'sine';
+      g.gain.setValueAtTime(0.0001, t + i * 0.16); g.gain.exponentialRampToValueAtTime(0.25, t + i * 0.16 + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + i * 0.16 + 0.15);
+      o.connect(g).connect(audioCtx.destination); o.start(t + i * 0.16); o.stop(t + i * 0.16 + 0.16); });
+  } catch { /* ignore */ }
+}
+function notifyMgr(title, body, id) {
+  beep(); toast(title + ': ' + body);
+  try { if (window.Notification && Notification.permission === 'granted' && (document.hidden || selId !== id)) { const n = new Notification(title, { body, tag: id }); n.onclick = () => { window.focus(); if (amode !== 'req') setAmode('req'); openAreq(id); n.close(); }; } } catch { /* ignore */ }
+}
+function detectNews() {
+  if (!userReady || !all.length) return;
+  const next = {};
+  for (const r of all) {
+    const m = lastTalk(r);
+    next[r.id] = { c: m && m.from === 'client' ? m.at : 0, acc: r.decision === 'accept' ? 1 : 0, n: r.status === 'new' ? 1 : 0 };
+  }
+  if (seenMap) {
+    for (const r of all) {
+      const a = seenMap[r.id], b = next[r.id];
+      const name = r.service === 'support' ? 'Поддержка · ' + (r.clientName || 'клиент') : '№' + r.num + ' · ' + (r.clientName || 'клиент');
+      if (!a) { if (r.service !== 'support') notifyMgr('Новая заявка', name + ' — ' + (r.title || ''), r.id); continue; }
+      if (b.acc && !a.acc) notifyMgr('Клиент оформил заказ', name, r.id);
+      else if (b.c && b.c > a.c && needsReply(r)) notifyMgr('Новое сообщение', name, r.id);
+      else if (b.c && b.c > a.c && r.handoff) notifyMgr('Нужен менеджер', name, r.id);
+    }
+  }
+  seenMap = next;
+}
+
+// ---------- список заявок ----------
+function renderAdminList() {
+  renderChatCount();
+  if (amode === 'clients') return renderClientList();
+  if (amode === 'chats') return renderChatList();
+  const box = $('#adminList');
+  const hit = (r) => !aq || norm([r.num, r.title, r.clientName, r.clientPhone, r.clientCompany, r.city, r.category, r.clientCode || clientCode(r.ownerId)].join(' ')).includes(aq);
+  const list = all.filter((r) => inFilter(r, afilter) && hit(r)).sort((a, b) => {
+    if (afilter === 'reply') return (lastTalk(a)?.at || 0) - (lastTalk(b)?.at || 0);
+    return (b.updatedAt || b.createdAt) - (a.updatedAt || a.createdAt);
+  });
+  if (!list.length) { box.replaceChildren(h('div', { class: 'empty' }, h('h2', { style: 'font-size:18px', text: aq ? 'Ничего не нашлось' : 'Здесь пусто' }), h('p', { class: 'muted', style: 'margin:0', text: aq ? 'Проверьте запрос или выберите «Ещё ▾ → Все».' : 'Новые заявки появятся сразу, без обновления страницы.' }))); return; }
+  box.replaceChildren(...list.map((r) => {
+    const reply = needsReply(r), wait = awaitingPay(r) || deliveryDue(r), paid = fullyPaid(r) && !wait;
+    const badge = reply ? h('span', { class: 'tag s-red', text: 'Нужен ответ' })
+      : wait ? h('span', { class: 'tag t-orange', text: deliveryDue(r) ? 'Оплата доставки' : 'Ждёт оплаты' })
+      : paid ? h('span', { class: 'tag t-green', text: r.status === 'done' ? 'Завершена' : 'Оплачено' })
+      : r.service === 'support' ? h('span', { class: 'tag s-gray', text: 'Поддержка' })
+      : kpViewed(r) && ['kp', 'waiting'].includes(r.status) ? h('span', { class: 'tag s-blue', text: 'КП просмотрено' })
+      : statusTag(r.status);
+    const lt = lastTalk(r);
+    const line3 = reply && lt ? h('small', { class: 'urgent', text: (r.handoff ? 'ИИ передал менеджеру · ' : '') + 'Клиент ждёт ' + fmtWait(lt.at) })
+      : wait ? h('small', { text: deliveryDue(r) ? 'Товар в Алматы, доставка не оплачена' : 'Оформил ' + fmtAgo(r.acceptedAt || r.updatedAt) })
+      : ['kp', 'waiting'].includes(r.status) ? h('small', { text: 'КП ' + fmtAgo(r.kp?.sentAt) + (kpViewed(r) ? ' · клиент открыл' : ' · ещё не открыл') })
+      : r.status === 'work' && r.stage ? h('small', { text: 'Этап: ' + (STAGE_LABEL[r.stage] || r.stage) + ' · ' + fmtAgo(r.stageAt || r.updatedAt) })
+      : h('small', { text: (r.status === 'new' ? 'Создана ' : 'Обновлена ') + fmtAgo(r.status === 'new' ? r.createdAt : r.updatedAt) });
+    const cls = 'ar zr' + (r.id === selId ? ' sel' : '') + (paid ? ' paid' : '') + (wait ? ' wait' : '');
+    return h('button', { class: cls, type: 'button', 'aria-current': r.id === selId ? 'true' : null, onclick: () => openAreq(r.id) },
+      h('span', { class: 'm' },
+        h('span', { class: 'zr-top' }, h('b', { text: r.service === 'support' ? 'Поддержка · ' + (r.clientName || '') : r.title }), badge),
+        h('small', { text: (r.service === 'support' ? (r.clientCode || '') : '№' + r.num + ' · ' + (SERVICES[r.service]?.name || 'Найти и купить')) + ' · ' + (r.clientName || '') + (r.city || r.clientCity ? ' · ' + (r.city || r.clientCity) : '') }),
+        line3,
+        r.callback?.requested && !r.callback?.done ? h('span', { class: 'flag', text: 'Просит перезвонить' }) : null));
+  }));
+}
+
+// ---------- шапка заявки: этапы и «следующий шаг» ----------
+const STAGE_SHORT = { paid: 'Оплатил', bought: 'Выкуплен', wait_china: 'Ждём груз', china: 'Склад Китай', transit: 'В пути', almaty: 'Алматы', delivery_paid: 'Доставка оплачена', sent_city: 'Отправлен в город', delivered: 'Выдан', received: 'Получил' };
+function stepsOf(r) {
+  const kind = SVC_KIND(r);
+  const s = [{ k: 's:new', l: 'Заявка' }];
+  if (r.approvals?.length || r.status === 'approval') s.push({ k: 's:approval', l: 'Согласование' });
+  s.push({ k: 's:kp', l: kind === 'cargo' ? 'Расчёт' : 'КП' });
+  s.push({ k: 's:acc', l: kind === 'cargo' ? 'Подтвердил' : kind === 'translate' ? 'Записался' : 'Оформил' });
+  if (kind === 'translate') { s.push({ k: 'paid', l: 'Оплатил' }); s.push({ k: 'received', l: 'Готово' }); return s; }
+  for (const k of stagesFor(r)) s.push({ k, l: STAGE_SHORT[k] || STAGE_LABEL[k] });
+  s.push({ k: 'received', l: 'Получил' });
+  return s;
+}
+function stepIndex(r, steps) {
+  const at = (k) => steps.findIndex((x) => x.k === k);
+  if (r.status === 'new') return 0;
+  if (r.status === 'approval') return at('s:approval');
+  if (['kp', 'waiting', 'delivery', 'declined'].includes(r.status)) return at('s:kp');
+  if (r.status === 'rejected') return -1;
+  if (r.stage === 'received' || r.receivedAt) return steps.length - 1;
+  if (r.stage && at(r.stage) >= 0) return at(r.stage);
+  if (r.status === 'done') return steps.length - 1;
+  if (goodsPaid(r) && at('paid') >= 0 && SVC_KIND(r) !== 'cargo') return at('paid');
+  return at('s:acc');
+}
+let atab = {};
+function nextStep(r) {
+  const kind = SVC_KIND(r);
+  if (r.status === 'new') return { t: kind === 'cargo' ? 'Отправить расчёт доставки' : 'Отправить КП', go: () => setTab(r, 'kp') };
+  if (r.status === 'approval') return r.approvalPick || r.approvalNone ? { t: 'Клиент ответил — отправить КП', go: () => setTab(r, 'kp') } : { t: 'Ждём выбора клиента', off: true };
+  if (r.status === 'kp' || r.status === 'waiting') return { t: kpViewed(r) ? 'Клиент смотрит КП — ждём ответа' : 'Ждём, пока клиент откроет КП', off: true };
+  if (r.status === 'delivery') return { t: 'Посчитать доставку', go: () => setTab(r, 'kp') };
+  if (r.status === 'declined') return { t: 'Клиент отказался', off: true };
+  if (r.status === 'rejected') return { t: 'Заявка закрыта', off: true };
+  if (r.status === 'done') return { t: r.receivedAt || r.stage === 'received' ? 'Заказ получен клиентом' : 'Заказ завершён', off: true };
+  if (r.status !== 'work') return { t: '—', off: true };
+  if (!goodsPaid(r)) return { t: 'Клиент оплатил…', pay: true, go: () => payDialog(r, ['goods']) };
+  if (kind === 'translate') return { t: 'Завершить заказ', go: () => setStatusOrStage(r, 'stage:delivered') };
+  const list = stagesFor(r);
+  const cur = list.indexOf(r.stage);
+  const nx = list.slice(cur + 1).find((k) => k !== 'paid');
+  if (!nx) return { t: 'Ждём, пока клиент нажмёт «Получил заказ»', off: true };
+  if (nx === 'delivery_paid') return { t: 'Клиент оплатил доставку…', pay: true, go: () => payDialog(r, ['china']) };
+  if (nx === 'sent_city') return { t: 'Отправить в ' + (r.delivery?.city || 'город') + ' (данные машины)', go: () => { dispatchOpen = true; setTab(r, 'dlv'); } };
+  return { t: 'Следующий этап: «' + STAGE_LABEL[nx] + '»', go: () => setStatusOrStage(r, 'stage:' + nx) };
+}
+function setTab(r, t) { atab[r.id] = t; renderAreq(false); }
+function defTab(r) {
+  if (atab[r.id]) return atab[r.id];
+  if (['new', 'approval', 'delivery', 'kp', 'waiting'].includes(r.status)) return 'kp';
+  if (r.status === 'work') return awaitingPay(r) || deliveryDue(r) ? 'pay' : 'dlv';
+  return 'info';
+}
+function headCard(r) {
+  const steps = stepsOf(r), cur = stepIndex(r, steps), ns = nextStep(r);
+  const tel = String(r.clientPhone || '').replace(/[^\d+]/g, '');
+  const dates = ['Создана ' + fmtTime(r.createdAt)];
+  if (r.kp?.sentAt) dates.push('КП ' + fmtTime(r.kp.sentAt));
+  if (r.acceptedAt) dates.push('Оформил ' + fmtTime(r.acceptedAt));
+  if (pays(r).goods?.at) dates.push('Оплатил ' + fmtTime(pays(r).goods.at));
+  const lt = lastTalk(r);
+  if (lt?.from === 'manager') dates.push('Последний ответ клиенту ' + fmtAgo(lt.at));
+  const paidTag = fullyPaid(r) ? h('span', { class: 'tag t-green', text: 'Оплачено' }) : awaitingPay(r) ? h('span', { class: 'tag t-orange', text: 'Ждёт оплаты' }) : null;
+  return h('section', { class: 'card zhead' + (fullyPaid(r) ? ' paid' : awaitingPay(r) ? ' wait' : '') },
+    h('div', { class: 'zhead-row' },
+      h('div', { class: 'zhead-l' },
+        h('div', { style: 'display:flex;gap:8px;align-items:center;flex-wrap:wrap' }, statusTag(r.status), paidTag, needsReply(r) ? h('span', { class: 'tag s-red', text: 'Нужен ответ' }) : null),
+        h('div', { class: 'zsub', text: [r.clientName, r.clientCode || clientCode(r.ownerId), r.clientPhone, r.city || r.clientCity].filter(Boolean).join(' · ') }),
+        h('div', { class: 'zdates', text: dates.join(' · ') })),
+      h('div', { class: 'zhead-r' },
+        chatBack && chatBack !== r.id ? h('button', { class: 'pill', type: 'button', onclick: () => openAreq(chatBack) }, '← К чату поддержки') : null,
+        tel ? h('a', { class: 'pill', href: 'tel:' + tel, style: 'text-decoration:none;color:var(--fg)' }, '📞 Позвонить') : null,
+        h('button', { class: 'btn ' + (ns.pay ? 'btn-green' : 'btn-accent'), type: 'button', disabled: !!ns.off, onclick: ns.go || null }, ns.t))),
+    r.status === 'rejected' ? null : h('ol', { class: 'zsteps', 'aria-label': 'Этапы заказа', style: 'grid-template-columns:repeat(' + steps.length + ',minmax(0,1fr))' },
+      steps.map((s, i) => h('li', { class: i < cur ? 'done' : i === cur ? 'cur' : '' }, h('span', { class: 'bar' }), h('span', { class: 'lbl', text: s.l })))));
+}
+
+// ---------- чат: как видит клиент ----------
+function tick(r, m) {
+  if (m.from !== 'manager' && m.from !== 'ai') return null;
+  const read = (r.clientReadAt || 0) >= m.at, seen = read || (r.clientSeenAt || 0) >= m.at;
+  return h('span', { class: 'ztick' + (read ? ' read' : ''), title: read ? 'Прочитано' : seen ? 'Доставлено' : 'Отправлено', text: seen ? '✓✓' : '✓' });
+}
+function clientTick(r, m) {
+  if (m.from !== 'client') return null;
+  const read = aiActive(r) || (r.staffReadAt || 0) >= m.at;
+  return h('span', { class: 'ztick' + (read ? ' read' : ''), text: '✓✓' });
+}
+function delBtn(r, m) {
+  if (m.deleted || (m.from === 'client' && !['photo', 'media', undefined].includes(m.kind) && m.kind) || m.kind === 'stage' || m.kind === 'received') return null;
+  return h('button', { class: 'zdel', type: 'button', 'aria-label': 'Удалить', title: 'Удалить', onclick: (e) => { e.stopPropagation(); delItem(r, m); } },
+    h('svg', { viewBox: '0 0 24 24', width: '16', height: '16', fill: 'none', stroke: 'currentColor', 'stroke-width': '1.9', 'aria-hidden': 'true' }));
+}
+function trashSvg() { const t = document.createElement('template'); t.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6"/></svg>'; return t.content.firstChild; }
+function withDel(r, m, el) {
+  const b = delBtn(r, m); if (!b) return el;
+  b.replaceChildren(trashSvg());
+  el.classList.add('zhasdel'); el.append(b); return el;
+}
+function mediaUrls(m) {
+  const out = [];
+  const add = (list) => (list || []).forEach((x) => x?.url && out.push(x.url));
+  add(m.media); (m.variants || []).forEach((v) => add(v.media)); add(m.dispatch?.media);
+  return out;
+}
+async function delItem(r, m) {
+  const what = m.kind === 'kp' ? 'КП' : m.kind === 'variants' ? 'варианты на согласование' : m.kind === 'dispatch' ? 'данные машины' : m.kind === 'media' || m.kind === 'photo' ? 'файл' : 'сообщение';
+  if (!confirm('Удалить ' + what + '? У клиента вместо него будет «Сообщение удалено».')) return;
+  try {
+    const { data, error } = await window.SB.rpc('delete_thread_item', { req_id: r.id, item_at: m.at });
+    if (error) throw error;
+    const paths = mediaUrls(data || m).map((u) => decodeURIComponent(u.split('/object/public/media/')[1] || '')).filter(Boolean);
+    if (paths.length) await window.SB.storage.from('media').remove(paths);
+    toast('Удалено');
+    await refreshA();
+  } catch (e) { console.error(e); toast('Не получилось удалить. Попробуйте ещё раз.'); }
+}
+function bubble(r, m, kids) {
+  const who = m.from === 'client' ? (r.clientName || 'Клиент') : m.from === 'ai' ? 'ИИ-помощник' : 'Менеджер';
+  return withDel(r, m, h('div', { class: 'zb ' + (m.from === 'client' ? 'cl' : m.from === 'ai' ? 'ai' : 'mg') },
+    h('span', { class: 'who', text: who }), kids,
+    h('span', { class: 'zt' }, hhmm(m.at), ' ', tick(r, m), clientTick(r, m))));
+}
+function yuanSmall(v, rate) {
+  const cny = num(v.cny), qty = num(v.qty) || 1, ship = num(v.chinaShip);
+  if (!cny || !rate) return '';
+  let b = cny + ' ¥' + (qty !== 1 ? ' × ' + qty : '');
+  if (ship) b = '(' + b + ' + ' + ship + ' ¥ по Китаю)';
+  return '= ' + b + ' × ' + rate + ' ₸';
+}
+function thumbOf(list) { const p = (list || []).find((x) => x.type === 'photo'); return p ? h('img', { src: p.url, alt: '', class: 'zthumb' }) : h('span', { class: 'zthumb ph', 'aria-hidden': 'true' }); }
+function kpMirror(r, m, isLast) {
+  const k = isLast ? (r.kp || {}) : {};
+  const kind = k.type || SVC_KIND(r);
+  const vs = k.variants?.length ? k.variants : (kind === 'cargo' ? [] : [{ name: k.product || r.title, price: k.price }]);
+  const logi = num(r.logiExact) || num(k.logi?.cost);
+  const ch = r.chosenVariant != null ? Number(r.chosenVariant) : null;
+  const total = kind === 'cargo' ? logi : (num(vs[ch ?? 0]?.price) && logi ? num(vs[ch ?? 0]?.price) + logi : 0);
+  const foot = r.status === 'declined' && r.decision === 'decline' ? h('div', { class: 'zfoot red', text: '✕ Клиент отказался' + (r.rejectReason ? ': ' + r.rejectReason : '') })
+    : ['work', 'done'].includes(r.status) && r.decision === 'accept' ? h('div', { class: 'zfoot green', text: '✓ Клиент оформил' + (vs.length > 1 && ch != null ? ' Вариант ' + (ch + 1) : '') + (r.acceptedAt ? ' · ' + hhmm(r.acceptedAt) : '') })
+    : h('div', { class: 'zfoot', text: kpViewed(r) ? 'Клиент открыл КП · ждём ответа' : 'Клиент ещё не открыл КП' });
+  if (!isLast) return withDel(r, m, h('div', { class: 'zsys', text: 'КП от ' + fmtTime(m.at) + ' (заменено новым)' }));
+  return withDel(r, m, h('div', { class: 'zcard kp' },
+    h('div', { class: 'zc-h' }, h('b', { text: (kind === 'cargo' ? 'Расчёт доставки' : 'КП') + ' №' + r.num }), h('span', { class: 'zt', text: fmtTime(m.at) })),
+    vs.map((v, i) => h('div', { class: 'zv' + (ch === i && r.decision === 'accept' ? ' on' : '') },
+      thumbOf(v.media),
+      h('div', { class: 'zv-m' }, h('span', { class: 'zv-n', text: (vs.length > 1 ? 'Вариант ' + (i + 1) + ' · ' : '') + (v.name || '') }),
+        yuanSmall(v, num(k.rate)) ? h('small', { text: yuanSmall(v, num(k.rate)) }) : v.term ? h('small', { text: v.term }) : null),
+      h('b', { text: num(v.price) ? money(num(v.price)) : '' }))),
+    kind !== 'translate' ? h('div', { class: 'zrow2' }, h('span', { text: 'Доставка до Алматы' + (k.logi ? ' (' + (SHIP_NAMES[k.logi.method] || '') + ')' : '') + (r.logiExact ? ', точная' : '') }), h('span', { text: logi ? (r.logiExact ? '' : '≈ ') + money(logi) : 'не указана' })) : null,
+    total && (vs.length < 2 || ch != null) ? h('div', { class: 'zrow2 tot' }, h('span', { text: 'Итого' }), h('span', { text: (r.logiExact ? '' : '≈ ') + money(total) })) : null,
+    foot));
+}
+function variantsMirror(r, m) {
+  const vs = m.variants || [];
+  return withDel(r, m, h('div', { class: 'zcard' },
+    h('div', { class: 'zc-h' }, h('b', { text: vs.length > 1 ? 'Варианты на согласование' : 'Вариант на согласование' }), h('span', { class: 'zt', text: fmtTime(m.at) })),
+    vs.map((v, i) => h('div', { class: 'zv' }, thumbOf(v.media), h('div', { class: 'zv-m' }, h('span', { class: 'zv-n', text: (vs.length > 1 ? 'Вариант ' + (i + 1) + ' · ' : '') + (v.name || '') }), v.desc ? h('small', { text: v.desc }) : null))),
+    r.approvalNone ? h('div', { class: 'zfoot red', text: '✕ Клиенту ничего не подошло' + (typeof r.approvalNone === 'string' ? ': ' + r.approvalNone : '') })
+      : r.approvalPick ? h('div', { class: 'zfoot green', text: '✓ Клиент выбрал: ' + r.approvalPick }) : h('div', { class: 'zfoot', text: 'Ждём выбора клиента' })));
+}
+function mirrorItem(r, m, lastKp, lastDisp) {
+  if (m.deleted) return h('div', { class: 'zdeleted ' + (m.from === 'client' ? 'cl' : 'mg'), text: (m.from === 'client' ? 'Клиент удалил сообщение' : 'Сообщение удалено') + ' · ' + hhmm(m.deletedAt || m.at) });
+  if (m.kind === 'kp') return kpMirror(r, m, m === lastKp);
+  if (m.kind === 'variants') return variantsMirror(r, m);
+  if (m.kind === 'dispatch') { const d = m.dispatch || {}; return withDel(r, m, h('div', { class: 'zcard ink' + (m === lastDisp ? '' : ' old') },
+    h('div', { class: 'zc-h' }, h('b', { text: '🚕 Отправлено в ' + (r.delivery?.city || 'город') }), h('span', { class: 'zt', text: fmtTime(m.at) })),
+    h('div', { class: 'zsmall', text: [d.method, d.driver, d.phone, [d.car, d.color].filter(Boolean).join(', '), d.plate, d.eta && 'приедет ' + d.eta, d.comment].filter(Boolean).join(' · ') || 'Без данных' }),
+    mediaView(d.media, true))); }
+  if (m.kind === 'city') return withDel(r, m, h('div', { class: 'zcard blue' }, h('b', { text: 'Доставка Алматы → ' + (r.delivery?.city || 'город') + (m.cost ? ': ' + money(m.cost) : '') }), h('span', { class: 'zsmall', text: m.prepaid ? 'Оплачено заранее' : 'Оплата при получении' })));
+  if (m.kind === 'exact') return withDel(r, m, h('div', { class: 'zcard exact' },
+    h('div', { class: 'zc-h' }, h('b', { text: '📦 Товар на складе' }), h('span', { class: 'zt', text: fmtTime(m.at) })),
+    h('div', { class: 'zrow2' }, h('span', { text: 'Точная доставка до Алматы' }), h('b', { text: money(m.cost || 0) })),
+    m.weight || m.volume ? h('div', { class: 'zsmall', text: [m.weight && m.weight + ' кг', m.volume && m.volume + ' м³'].filter(Boolean).join(' · ') }) : null,
+    m.total ? h('div', { class: 'zrow2 tot' }, h('span', { text: 'Итого к оплате' }), h('span', { text: money(m.total) })) : null));
+  if (m.kind === 'payment') return withDel(r, m, h('div', { class: 'zpay', text: '✓ ' + (m.text || 'Оплата получена') + ' · ' + hhmm(m.at) }));
+  if (m.kind === 'received') return h('div', { class: 'zpay', text: '✓ Клиент подтвердил получение заказа · ' + fmtTime(m.at) });
+  if (m.kind === 'stage') return h('div', { class: 'zsys', text: (STAGE_LABEL[m.stage] || 'Этап') + ' · ' + fmtTime(m.at) });
+  if (m.kind === 'photo') return bubble(r, m, h('img', { src: m.thumb, alt: 'Фото', class: 'zphoto', onclick: () => openPhoto(r.id, { thumb: m.thumb, fileId: m.fileId }) }));
+  if (m.kind === 'media') return bubble(r, m, [mediaView(m.media), m.text ? h('span', { text: m.text }) : null]);
+  if (m.from === 'client' || m.from === 'manager' || m.from === 'ai') return bubble(r, m, h('span', { class: 'zx', text: m.text || '' }));
+  return h('div', { class: 'zsys', text: personify(m.text) + ' · ' + hhmm(m.at) });
+}
+let chatPinned = {};
+function chatMirror(r) {
+  const th = r.thread || [];
+  let lastKp = null, lastDisp = null; th.forEach((m) => { if (m.kind === 'kp' && !m.deleted) lastKp = m; if (m.kind === 'dispatch' && !m.deleted) lastDisp = m; });
+  const fileIn = h('input', { type: 'file', multiple: true, hidden: true, accept: 'image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx', onchange: (e) => { const fs = [...e.target.files]; e.target.value = ''; sendMediaFiles(fs, r.id).then(refreshA); } });
+  const recBtn = h('button', { class: 'cbtn', type: 'button', 'aria-label': 'Голосовое сообщение', title: 'Голосовое сообщение', onclick: (e) => toggleRecord(e.currentTarget, r.id) }, '🎤');
+  const msgs = h('div', { class: 'zmsgs', id: 'zmsgs', onscroll: (e) => { const el = e.currentTarget; chatPinned[r.id] = el.scrollHeight - el.scrollTop - el.clientHeight < 60; } }, th.map((m) => mirrorItem(r, m, lastKp, lastDisp)));
+  const ai = aiActive(r);
+  return h('section', { class: 'card zchat', 'aria-label': 'Чат с клиентом' },
+    h('div', { class: 'zchat-h' }, h('b', { text: r.service === 'support' ? 'Чат поддержки' : 'Чат — как видит клиент' }),
+      r.service === 'support' || !r.kp ? h('span', { class: 'zsmall', text: 'Отвечает менеджер' })
+        : h('span', { class: 'zsmall' }, 'Ведёт: ' + (ai ? 'ИИ-помощник · ' : 'менеджер · '),
+          h('button', { class: 'linkbtn', type: 'button', onclick: () => patchA({ mode: ai ? 'manager' : 'ai', handoff: false }) }, ai ? 'переключить на себя' : 'включить ИИ'))),
+    msgs,
+    h('div', { class: 'cbar', style: 'box-shadow:none;border:1.5px solid var(--line);margin:0 12px 12px' },
+      h('button', { class: 'cbtn', type: 'button', 'aria-label': 'Фото, видео, документы', title: 'Фото, видео, документы', onclick: () => fileIn.click() }, '📎'),
+      recBtn,
+      h('textarea', { id: 'mgrMsg', rows: '1', placeholder: 'Ответ клиенту', 'aria-label': 'Ответ клиенту', onkeydown: (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMgr(); } } }),
+      h('button', { class: 'cbtn send', type: 'button', 'aria-label': 'Отправить', onclick: sendMgr }, svg('send'))),
+    fileIn);
+}
+async function sendMgr() {
+  const ta = $('#mgrMsg'); const text = ta.value.trim(); if (!text) return;
+  ta.value = '';
+  const ok = await patchA({ staffReadAt: Date.now() + 1000, handoff: false }, { from: 'manager', text, at: Date.now() });
+  if (!ok) ta.value = text;
+}
+
+// ---------- вкладка «Оплаты» ----------
+function payTab(r) {
+  const p = pays(r), keys = payList(r);
+  if (!['work', 'done'].includes(r.status)) return h('div', { class: 'zempty', text: 'Оплаты появятся, когда клиент оформит заказ.' });
+  let paidSum = 0, left = 0;
+  const rows = keys.map((key) => {
+    const amt = num(p[key]?.amount) || payAmount(r, key); const ok = !!p[key]?.paid;
+    if (ok) paidSum += amt; else left += amt;
+    const label = key === 'city' ? 'Доставка Алматы → ' + (r.delivery?.city || 'город') : key === 'goods' && SVC_KIND(r) === 'translate' ? 'Услуга переводчика' : PAY_LABEL[key];
+    return h('div', { class: 'zpayrow ' + (ok ? 'ok' : 'no') },
+      h('div', { class: 'zrow2' }, h('b', { text: label }), h('b', { text: amt ? (key === 'china' && !r.logiExact && !ok ? '≈ ' : '') + money(amt) : '—' })),
+      h('span', { class: 'zsmall', text: ok ? '✓ Оплачено' + (p[key].at ? ' · ' + fmtTime(p[key].at) : '') + (p[key].method ? ' · ' + p[key].method : '') + (p[key].receipt ? ' · чек приложен' : '')
+        : key === 'china' && !r.logiExact ? 'Не оплачено · точную сумму укажете после склада (вкладка КП)' : 'Не оплачено' }),
+      p[key]?.receipt ? h('a', { href: p[key].receipt, target: '_blank', rel: 'noopener', class: 'zsmall' }, 'Открыть чек') : null,
+      ok ? h('button', { class: 'linkbtn', type: 'button', onclick: () => unpay(r, key) }, 'Снять отметку')
+        : h('button', { class: 'pill', type: 'button', onclick: () => payDialog(r, [key]) }, 'Отметить оплату'));
+  });
+  return h('div', { class: 'ztab-body' }, rows,
+    h('div', { class: 'zrow2 zsmall' }, h('span', {}, 'Оплачено: ', h('b', { class: 'gtxt', text: money(paidSum) })), h('span', {}, 'Осталось: ', h('b', { class: 'otxt', text: left ? '≈ ' + money(left) : '0 ₸' }))),
+    keys.some((k) => !p[k]?.paid) ? h('button', { class: 'btn btn-green', type: 'button', onclick: () => payDialog(r, keys.filter((k) => !p[k]?.paid)) }, 'Клиент оплатил…') : h('div', { class: 'zpay', text: '✓ Всё оплачено' }));
+}
+async function unpay(r, key) {
+  if (!confirm('Снять отметку об оплате?')) return;
+  const payments = { ...(r.payments || {}) }; payments[key] = { paid: false };
+  const extra = key === 'china' ? { deliveryPrepaid: false } : key === 'city' ? { cityDelivery: { ...(r.cityDelivery || {}), prepaid: false } } : {};
+  await patchA({ payments, ...extra });
+}
+function payDialog(r, preset) {
+  const keys = payList(r), p = pays(r);
+  const dlg = h('dialog', { class: 'zdlg' });
+  const checks = keys.map((key) => {
+    const done = !!p[key]?.paid;
+    return h('label', { class: 'check', style: 'align-items:center' + (done ? ';opacity:.5' : '') },
+      h('input', { type: 'checkbox', value: key, checked: !done && preset.includes(key), disabled: done }),
+      h('span', { text: (key === 'city' ? 'Доставка Алматы → ' + (r.delivery?.city || 'город') : PAY_LABEL[key]) + (payAmount(r, key) ? ' — ' + money(payAmount(r, key)) : '') + (done ? ' (уже оплачено)' : '') }));
+  });
+  const amt = h('input', { class: 'input', inputmode: 'decimal', placeholder: 'Сумма, ₸ (необязательно)' });
+  const method = h('select', { class: 'input' }, ['Kaspi', 'Перевод на карту', 'Наличные', 'Счёт (ТОО/ИП)', 'Другое'].map((t) => h('option', { text: t })));
+  const file = h('input', { class: 'input', type: 'file', accept: 'image/*,.pdf' });
+  const save = h('button', { class: 'btn btn-green', type: 'button' }, 'Сохранить оплату');
+  save.onclick = async () => {
+    const sel = checks.map((c) => c.querySelector('input')).filter((i) => i.checked).map((i) => i.value);
+    if (!sel.length) { toast('Отметьте, что оплачено'); return; }
+    save.disabled = true; save.textContent = 'Сохраняем…';
+    try {
+      let receipt = null;
+      if (file.files[0]) receipt = (await zkUpload(file.files[0], r.id)).url;
+      const at = Date.now();
+      const payments = { ...(r.payments || {}) };
+      sel.forEach((k) => { payments[k] = { paid: true, at, method: method.value, amount: sel.length === 1 && num(amt.value) ? num(amt.value) : payAmount(r, k), receipt }; });
+      const patch = { payments };
+      if (sel.includes('china')) patch.deliveryPrepaid = true;
+      if (sel.includes('city')) patch.cityDelivery = { ...(r.cityDelivery || {}), prepaid: true };
+      const kind = SVC_KIND(r);
+      if (sel.includes('goods') && kind !== 'cargo' && (!r.stage || r.stage === 'paid')) { patch.stage = 'paid'; patch.stageAt = at; patch.status = 'work'; }
+      if (sel.includes('china') && r.stage === 'almaty') { patch.stage = 'delivery_paid'; patch.stageAt = at; }
+      const total = sel.reduce((s, k) => s + (payments[k].amount || 0), 0);
+      const text = 'Оплата получена: ' + sel.map((k) => (k === 'goods' ? (kind === 'translate' ? 'услуга' : 'товар') : k === 'china' ? 'доставка до Алматы' : 'доставка до ' + (r.delivery?.city || 'города'))).join(', ') + (total ? ' — ' + money(total) : '');
+      dlg.close(); dlg.remove();
+      await patchA(patch, { from: 'sys', kind: 'payment', keys: sel, amount: total, text, at });
+      toast('Оплата отмечена. Клиенту ушло уведомление');
+    } catch (e) { console.error(e); toast('Не сохранилось. Попробуйте ещё раз.'); save.disabled = false; save.textContent = 'Сохранить оплату'; }
+  };
+  dlg.append(h('div', { style: 'display:flex;flex-direction:column;gap:12px' },
+    h('h2', { style: 'font-size:19px', text: 'Клиент оплатил' }),
+    h('div', { class: 'zsmall', text: 'Что оплачено:' }), checks,
+    h('div', { class: 'field' }, h('label', { text: 'Сумма (если отличается)' }), amt),
+    h('div', { class: 'field' }, h('label', { text: 'Способ' }), method),
+    h('div', { class: 'field' }, h('label', { text: 'Фото чека (необязательно)' }), file),
+    h('div', { style: 'display:flex;gap:8px;justify-content:flex-end' }, h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => { dlg.close(); dlg.remove(); } }, 'Отмена'), save)));
+  document.body.append(dlg); dlg.showModal();
+}
+
+// ---------- вкладка «Доставка» ----------
+function dlvTab(r) {
+  return h('div', { class: 'ztab-body' },
+    clientChoiceNote(r),
+    statusSelect(r),
+    cityBlock(r) || (r.delivery?.method === 'door' ? h('div', { class: 'zsmall', text: 'Доставка в ' + (r.delivery.city || 'город') + ' откроется, когда клиент оформит заказ.' }) : h('div', { class: 'zsmall', text: r.delivery ? 'Клиент заберёт сам со склада в Алматы.' : 'Способ получения не указан.' })));
+}
+function dispatchForm(r) {
+  if (!dispatchOpen && r.dispatch) return h('div', { class: 'zpay', style: 'display:flex;justify-content:space-between;align-items:center;gap:8px' },
+    h('span', { text: '✓ Данные машины отправлены клиенту · ' + fmtTime(r.dispatch.at) }), h('button', { class: 'linkbtn', type: 'button', onclick: () => { dispatchOpen = true; renderAreq(false); } }, 'Изменить'));
+  if (!dispatchOpen) return h('button', { class: 'btn btn-ink', type: 'button', onclick: () => { dispatchOpen = true; renderAreq(false); } }, 'Отправили клиенту (данные машины)');
+  const d = r.dispatch || {};
+  const f = (id, label, val, ph) => h('div', { class: 'field' }, h('label', { for: id, text: label }), h('input', { class: 'input', id, value: val || '', placeholder: ph || '' }));
+  return h('div', { id: 'dispatchBox', style: 'display:flex;flex-direction:column;gap:10px;border-top:1px solid var(--line);padding-top:10px' },
+    h('b', { text: 'Данные отправки (все поля необязательные)' }),
+    h('div', { class: 'field' }, h('label', { for: 'dMethod', text: 'Как отправили' }),
+      h('select', { class: 'input', id: 'dMethod' }, ['Такси', 'Транспортная компания', 'Автобус', 'Другое'].map((t) => h('option', { value: t, text: t, selected: d.method === t })))),
+    h('div', { class: 'cg2' }, f('dDriver', 'Водитель', d.driver, 'Имя'), f('dPhone', 'Телефон водителя', d.phone, '+7 7__ ___ __ __')),
+    h('div', { class: 'cg2' }, f('dCar', 'Марка машины', d.car, 'Toyota Camry'), f('dColor', 'Цвет', d.color, 'Белый')),
+    h('div', { class: 'cg2' }, f('dPlate', 'Госномер', d.plate, '123 ABC 02'), f('dEta', 'Примерно приедет', d.eta, 'Завтра к 18:00')),
+    f('dComment', 'Комментарий', d.comment, 'Например: накладная №…'),
+    h('div', { class: 'field' }, h('label', { for: 'dFiles', text: 'Фото товара и машины' }), h('input', { class: 'input', id: 'dFiles', type: 'file', accept: 'image/*', multiple: true })),
+    h('div', { style: 'display:flex;gap:8px' },
+      h('button', { class: 'btn btn-accent', type: 'button', style: 'flex:1', onclick: (e) => sendDispatch(e.currentTarget) }, r.dispatch ? 'Отправить обновлённые данные' : 'Отправить клиенту'),
+      h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => { dispatchOpen = false; renderAreq(false); } }, 'Отмена')));
+}
+async function sendDispatch(btn) {
+  const v = (id) => ($('#' + id)?.value || '').trim();
+  if (btn) { btn.disabled = true; btn.textContent = 'Отправляем…'; }
+  try {
+    const files = [...($('#dFiles')?.files || [])];
+    const media = [];
+    for (const f of files.slice(0, 6)) media.push(await zkUpload(f, areq.id));
+    const d = { method: v('dMethod'), driver: v('dDriver'), phone: v('dPhone'), car: v('dCar'), color: v('dColor'), plate: v('dPlate'), eta: v('dEta'), comment: v('dComment'), media: media.length ? media : (areq.dispatch?.media || []), at: Date.now() };
+    dispatchOpen = false;
+    const ok = await patchA({ dispatch: d, stage: 'sent_city', stageAt: Date.now(), status: 'work' },
+      { from: 'sys', kind: 'dispatch', dispatch: d, text: 'Товар отправлен в ' + (areq.delivery?.city || 'ваш город') + '.', at: Date.now() });
+    if (ok) toast('Данные отправки отправлены клиенту'); else { dispatchOpen = true; renderAreq(false); }
+  } catch (e) { console.error(e); toast('Не получилось загрузить фото. Попробуйте ещё раз.'); if (btn) { btn.disabled = false; btn.textContent = 'Отправить клиенту'; } }
+}
+
+// ---------- точная доставка после склада ----------
+function exactBox(r) {
+  if (!r.kp || !['work', 'done'].includes(r.status) || SVC_KIND(r) === 'translate') return null;
+  return h('div', { class: 'card', style: 'display:flex;flex-direction:column;gap:10px' },
+    h('h2', { style: 'font-size:17px', text: 'Точная стоимость доставки до Алматы (после склада)' }),
+    h('div', { class: 'cg3' },
+      h('div', { class: 'field' }, h('label', { for: 'kpExact', text: 'Стоимость, ₸' }), h('input', { class: 'input', id: 'kpExact', inputmode: 'decimal', value: r.logiExact || '', placeholder: '20 000' })),
+      h('div', { class: 'field' }, h('label', { for: 'kpW', text: 'Вес, кг' }), h('input', { class: 'input', id: 'kpW', inputmode: 'decimal', placeholder: '12' })),
+      h('div', { class: 'field' }, h('label', { for: 'kpV', text: 'Объём, м³' }), h('input', { class: 'input', id: 'kpV', inputmode: 'decimal', placeholder: '0,08' }))),
+    h('button', { class: 'btn btn-ink', type: 'button', onclick: sendExact }, 'Сообщить клиенту (заметной карточкой)'));
+}
+async function sendExact() {
+  const v = num($('#kpExact').value);
+  if (!v) { toast('Укажите точную стоимость доставки'); return; }
+  const goods = pays(areq).goods?.paid ? 0 : payAmount(areq, 'goods');
+  const weight = num($('#kpW')?.value), volume = num($('#kpV')?.value);
+  await patchA({ logiExact: v }, { from: 'sys', kind: 'exact', cost: v, weight: weight || null, volume: volume || null, total: goods + v,
+    text: 'Товар на складе. Точная стоимость доставки: ' + money(v) + (goods ? '. Итого: ' + money(goods + v) : '') + '.', at: Date.now() });
+  toast('Клиенту отправлена точная стоимость');
+}
+
+// ---------- вкладка «Заявка» ----------
+function infoTab(r) {
+  const hs = history(r.ownerId);
+  return h('div', { class: 'ztab-body' },
+    r.lang && r.lang !== 'ru' ? h('div', { class: 'notice', style: 'background:var(--blue-bg);color:var(--blue-fg)', text: 'Клиент пишет на языке: ' + (LANG_NAMES_RU[r.lang] || r.lang) + '. ТЗ переведено на русский, ИИ отвечает клиенту на его языке.' }) : null,
+    h('div', { class: 'zsmall', text: 'ТЗ от ИИ · ' + (SERVICES[r.service]?.name || 'Найти и купить') }),
+    h('div', { class: 'kv' }, (r.fields || []).map((f) => h('div', {}, h('span', { text: f.label }), h('b', { text: f.value })))),
+    (r.photos?.length || r.photo) ? h('div', { class: 'gal' }, (r.photos?.length ? r.photos : [{ thumb: r.photo }]).map((p) => h('button', { class: 'phb', type: 'button', 'aria-label': 'Открыть фото', onclick: () => openPhoto(r.id, p) }, h('img', { src: p.thumb, alt: 'Фото клиента' })))) : null,
+    h('div', { class: 'kv' },
+      h('div', {}, h('span', { text: 'Получение' }), h('b', { text: r.delivery ? deliveryText(r.delivery) : '—' })),
+      h('div', {}, h('span', { text: 'История клиента' }), h('b', { text: hs.total + ' заявок, ' + hs.orders + ' заказов' }))),
+    h('button', { class: 'pill', type: 'button', style: 'align-self:flex-start', onclick: () => openClient(r.ownerId) }, 'Карточка клиента и все его заявки'),
+    h('div', { class: 'zh' },
+      h('div', { class: 'label', text: 'Для поставщиков · 中文' }),
+      r.zh ? h('p', { lang: 'zh-CN', text: r.zh }) : h('p', { class: 'muted', style: 'font-family:var(--font-body)', text: 'Перевод ещё не сделан.' }),
+      h('div', { style: 'display:flex;gap:8px;flex-wrap:wrap' },
+        h('button', { class: 'pill', type: 'button', id: 'zhBtn', onclick: translateZh }, r.zh ? 'Перевести заново' : 'Перевести на китайский'),
+        r.zh ? h('button', { class: 'pill', type: 'button', onclick: (e) => copyText(r.zh, e.currentTarget) }, 'Скопировать') : null)),
+    r.status === 'declined' && r.kp ? h('div', { class: 'notice', style: 'display:flex;flex-direction:column;gap:8px;background:var(--red-bg);color:var(--red-fg)' },
+      h('span', { text: 'Клиент отказался' + (r.rejectReason ? ': ' + r.rejectReason : '') + '. Договорились по телефону? Верните КП — у клиента снова появятся кнопки.' }),
+      h('button', { class: 'pill', type: 'button', style: 'align-self:flex-start', onclick: () => patchA({ status: 'waiting', decision: null, rejectReason: null }, { from: 'sys', text: 'Менеджер снова открыл КП. Если всё устраивает, нажмите «Оформить заказ».', at: Date.now() }) }, 'Вернуть КП клиенту')) : null,
+    r.callback?.requested && !r.callback?.done ? h('div', { class: 'notice', style: 'display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap' },
+      h('span', { text: 'Перезвонить: ' + (r.clientPhone || '') + (r.callback.reason ? ' · ' + r.callback.reason : '') }),
+      h('button', { class: 'pill', type: 'button', onclick: () => patchA({ callback: { ...r.callback, done: true } }, { from: 'sys', text: 'Менеджер перезвонил.', at: Date.now() }) }, 'Перезвонил')) : null,
+    rejectBlock(r),
+    h('div', { class: 'field' },
+      h('label', { for: 'mgrNote', text: 'Внутренняя пометка (клиент не видит)' }),
+      h('textarea', { class: 'input', id: 'mgrNote', placeholder: 'Например: оптовик, платит быстро' }, r.note || ''),
+      h('button', { class: 'pill', type: 'button', style: 'align-self:flex-start', onclick: () => patchA({ note: $('#mgrNote').value }).then(() => toast('Пометка сохранена')) }, 'Сохранить пометку')));
+}
+
+// ---------- карточка заявки целиком ----------
+function renderAreq(first) {
+  const r = areq; if (!r) return;
+  const body = $('#areqBody');
+  const keep = {};
+  ['mgrMsg', 'mgrNote', 'rejText', 'kpExact', 'kpW', 'kpV', 'cityCost', 'dDriver', 'dPhone', 'dCar', 'dColor', 'dPlate', 'dEta', 'dComment'].forEach((k) => { const el = document.getElementById(k); if (el && !first) keep[k] = el.value; });
+  const prevMsgs = document.getElementById('zmsgs');
+  const prevScroll = prevMsgs && !first ? prevMsgs.scrollTop : null;
+  const keepScrollTop = body.scrollTop;
+  if (first) { dispatchOpen = false; chatPinned[r.id] = true; const lt = lastTalk(r); if (lt?.from === 'client' && (!r.staffReadAt || r.staffReadAt < lt.at)) setTimeout(() => pushThread(r.id, null, { staffReadAt: Date.now() }), 400); }
+  if (r.service === 'support') {
+    $('#areqTtl').textContent = 'Поддержка · ' + (r.clientName || 'Клиент');
+    body.replaceChildren(h('div', { class: 'zrow' }, chatMirror(r), supportInfo(r)));
+  } else {
+    $('#areqTtl').textContent = '№' + r.num + ' · ' + r.title;
+    const tab = defTab(r);
+    const tabs = [['info', 'Заявка'], ['kp', SVC_KIND(r) === 'cargo' ? 'Расчёт' : 'КП'], ['pay', 'Оплаты'], ['dlv', 'Доставка']];
+    const dot = (k) => (k === 'pay' && (awaitingPay(r) || deliveryDue(r))) || (k === 'kp' && ['new', 'delivery'].includes(r.status)) ? h('span', { class: 'zdot', 'aria-hidden': 'true' }) : null;
+    const content = tab === 'kp' ? h('div', { class: 'ztab-body flat' }, kpFormV2(r), exactBox(r)) : tab === 'pay' ? payTab(r) : tab === 'dlv' ? dlvTab(r) : infoTab(r);
+    const side = h('section', { class: 'card zside', 'aria-label': 'Детали заявки' },
+      h('div', { class: 'ztabs', role: 'tablist' }, tabs.map(([k, l]) => h('button', { type: 'button', role: 'tab', 'aria-selected': String(tab === k), onclick: () => setTab(r, k) }, l, dot(k)))),
+      content);
+    body.replaceChildren(headCard(r), h('div', { class: 'zrow' }, chatMirror(r), side));
+  }
+  for (const [id, v] of Object.entries(keep)) { const el = document.getElementById(id); if (el) el.value = v; }
+  const msgs = document.getElementById('zmsgs');
+  if (msgs) { if (first || chatPinned[r.id] !== false) msgs.scrollTop = msgs.scrollHeight; else if (prevScroll != null) msgs.scrollTop = prevScroll; }
+  if (!first) body.scrollTop = keepScrollTop;
+}
+function draftMedia(v) {
+  if (!v.media?.length) return null;
+  return h('div', { class: 'gal' }, v.media.map((m, i) => h('div', { style: 'position:relative' },
+    m.type === 'photo' ? h('img', { src: m.url, alt: m.name || 'Фото', style: 'width:84px;height:84px;object-fit:cover;border-radius:10px' })
+      : h('span', { class: 'pill', style: 'height:84px', text: (m.type === 'video' ? '🎬 ' : '📄 ') + (m.name || 'Файл') }),
+    h('button', { type: 'button', 'aria-label': 'Убрать файл', title: 'Убрать файл', style: 'position:absolute;top:-8px;right:-8px;width:26px;height:26px;border-radius:13px;border:0;background:var(--ink);color:var(--on-ink);font-weight:800',
+      onclick: () => { v.media.splice(i, 1); renderAreq(false); } }, '×'))));
+}
+/* ===================== конец v3 ===================== */
+
 
 async function sendKp() {
   const kp = {
@@ -3290,18 +4010,6 @@ async function sendKp() {
   const moves = !keepStatus && TAB_OF[areq.status] !== 'kp' && afilter !== 'all' && afilter !== 'kp';
   await patchA(patch, msg);
   if (!moves) toast(had ? 'Новое КП отправлено в чат' : 'КП отправлено клиенту');
-}
-async function sendExact() {
-  const v = num($('#kpExact').value);
-  if (!v) { toast('Укажите точную стоимость доставки'); return; }
-  const goods = num(areq.kp?.price);
-  await patchA({ logiExact: v }, { from: 'sys', text: 'Товар на складе. Точная стоимость доставки: ' + money(v) + (goods ? '. Итого: ' + money(goods + v) : '') + '.', at: Date.now() });
-  toast('Клиенту отправлена точная стоимость');
-}
-async function sendMgr() {
-  const ta = $('#mgrMsg'); const text = ta.value.trim(); if (!text) return;
-  ta.value = '';
-  await patchA({ staffReadAt: Date.now() + 1000 }, { from: 'manager', text, at: Date.now() });
 }
 async function translateZh() {
   if (!sample) { toast('ИИ недоступен в этом просмотре'); return; }
@@ -3333,7 +4041,23 @@ function renderTariffs() {
   $('#sCnyAt').textContent = rates?.updatedAt ? 'Обновлён: ' + fmtTime(rates.updatedAt) : '';
   $('#sPhone').value = contacts?.phone ?? '';
   $('#sWa').value = contacts?.whatsapp ?? '';
+  renderReminders();
 }
+let reminders = null;
+function renderReminders() {
+  const r = reminders || {};
+  $('#rKpOn').checked = r.kp?.on !== false; $('#rKp').value = r.kp?.text || '';
+  $('#rAfterOn').checked = r.after?.on !== false; $('#rAfter').value = r.after?.text || '';
+  $('#rIdleOn').checked = r.idle?.on !== false; $('#rIdle').value = r.idle?.text || '';
+  $('#rSeaOn').checked = !!r.seasonal?.on; $('#rSea').value = r.seasonal?.text || ''; $('#rSeaDate').value = r.seasonal?.date || '';
+}
+$('#remForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const v = (id) => $('#' + id).value.trim();
+  const r = { kp: { on: $('#rKpOn').checked, text: v('rKp') }, after: { on: $('#rAfterOn').checked, text: v('rAfter') }, idle: { on: $('#rIdleOn').checked, text: v('rIdle') }, seasonal: { on: $('#rSeaOn').checked, text: v('rSea'), date: v('rSeaDate') } };
+  if (r.seasonal.on && (!r.seasonal.text || !r.seasonal.date)) { toast('Для сезонного напоминания укажите день и текст'); return; }
+  try { await db.doc('settings/reminders').set(r); reminders = r; toast('Напоминания сохранены'); } catch { toast('Не сохранилось. Попробуйте ещё раз.'); }
+});
 $('#setForm').addEventListener('submit', async (e) => {
   e.preventDefault();
   try {
@@ -3374,6 +4098,7 @@ renderSpec();
   if (db) db.doc('settings/tariffs').onSnapshot((s) => { tariffs = s.exists ? s.data() : null; if (current === 'tariffs') renderTariffs(); }, () => {});
   if (db) db.doc('settings/rates').onSnapshot((s) => { if (s.exists) rates = s.data(); if (current === 'tariffs') renderTariffs(); }, () => {});
   if (db) db.doc('settings/contacts').onSnapshot((s) => { if (s.exists) contacts = s.data(); if (current === 'tariffs') renderTariffs(); }, () => {});
+  if (db) db.doc('settings/reminders').onSnapshot((s) => { if (s.exists) reminders = s.data(); if (current === 'tariffs') renderReminders(); }, () => {});
   if (db && uid && !profile) {
     try { const p = await db.doc('data/users/' + uid + '/profile').get(); if (p.exists) { profile = p.data(); store.set('snab_profile', profile); if (current === 'onb') go('home'); } } catch {}
   } else if (profile) saveProfileRemote();
