@@ -773,7 +773,7 @@ function menuEl(r) {
   const it = (icon, bg, fg, title, sub, fn) => h('button', { type: 'button', onclick: () => { menuOpen = false; renderChat(); fn(); } }, h('span', { class: 'mi', style: 'background:' + bg + ';color:' + fg }, ic(icon, 18)), h('span', {}, h('b', { text: title }), h('small', { text: sub })));
   return h('div', { class: 'menu', role: 'menu' },
     it('var', 'var(--yelBg)', 'var(--yelT)', 'Варианты на согласование', 'Фото и характеристики, без цены', () => sheetVariants(r)),
-    it('doc', 'var(--accS)', 'var(--accT)', r.kp ? 'КП / доставка' : 'КП с ценой', 'Товар, доставка или всё вместе', () => sheetKp(r, selOrder)),
+    it('doc', 'var(--accS)', 'var(--accT)', viewOf(r, selOrder).decision === 'accept' ? 'Доставка до Алматы' : r.kp ? 'КП / доставка' : 'КП с ценой', viewOf(r, selOrder).decision === 'accept' ? 'Заказ оформлен — отправить сумму доставки' : 'Товар, доставка или всё вместе', () => sheetKp(r, selOrder)),
     r.kp && r.service !== 'support' ? it('plus', 'var(--yelBg)', 'var(--yelT)', 'Дозаказ', 'Клиент хочет ещё товар — отдельное КП в этот же чат', () => sheetKp(r, null, true)) : null,
     it('check', 'var(--grnBg)', 'var(--grnT)', 'Клиент оплатил', 'Товар · доставка · чек', () => sheetPay(r, selOrder)),
     it('truck', 'var(--bluBg)', 'var(--bluT)', 'Этап заказа', 'Выкупили · в пути · в Алматы · отправили', () => sheetStage(r, selOrder)),
@@ -899,12 +899,13 @@ function sheetKp(r0, oid, isNew) {
   const prev = r.kp?.variants?.length ? r.kp.variants : fromApproval;
   const yuanMode = kind === 'goods' || kind === 'buyout';
   const vars = (prev.length ? prev : [{ name: r.title || '' }]).map((v) => ({ name: v.name || '', desc: v.desc || '', media: [...(v.media || [])], cny: v.cny || '', qty: v.qty || 1, chinaShip: v.chinaShip || '', term: v.term || '', price: yuanMode && v.cny ? '' : (v.price || '') }));
-  const lg = { method: r.kp?.logi?.method || r.shipping?.key || 'auto', cost: r.kp?.logi?.cost || '', term: r.kp?.logi?.term || '' };
+  const lg = { method: r.kp?.logi?.method || r.shipping?.key || 'auto', cost: '', term: r.kp?.logi?.term || '' };
   if (!SHIP[lg.method]) lg.method = 'auto';
-  lg.exact = !!r.logiExact && (!r.kp?.logi || num(r.logiExact) === num(r.kp.logi.cost));
-  if (lg.exact && !lg.cost) lg.cost = r.logiExact;
+  lg.exact = false;
+  // заказ уже оформлен клиентом: товар в нём менять нельзя, можно только отправить доставку; новый товар — это дозаказ
+  const locked = !isNew && ['work', 'done'].includes(r.status) && r.decision === 'accept';
   const ap = () => (lg.exact ? '' : '≈ ');
-  let what = kind === 'cargo' ? 'logi' : kind === 'translate' ? 'goods' : (isNew ? 'both' : r.decision === 'accept' ? 'logi' : 'both');
+  let what = kind === 'cargo' ? 'logi' : kind === 'translate' ? 'goods' : (isNew ? 'both' : locked || r.decision === 'accept' ? 'logi' : 'both');
   const showG = () => what !== 'logi' && kind !== 'cargo';
   const showL = () => what !== 'goods' && kind !== 'translate';
   const extra = { terms: r.kp?.terms || '' };
@@ -921,8 +922,9 @@ function sheetKp(r0, oid, isNew) {
   const draw = () => {
     put(body, 
       isNew ? h('div', { style: 'font-size:13px;color:var(--mut)', text: 'Клиент хочет ещё товар. Уйдёт отдельное КП в этот же чат со своим номером; оплата и этапы у него будут свои.' }) : orderSwitch(r0, oid, (id) => sheetKp(r0, id)),
-      kind === 'cargo' || kind === 'translate' ? null : h('div', { class: 'box' }, h('b', { text: 'Что отправляем' }),
-        h('div', { class: 'opts' }, [['both', 'Товар + доставка'], ['goods', 'Только товар'], ['logi', 'Только доставка']].filter(([key]) => !isNew || key !== 'logi').map(([key, l]) => h('button', { type: 'button', 'aria-pressed': String(what === key), onclick: () => { what = key; draw(); } }, l)))),
+      locked && kind !== 'cargo' && kind !== 'translate' ? h('div', { class: 'box', style: 'border:1.5px solid var(--yel)' }, h('b', { text: 'Заказ №' + r.num + ' уже оформлен клиентом' }), h('small', { style: 'color:var(--mut);font-size:12.5px', text: 'Товар в нём менять нельзя — здесь можно отправить только доставку. Если клиент хочет ещё товар, это дозаказ: отдельное КП в этот же чат.' }), h('button', { class: 'pillb a', type: 'button', style: 'align-self:flex-start', onclick: () => { document.querySelector('.shade')?.remove(); sheetKp(r0, null, true); } }, '+ Сделать дозаказ')) : null,
+      kind === 'cargo' || kind === 'translate' || locked ? null : h('div', { class: 'box' }, h('b', { text: 'Что отправляем' }),
+        h('div', { class: 'opts' }, [['both', 'Товар + доставка'], ['goods', 'Только товар'], ['logi', 'Только доставка']].filter(([key]) => (!isNew || key !== 'logi') && (!locked || key === 'logi')).map(([key, l]) => h('button', { type: 'button', 'aria-pressed': String(what === key), onclick: () => { what = key; draw(); } }, l)))),
       !showG() ? null : h('div', { style: 'font-size:13px;color:var(--mut)' }, 'Курс сегодня: ', h('b', { style: 'color:var(--fg)', text: rate + ' ₸ за 1 ¥' }), ' · меняется в настройках'),
       !showG() ? null : vars.map((v, i) => {
         v.__tot = yuanMode ? h('b', { text: priceOf(v) ? money(priceOf(v)) : '—' }) : null;
@@ -945,7 +947,7 @@ function sheetKp(r0, oid, isNew) {
       buildPrev());
   };
   draw();
-  sheet(isNew ? 'Дозаказ для ' + (r.clientName || 'клиента') + ' (№' + r0.num + '-' + (ordersOf(r0).reduce((m, o) => Math.max(m, o.n || 1), 1) + 1) + ')' : r._order ? 'КП дозаказа №' + r.num : r.kp ? 'Новое КП для ' + (r.clientName || 'клиента') : 'КП для ' + (r.clientName || 'клиента'), body, (close) => [h('button', { class: 'bigb', type: 'button', onclick: async () => {
+  sheet(isNew ? 'Дозаказ для ' + (r.clientName || 'клиента') + ' (№' + r0.num + '-' + (ordersOf(r0).reduce((m, o) => Math.max(m, o.n || 1), 1) + 1) + ')' : locked ? 'Доставка для ' + (r.clientName || 'клиента') + ' · №' + r.num : r._order ? 'КП дозаказа №' + r.num : r.kp ? 'Новое КП для ' + (r.clientName || 'клиента') : 'КП для ' + (r.clientName || 'клиента'), body, (close) => [h('button', { class: 'bigb', type: 'button', onclick: async () => {
     const logi = num(lg.cost) ? { method: lg.method, cost: num(lg.cost), term: lg.term.trim() } : null;
     if (what === 'logi' && kind !== 'cargo') {
       if (!logi) { toast('Укажите стоимость доставки'); return; }
