@@ -3232,7 +3232,7 @@ async function sendApproval() {
   const d = draftFor(areq);
   const variants = d.variants.filter((v) => v.name.trim() || v.desc.trim() || v.media.length).map((v) => ({ id: v.id, name: v.name.trim(), desc: v.desc.trim(), media: v.media }));
   if (!variants.length) { toast('Добавьте хотя бы один вариант: название, описание или фото'); return; }
-  await patchA({ status: 'approval', approvals: variants, approvalPick: null }, { from: 'manager', kind: 'variants', variants, text: variants.length > 1 ? 'Варианты на согласование' : 'Вариант на согласование', at: Date.now() });
+  await patchA({ status: 'approval', approvals: variants, approvalPick: null, approvalNone: null }, { from: 'manager', kind: 'variants', variants, text: variants.length > 1 ? 'Варианты на согласование' : 'Вариант на согласование', at: Date.now() });
   toast('Отправлено клиенту на согласование');
 }
 async function sendKpV2() {
@@ -3727,10 +3727,13 @@ function kpMirror(r, m, isLast) {
 }
 function variantsMirror(r, m) {
   const vs = m.variants || [];
+  const lastV = [...(r.thread || [])].reverse().find((x) => x.kind === 'variants' && !x.deleted);
+  const isLast = lastV === m;
   return withDel(r, m, h('div', { class: 'zcard' },
     h('div', { class: 'zc-h' }, h('b', { text: vs.length > 1 ? 'Варианты на согласование' : 'Вариант на согласование' }), h('span', { class: 'zt', text: fmtTime(m.at) })),
     vs.map((v, i) => h('div', { class: 'zv' }, thumbOf(v.media), h('div', { class: 'zv-m' }, h('span', { class: 'zv-n', text: (vs.length > 1 ? 'Вариант ' + (i + 1) + ' · ' : '') + (v.name || '') }), v.desc ? h('small', { text: v.desc }) : null))),
-    r.approvalNone ? h('div', { class: 'zfoot red', text: '✕ Клиенту ничего не подошло' + (typeof r.approvalNone === 'string' ? ': ' + r.approvalNone : '') })
+    !isLast ? h('div', { class: 'zfoot', text: 'Заменено новыми вариантами ниже' })
+      : r.approvalNone ? h('div', { class: 'zfoot red', text: '✕ Клиенту ничего не подошло' + (typeof r.approvalNone === 'string' ? ': ' + r.approvalNone : '') })
       : r.approvalPick ? h('div', { class: 'zfoot green', text: '✓ Клиент выбрал: ' + r.approvalPick }) : h('div', { class: 'zfoot', text: 'Ждём выбора клиента' })));
 }
 function mirrorItem(r, m, lastKp, lastDisp) {
