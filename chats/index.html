@@ -1,0 +1,919 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Закупщик · Чаты</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0F1215;--bg2:#0B0E10;--s1:#161A1E;--s2:#1C2126;--s3:#23282E;--s4:#2C3036;--fg:#ECEDEE;--mut:#9AA1A9;--mut2:#737B84;--acc:#F06A2A;--accS:#3A2418;--accT:#F2A27A;
+--grn:#2FB36D;--grnBg:#12301F;--grnT:#8FE0B0;--yel:#F59E0B;--yelBg:#3A2E12;--yelT:#FCD34D;--org:#FDBA74;--orgBg:#3A2810;--red:#EF4444;--redBg:#3A1D1D;--redT:#FCA5A5;--blu:#4EA3FF;--bluBg:#1E2A3A;--bluT:#9CC8FF}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--fg);font:500 14px/1.45 Manrope,system-ui,sans-serif;overflow:hidden}
+button,input,textarea,select{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+.app{display:flex;height:100vh}
+.rail{width:64px;flex-shrink:0;border-right:1px solid var(--s3);display:flex;flex-direction:column;align-items:center;gap:8px;padding:14px 0}
+.rail .logo{font-weight:800;font-size:20px;color:var(--acc);margin-bottom:8px}
+.rail button,.rail a{position:relative;width:44px;height:44px;border-radius:14px;border:0;background:transparent;color:var(--mut);display:flex;align-items:center;justify-content:center;text-decoration:none}
+.rail .on{background:var(--s3);color:var(--fg)}
+.rail .badge{position:absolute;top:3px;right:3px;min-width:18px;height:18px;border-radius:9px;background:var(--grn);color:#06210F;font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;padding:0 4px}
+.rail .sp{flex:1}
+svg{flex-shrink:0}
+/* list */
+.list{width:370px;flex-shrink:0;border-right:1px solid var(--s3);display:flex;flex-direction:column;min-width:0}
+.lh{padding:14px 14px 8px;display:flex;flex-direction:column;gap:10px}
+.lh h1{margin:0;font-size:21px;font-weight:800;display:flex;justify-content:space-between;align-items:baseline}
+.lh h1 small{font-size:12px;color:var(--mut);font-weight:600}
+.search{height:40px;border-radius:12px;border:0;background:var(--s2);padding:0 14px;width:100%}
+.seg{display:flex;gap:6px;flex-wrap:wrap}
+.seg button{height:30px;padding:0 11px;border:0;border-radius:15px;background:var(--s2);color:#C9CDD2;font-weight:700;font-size:12.5px}
+.seg button[aria-pressed="true"]{background:var(--grnBg);color:var(--grnT)}
+.seg button .n{opacity:.8}
+.rows{flex:1;overflow-y:auto}
+.row{display:flex;gap:11px;padding:11px 14px;width:100%;text-align:left;border:0;background:transparent;border-bottom:1px solid #191D21}
+.row:hover{background:#171B1F}
+.row.sel{background:var(--s2)}
+.av{width:46px;height:46px;flex-shrink:0;border-radius:23px;color:#fff;font-weight:800;display:flex;align-items:center;justify-content:center;font-size:15px}
+.rm{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
+.r1{display:flex;justify-content:space-between;gap:8px}
+.r1 b{font-size:14.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.r1 .t{font-size:11.5px;color:var(--mut);white-space:nowrap}
+.r1 .t.hot{color:var(--grn);font-weight:700}
+.r1 .t.urg{color:var(--redT);font-weight:700}
+.r2{font-size:12.5px;color:#C9CDD2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.r3{display:flex;justify-content:space-between;gap:8px;align-items:center}
+.r3 span:first-child{font-size:12.5px;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.r3 .urg{color:var(--redT)}
+.cnt{min-width:20px;height:20px;border-radius:10px;background:var(--grn);color:#06210F;font-size:11.5px;font-weight:800;display:inline-flex;align-items:center;justify-content:center;padding:0 5px;flex-shrink:0}
+.cnt.red{background:var(--red);color:#fff}
+.chips{display:flex;gap:5px;flex-wrap:wrap;margin-top:3px}
+.chip{font-size:10.5px;font-weight:800;padding:2px 7px;border-radius:7px;background:var(--s3);color:#C9CDD2;white-space:nowrap}
+.c-yel{background:var(--yelBg);color:var(--yelT)}.c-grn{background:var(--grnBg);color:var(--grnT)}.c-org{background:var(--orgBg);color:var(--org)}.c-red{background:var(--redBg);color:var(--redT)}.c-blu{background:var(--bluBg);color:var(--bluT)}.c-acc{background:var(--accS);color:var(--accT)}
+.empty{padding:40px 20px;text-align:center;color:var(--mut)}
+/* chat */
+.chat{flex:1;min-width:0;display:flex;flex-direction:column;background:var(--bg2)}
+.ch{height:64px;flex-shrink:0;display:flex;align-items:center;gap:10px;padding:0 16px;border-bottom:1px solid var(--s3);background:var(--s1)}
+.ch .av{width:40px;height:40px;font-size:14px}
+.chm{flex:1;min-width:0;display:flex;flex-direction:column}
+.chm b{font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chm b span{color:var(--mut);font-weight:600;font-size:12.5px}
+.chm small{font-size:12px;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pillb{height:36px;padding:0 13px;border-radius:18px;border:0;background:var(--s3);color:var(--fg);font-weight:700;font-size:12.5px;white-space:nowrap;display:inline-flex;align-items:center;gap:6px;text-decoration:none}
+.pillb.g{background:var(--grnBg);color:var(--grnT)}
+.pillb.a{background:var(--acc);color:#fff}
+.ib{width:36px;height:36px;border-radius:18px;border:0;background:var(--s3);color:var(--fg);display:inline-flex;align-items:center;justify-content:center;text-decoration:none}
+.msgs{flex:1;overflow-y:auto;padding:16px 26px;display:flex;flex-direction:column;gap:8px}
+.msgs>*{flex-shrink:0}
+.day{align-self:center;font-size:11.5px;color:var(--mut);background:var(--s2);padding:4px 11px;border-radius:9px;margin:6px 0}
+.b{position:relative;max-width:64%;padding:7px 11px 6px;border-radius:13px;display:flex;flex-direction:column;gap:2px;font-size:14.5px;white-space:pre-wrap;overflow-wrap:anywhere}
+.b.cl{align-self:flex-start;background:var(--s2);border-bottom-left-radius:4px}
+.b.mg{align-self:flex-end;background:#3A2418;border-bottom-right-radius:4px}
+.b.ai{align-self:flex-end;background:var(--bluBg);border-bottom-right-radius:4px}
+.b .who{font-size:11px;font-weight:800;color:var(--bluT)}
+.b.mg .who{color:var(--accT)}
+.b .tm{align-self:flex-end;font-size:10.5px;color:var(--mut);white-space:nowrap}
+.tk{font-weight:800;letter-spacing:-2px;margin-left:3px}.tk.r{color:var(--blu)}
+.sys{align-self:center;max-width:80%;text-align:center;font-size:12px;color:var(--mut);background:var(--s1);padding:5px 11px;border-radius:9px}
+.sys.g{color:var(--grnT);background:var(--grnBg)}
+.del{font-style:italic;color:var(--mut2);font-size:12.5px;padding:5px 10px;border:1px dashed var(--s4);border-radius:10px}
+.del.cl{align-self:flex-start}.del.mg{align-self:flex-end}
+.card{position:relative;align-self:flex-end;width:min(100%,430px);border-radius:15px;background:var(--s1);border:2px solid var(--s4);overflow:hidden}
+.card.kp{border-color:var(--acc)}.card.var{border-color:var(--yel)}.card.ex{border-color:var(--blu)}.card.dp{border-color:var(--s4);background:#101418}
+.card .in{padding:10px 12px;display:flex;flex-direction:column;gap:7px}
+.card .hd{display:flex;justify-content:space-between;gap:8px;align-items:baseline}
+.card .hd b{font-size:13.5px}.card .hd span{font-size:11px;color:var(--mut)}
+.vr{display:flex;gap:10px;align-items:center}
+.th{width:48px;height:48px;border-radius:9px;object-fit:cover;background:var(--s3);flex-shrink:0}
+.vm{flex:1;min-width:0;display:flex;flex-direction:column}
+.vm b{font-size:13px}.vm small{font-size:11.5px;color:var(--mut);white-space:pre-line}
+.vr .pr{font-weight:800;font-size:13.5px;white-space:nowrap}
+.kv2{display:flex;justify-content:space-between;gap:10px;font-size:12.5px;color:#C9CDD2}
+.kv2.tot{font-size:14px;font-weight:800;color:var(--fg)}
+.foot{padding:6px 12px;font-size:12px;font-weight:700;background:var(--s3);color:#C9CDD2}
+.foot.g{background:var(--grnBg);color:var(--grnT)}.foot.r{background:var(--redBg);color:var(--redT)}
+.media{display:flex;gap:6px;flex-wrap:wrap}
+.media img{width:150px;height:150px;object-fit:cover;border-radius:10px;cursor:zoom-in}
+.media video{width:240px;border-radius:10px;background:#000}
+.media audio{max-width:260px}
+.media a.doc{display:inline-flex;gap:6px;align-items:center;padding:8px 10px;border-radius:10px;background:var(--s3);color:var(--fg);text-decoration:none;font-size:13px}
+.x{position:absolute;top:-9px;right:-9px;width:26px;height:26px;border-radius:13px;border:1px solid var(--s4);background:var(--s1);color:var(--redT);display:none;align-items:center;justify-content:center;padding:0}
+.b:hover .x,.card:hover .x{display:flex}
+.sug{margin:0 16px 8px;border:1.5px dashed var(--blu);border-radius:13px;padding:9px 11px;background:#121A24;display:flex;gap:10px;align-items:flex-start}
+.sug .t{flex:1;display:flex;flex-direction:column;gap:3px}
+.sug .t small{font-size:11.5px;font-weight:800;color:var(--bluT)}
+.sug .t span{font-size:13.5px;white-space:pre-wrap}
+.sug .bb{display:flex;gap:6px;flex-shrink:0}
+.sb{height:34px;padding:0 11px;border-radius:9px;border:0;background:var(--blu);color:#061423;font-weight:800;font-size:12.5px}
+.sb.gh{background:transparent;border:1px solid #2C3540;color:var(--fg)}
+.comp{display:flex;align-items:flex-end;gap:7px;padding:8px 16px 14px;position:relative}
+.cb{width:44px;height:44px;flex-shrink:0;border-radius:22px;border:0;background:var(--s3);color:var(--fg);display:flex;align-items:center;justify-content:center}
+.cb.plus{background:var(--acc);color:#fff;font-size:26px;line-height:1}
+.cb.rec{background:var(--red);color:#fff}
+.ta{flex:1;min-width:0;min-height:44px;max-height:160px;border-radius:22px;border:0;background:var(--s2);padding:11px 16px;resize:none}
+.menu{position:absolute;left:16px;bottom:66px;width:330px;background:var(--s2);border:1px solid var(--s4);border-radius:16px;padding:7px;display:flex;flex-direction:column;gap:2px;box-shadow:0 16px 40px rgba(0,0,0,.5);z-index:5}
+.menu button{display:flex;gap:11px;align-items:center;padding:9px;border-radius:11px;border:0;background:transparent;text-align:left}
+.menu button:hover{background:var(--s3)}
+.menu .mi{width:36px;height:36px;border-radius:18px;display:flex;align-items:center;justify-content:center}
+.menu b{display:block;font-size:13.5px}.menu small{font-size:11.5px;color:var(--mut)}
+.tpl{position:absolute;left:120px;right:70px;bottom:66px;background:var(--s2);border:1px solid var(--s4);border-radius:14px;padding:6px;max-height:280px;overflow:auto;z-index:5}
+.tpl button{display:block;width:100%;text-align:left;border:0;background:transparent;padding:8px 10px;border-radius:9px;font-size:13px}
+.tpl button:hover{background:var(--s3)}
+.nochat{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;color:var(--mut)}
+/* info */
+.info{width:300px;flex-shrink:0;border-left:1px solid var(--s3);background:var(--s1);padding:16px;display:flex;flex-direction:column;gap:12px;overflow-y:auto}
+.info h3{margin:0;font-size:14px}
+.info .f{display:flex;flex-direction:column;gap:2px;font-size:12.5px}
+.info .f span{color:var(--mut)}
+.info hr{border:0;border-top:1px solid var(--s3);margin:2px 0;width:100%}
+.stp{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:5px;font-size:12.5px}
+.stp li{display:flex;gap:8px;align-items:center;color:var(--mut2)}
+.stp li i{width:9px;height:9px;border-radius:5px;border:1.5px solid #4A5159}
+.stp li.d{color:#C9CDD2}.stp li.d i{background:var(--grn);border-color:var(--grn)}
+.stp li.c{color:var(--yelT);font-weight:800}.stp li.c i{background:var(--yel);border-color:var(--yel)}
+.payr{display:flex;justify-content:space-between;font-size:12.5px;gap:8px}
+.payr .ok{color:var(--grnT);font-weight:700}.payr .no{color:var(--org)}
+.note{width:100%;border-radius:10px;border:1px solid var(--s4);background:var(--bg);padding:8px;font-size:13px;resize:vertical;min-height:60px}
+/* sheet */
+.shade{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:20;display:flex;justify-content:flex-end}
+.sheet{width:min(540px,100vw);height:100%;background:var(--s1);border-left:1px solid var(--s4);display:flex;flex-direction:column}
+.sh-h{display:flex;justify-content:space-between;align-items:center;padding:16px 18px;border-bottom:1px solid var(--s3)}
+.sh-h b{font-size:17px}
+.sh-b{flex:1;overflow-y:auto;padding:16px 18px;display:flex;flex-direction:column;gap:12px}
+.sh-f{padding:12px 18px 18px;border-top:1px solid var(--s3);display:flex;gap:8px}
+.box{background:var(--s2);border-radius:13px;padding:12px;display:flex;flex-direction:column;gap:9px}
+.box .bh{display:flex;justify-content:space-between;align-items:center}
+.lab{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--mut);font-weight:700;min-width:0}
+.inp{height:42px;border-radius:10px;border:1px solid var(--s4);background:var(--bg);padding:0 10px;font-size:14.5px;font-weight:700;width:100%}
+textarea.inp{height:auto;min-height:62px;padding:8px 10px;font-weight:500;font-size:13.5px;resize:vertical}
+.g3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.g2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.tot{display:flex;justify-content:space-between;align-items:baseline;font-size:12.5px;color:var(--mut)}
+.tot b{font-size:18px;color:var(--accT)}
+.ph{display:flex;gap:6px;flex-wrap:wrap}
+.ph div{position:relative}
+.ph img,.ph .fd{width:60px;height:60px;border-radius:9px;object-fit:cover;background:var(--s3);display:flex;align-items:center;justify-content:center;font-size:11px;text-align:center;padding:3px;overflow:hidden}
+.ph button{position:absolute;top:-6px;right:-6px;width:22px;height:22px;border-radius:11px;border:0;background:#000;color:#fff;font-weight:800;line-height:1;padding:0}
+.opts{display:flex;gap:6px;flex-wrap:wrap}
+.opts button{height:34px;padding:0 13px;border-radius:17px;border:0;background:var(--s3);font-weight:700;font-size:13px}
+.opts button[aria-pressed="true"]{background:var(--fg);color:var(--bg)}
+.prev{border:1.5px dashed #3A4048;border-radius:13px;padding:12px;display:flex;flex-direction:column;gap:5px}
+.prev .cap{font-size:11px;font-weight:800;color:var(--mut);letter-spacing:.06em}
+.bigb{flex:1;height:50px;border-radius:13px;border:0;background:var(--acc);color:#fff;font-weight:800;font-size:15px}
+.bigb.g{background:var(--grn);color:#06210F}
+.ghb{height:50px;padding:0 16px;border-radius:13px;border:1px solid var(--s4);background:transparent;font-weight:700}
+.chk{display:flex;gap:10px;align-items:center;padding:10px;border-radius:11px;background:var(--s2);font-size:14px}
+.chk input{width:20px;height:20px;accent-color:var(--grn)}
+.stg{display:flex;flex-direction:column;gap:6px}
+.stg button{display:flex;justify-content:space-between;align-items:center;padding:12px;border-radius:11px;border:1px solid var(--s4);background:var(--s2);text-align:left;font-weight:700}
+.stg button.nx{border-color:var(--acc);background:var(--accS)}
+.stg button[disabled]{opacity:.45;cursor:default}
+/* board */
+.board{flex:1;min-width:0;display:flex;flex-direction:column;padding:18px 22px;gap:14px;overflow:hidden}
+.board h1{margin:0;font-size:21px}
+.cols{flex:1;display:grid;grid-template-columns:repeat(6,minmax(180px,1fr));gap:10px;min-height:0;overflow-x:auto}
+.col{background:var(--s1);border-radius:15px;padding:10px;display:flex;flex-direction:column;gap:8px;min-height:0;overflow-y:auto}
+.col .chd{display:flex;justify-content:space-between;font-weight:800;font-size:13.5px;padding:2px 2px 4px}
+.col.pay{outline:2px solid var(--yel);outline-offset:-2px}
+.bc{border:0;text-align:left;background:var(--s2);border-radius:11px;padding:9px;display:flex;flex-direction:column;gap:3px}
+.bc b{font-size:13px}.bc small{font-size:11.5px;color:var(--mut)}
+.bc.paid{background:#12261A}.bc.wait{background:#2A2010}
+/* misc */
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--fg);color:var(--bg);padding:10px 16px;border-radius:12px;font-weight:700;z-index:40;box-shadow:0 10px 30px rgba(0,0,0,.4)}
+.lb{position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:50;display:flex;align-items:center;justify-content:center;cursor:zoom-out}
+.lb img{max-width:94vw;max-height:92vh}
+.gate{position:fixed;inset:0;z-index:60;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:16px}
+.gate form{width:100%;max-width:360px;background:var(--s1);border-radius:18px;padding:22px;display:flex;flex-direction:column;gap:12px}
+.err{color:var(--redT);font-weight:700;font-size:13px}
+@media (max-width:1250px){.info{display:none}.info.force{display:flex;position:fixed;right:0;top:0;bottom:0;z-index:15;box-shadow:-10px 0 30px rgba(0,0,0,.5)}}
+@media (max-width:820px){#backBtn{display:inline-flex!important}.ch select.pillb,.ch a.pillb{display:none}.ch{padding:0 8px;gap:6px}.msgs{padding:12px}.b{max-width:85%}.list{width:100%}.app.open .list{display:none}.app:not(.open) .chat{display:none}.rail{display:none}}
+</style>
+</head>
+<body>
+<div class="app" id="app"></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.js"></script>
+<script>
+(() => {
+'use strict';
+const SB = window.supabase.createClient('https://tqhigjvyoqtwukqqnlmb.supabase.co', 'sb_publishable_LBGMjPTdbjINAwQa-uchpA_okvE5SQY');
+window.SB = SB;
+const $ = (s) => document.querySelector(s);
+const put = (el, ...k) => el.replaceChildren(...k.flat(Infinity).filter((x) => x != null && x !== false));
+function h(tag, props, ...kids) {
+  const el = document.createElement(tag);
+  for (const [k, v] of Object.entries(props || {})) {
+    if (v == null || v === false) continue;
+    if (k === 'class') el.className = v;
+    else if (k === 'text') el.textContent = v;
+    else if (k === 'style') el.setAttribute('style', v);
+    else if (k === 'value') el.value = v;
+    else if (k.startsWith('on') && typeof v === 'function') el.addEventListener(k.slice(2).toLowerCase(), v);
+    else el.setAttribute(k, v === true ? '' : v);
+  }
+  for (const c of kids.flat(Infinity)) { if (c == null || c === false) continue; el.append(c.nodeType ? c : document.createTextNode(String(c))); }
+  return el;
+}
+const ICONS = {
+  chat: '<path d="M4 5h16v11H9l-5 4z"/>', board: '<rect x="3" y="4" width="5" height="16" rx="1.5"/><rect x="10" y="4" width="5" height="11" rx="1.5"/><rect x="17" y="4" width="4" height="7" rx="1.5"/>',
+  gear: '<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/>',
+  phone: '<path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2z"/>',
+  clip: '<path d="M20 11.5l-8 8a5 5 0 0 1-7-7l8.5-8.5a3.3 3.3 0 0 1 4.7 4.7L9.7 17.2a1.7 1.7 0 0 1-2.4-2.4L15 7"/>',
+  mic: '<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/>', send: '<path d="M5 12h14M13 6l6 6-6 6"/>',
+  info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5h.01"/>', trash: '<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/>',
+  var: '<rect x="3" y="4" width="8" height="8" rx="2"/><rect x="13" y="4" width="8" height="8" rx="2"/><path d="M3 17h18M3 21h12"/>', doc: '<path d="M6 3h9l3 3v15H6z"/><path d="M9 11h6M9 15h6"/>',
+  check: '<path d="M5 12l5 5 9-10"/>', truck: '<path d="M3 6h11v10H3zM14 10h4l3 3v3h-7"/><circle cx="7" cy="18" r="1.8"/><circle cx="17" cy="18" r="1.8"/>',
+  back: '<path d="M15 5l-7 7 7 7"/>', old: '<path d="M4 4h16v16H4z"/><path d="M4 9h16M9 9v11"/>', bulb: '<path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.4 1 1.1 1 1.8V16h5v-.3c0-.7.4-1.4 1-1.8A6 6 0 0 0 12 3z"/>',
+};
+function ic(name, size = 20) { const t = document.createElement('template'); t.innerHTML = '<svg width="' + size + '" height="' + size + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + ICONS[name] + '</svg>'; return t.content.firstChild; }
+let toastT;
+function toast(t) { let el = $('.toast'); if (!el) { el = h('div', { class: 'toast', role: 'status' }); document.body.append(el); } el.textContent = t; el.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => { el.hidden = true; }, 2600); }
+const num = (v) => { const n = parseFloat(String(v ?? '').replace(',', '.').replace(/\s/g, '')); return isFinite(n) && n > 0 ? n : 0; };
+const money = (n) => Math.round(n).toLocaleString('ru-RU') + ' ₸';
+const rid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+const hhmm = (ms) => new Date(ms).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+function ago(ms) {
+  if (!ms) return ''; const d = Date.now() - ms; const dt = new Date(ms); const now = new Date();
+  if (dt.toDateString() === now.toDateString()) return hhmm(ms);
+  if (d < 2 * 86400000 && new Date(now - 86400000).toDateString() === dt.toDateString()) return 'вчера';
+  return dt.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
+}
+const waitTxt = (ms) => { const d = Date.now() - ms; return d < 3600000 ? Math.max(1, Math.round(d / 60000)) + ' мин' : d < 86400000 ? Math.round(d / 3600000) + ' ч' : Math.round(d / 86400000) + ' дн'; };
+const AVC = ['#7C5CFF', '#E0565B', '#2FB36D', '#F59E0B', '#3B82F6', '#EC4899', '#14B8A6', '#A855F7', '#F97316'];
+const avColor = (s) => { let x = 0; for (const c of String(s)) x = (x * 31 + c.charCodeAt(0)) >>> 0; return AVC[x % AVC.length]; };
+const initials = (n) => String(n || '?').trim().split(/\s+/).map((w) => w[0] || '').join('').slice(0, 2).toUpperCase() || '?';
+
+/* ---------- данные заявки ---------- */
+const SERVICES = { purchase: 'Найти и купить', cargo: 'Доставить груз', buyout: 'Помощь с выкупом', translate: 'Переводчик', support: 'Поддержка' };
+const SHIP = { auto: 'Авто', air: 'Авиа', official: 'Официальная' };
+const KIND = (r) => (r.service === 'cargo' ? 'cargo' : r.service === 'buyout' ? 'buyout' : r.service === 'translate' ? 'translate' : 'goods');
+const STAGE_LABEL = { paid: 'Оплата за товар получена', bought: 'Выкупили у поставщика', wait_china: 'Ждём груз на складе в Китае', china: 'На складе в Китае', transit: 'В пути в Казахстан', almaty: 'Прибыл в Алматы', delivery_paid: 'Доставка оплачена', sent_city: 'Отправлен в город клиента', delivered: 'Выдан клиенту', received: 'Клиент получил заказ' };
+const STAGE_SHORT = { paid: 'Оплатил', bought: 'Выкуплен', wait_china: 'Ждём груз', china: 'Склад Китай', transit: 'В пути', almaty: 'В Алматы', delivery_paid: 'Доставка оплачена', sent_city: 'Отправлен в город', delivered: 'Выдан', received: 'Получил' };
+function stagesFor(r) {
+  const base = KIND(r) === 'cargo' ? ['wait_china', 'china', 'transit', 'almaty'] : ['paid', 'bought', 'china', 'transit', 'almaty'];
+  if (!r.deliveryPrepaid && !r.payments?.china?.paid) base.push('delivery_paid');
+  base.push(r.delivery?.method === 'door' ? 'sent_city' : 'delivered');
+  return base;
+}
+function stageText(key, r) {
+  const door = r.delivery?.method === 'door', city = r.delivery?.city || 'ваш город', exact = num(r.logiExact), prepaid = r.deliveryPrepaid || r.payments?.china?.paid;
+  if (key === 'paid') return 'Оплата за товар получена. Выкупаем товар у поставщика.';
+  if (key === 'bought') return 'Товар выкуплен у поставщика. Ждём, когда он придёт на наш склад в Китае.';
+  if (key === 'wait_china') return 'Ждём ваш груз на нашем складе в Китае.';
+  if (key === 'china') return 'Товар на нашем складе в Китае. Готовим к отправке в Казахстан.' + (exact ? ' Стоимость доставки до Алматы: ' + money(exact) + '.' : '');
+  if (key === 'transit') return 'Товар отправлен и едет в Казахстан.';
+  if (key === 'almaty') return prepaid ? (door ? 'Товар прибыл на наш склад в Алматы. Доставка оплачена — скоро отправим в ' + city + '.' : 'Товар прибыл на наш склад в Алматы. Доставка оплачена — можно забирать. Менеджер пришлёт адрес и часы работы.') : 'Товар прибыл на наш склад в Алматы. Оплатите доставку' + (exact ? ': ' + money(exact) : '') + '. Для оплаты нажмите «Связаться с менеджером».';
+  if (key === 'delivery_paid') return door ? 'Доставка оплачена. Скоро отправим товар в ' + city + '.' : 'Доставка оплачена. Можно забирать товар со склада в Алматы.';
+  if (key === 'sent_city') return 'Товар отправлен в ' + city + '.';
+  return 'Заказ выдан. Спасибо, что выбрали Закупщик!';
+}
+const live = (r) => (r.thread || []).filter((m) => !m.deleted);
+function lastTalk(r) { const th = live(r); for (let i = th.length - 1; i >= 0; i--) if (['client', 'manager', 'ai'].includes(th[i].from)) return th[i]; return null; }
+function lastItem(r) { const th = live(r); return th[th.length - 1] || null; }
+const aiOn = (r) => r.mode === 'ai' && r.service !== 'support' && (!!r.kp || !!r.aiNote) && !['rejected', 'done', 'declined'].includes(r.status);
+function needsReply(r) {
+  if (r.status === 'rejected') return false;
+  if (r.handoff) return true;
+  const m = lastTalk(r);
+  return !!m && m.from === 'client' && (!aiOn(r) || Date.now() - m.at > 120000);
+}
+function unread(r) { const t = r.staffReadAt || 0; return live(r).filter((m) => m.from === 'client' && m.at > t).length; }
+function pays(r) {
+  const p = { ...(r.payments || {}) };
+  if (r.deliveryPrepaid && !p.china) p.china = { paid: true };
+  if (r.cityDelivery?.prepaid && !p.city) p.city = { paid: true };
+  if (!p.goods && KIND(r) !== 'cargo' && ['paid', 'bought', 'china', 'transit', 'almaty', 'delivery_paid', 'sent_city', 'delivered', 'received'].includes(r.stage)) p.goods = { paid: true };
+  return p;
+}
+const goodsPaid = (r) => KIND(r) === 'cargo' || !!pays(r).goods?.paid;
+const awaitingPay = (r) => r.status === 'work' && r.decision === 'accept' && !goodsPaid(r);
+const delivDue = (r) => r.status === 'work' && r.stage === 'almaty' && !pays(r).china?.paid && KIND(r) !== 'translate';
+function payAmount(r, key) {
+  const k = r.kp || {};
+  if (key === 'goods') { const v = (k.variants || [])[r.chosenVariant != null ? Number(r.chosenVariant) : 0]; return num(v?.price ?? k.price); }
+  if (key === 'china') return num(r.logiExact) || num(k.logi?.cost);
+  if (key === 'city') return num(r.cityDelivery?.cost);
+  return 0;
+}
+function statusChip(r) {
+  if (r.service === 'support') return ['Поддержка', ''];
+  if (r.status === 'done') return [r.receivedAt ? 'Получил' : 'Завершена', 'c-grn'];
+  if (r.status === 'declined') return ['Отказался', 'c-red'];
+  if (r.status === 'rejected') return ['Отказали мы', ''];
+  if (r.status === 'new') return ['Новая', 'c-blu'];
+  if (r.status === 'approval') return [r.approvalPick ? 'Выбрал вариант' : r.approvalNone ? 'Не подошло' : 'Согласование', r.approvalPick ? 'c-grn' : r.approvalNone ? 'c-red' : 'c-yel'];
+  if (r.status === 'kp') return ['КП отправлено', 'c-acc'];
+  if (r.status === 'waiting') return ['КП открыто', 'c-acc'];
+  if (r.status === 'delivery') return ['Посчитать доставку', 'c-org'];
+  if (awaitingPay(r)) return ['Ждёт оплаты', 'c-org'];
+  if (delivDue(r)) return ['Оплата доставки', 'c-org'];
+  if (r.status === 'work') return [r.stage ? (STAGE_SHORT[r.stage] || 'В работе') : 'В работе', goodsPaid(r) ? 'c-grn' : ''];
+  return [r.status, ''];
+}
+function preview(r) {
+  const m = lastItem(r); if (!m) return '';
+  const who = m.from === 'manager' ? 'Вы: ' : m.from === 'ai' ? 'ИИ: ' : '';
+  if (m.kind === 'kp') return who + 'КП отправлено';
+  if (m.kind === 'variants') return who + 'Варианты на согласование';
+  if (m.kind === 'media' || m.kind === 'photo') return who + ((m.media || [])[0]?.type === 'audio' ? 'Голосовое' : 'Файл');
+  if (m.kind === 'payment') return m.text || 'Оплата получена';
+  if (m.kind === 'stage') return STAGE_LABEL[m.stage] || 'Этап';
+  return who + (m.text || '');
+}
+
+/* ---------- состояние ---------- */
+let me = null, staff = [], all = [], sel = null, view = 'chats', filt = 'all', q = '', infoOpen = false;
+let rates = { cny: 71 }, templates = [];
+const sugCache = {}; // id -> { at, text, loading }
+const DEF_TPL = ['Здравствуйте! Заявку получили, уже ищем варианты у поставщиков в Китае.', 'Отправили вам варианты — посмотрите и выберите подходящий.', 'Цена указана с доставкой до нашего склада в Алматы. Точную стоимость доставки назовём после взвешивания на складе.', 'Оплатить можно через Kaspi по номеру +7 708 255 11 70. После оплаты пришлите, пожалуйста, чек сюда.', 'Товар выкуплен и едет на наш склад в Китае.', 'Спасибо за заказ! Если появятся вопросы — пишите сюда.'];
+const rowToReq = (row) => ({ ...(row.doc || {}), id: row.id, num: row.num, ownerId: row.owner_id, status: row.status, createdAt: Number(row.created_at), updatedAt: Number(row.updated_at) });
+
+/* ---------- вход ---------- */
+async function boot() {
+  const { data } = await SB.auth.getSession();
+  if (!(await checkSession(data.session))) return showGate();
+  start();
+}
+async function checkSession(session) {
+  if (!session) return false;
+  const { data } = await SB.from('profiles').select('id,role,first_name,last_name').eq('id', session.user.id).maybeSingle();
+  if (!data || !['manager', 'admin'].includes(data.role)) { await SB.auth.signOut(); return false; }
+  me = { id: data.id, name: [data.first_name, data.last_name].filter(Boolean).join(' ') || String(session.user.email || 'Менеджер').split('@')[0] };
+  return true;
+}
+function showGate(err) {
+  const em = h('input', { class: 'inp', type: 'email', autocomplete: 'username', required: true, 'aria-label': 'Почта', placeholder: 'Почта' });
+  const pw = h('input', { class: 'inp', type: 'password', autocomplete: 'current-password', required: true, 'aria-label': 'Пароль', placeholder: 'Пароль' });
+  const e = h('div', { class: 'err', role: 'alert', text: err || '' });
+  const g = h('div', { class: 'gate' }, h('form', { onsubmit: async (ev) => {
+    ev.preventDefault();
+    const { data, error } = await SB.auth.signInWithPassword({ email: em.value.trim(), password: pw.value });
+    if (error) { e.textContent = 'Неверная почта или пароль.'; return; }
+    if (!(await checkSession(data.session))) { e.textContent = 'У этого аккаунта нет доступа к панели.'; return; }
+    g.remove(); start();
+  } }, h('b', { style: 'font-size:22px', text: 'Закупщик · Чаты' }), em, pw, e, h('button', { class: 'bigb', type: 'submit' }, 'Войти')));
+  document.body.append(g);
+}
+
+/* ---------- загрузка и обновления ---------- */
+async function loadAll() {
+  const { data } = await SB.from('requests').select('*').order('updated_at', { ascending: false }).limit(400);
+  all = (data || []).map(rowToReq);
+  detectNews(); render();
+}
+async function loadOne(id) {
+  const { data } = await SB.from('requests').select('*').eq('id', id).maybeSingle();
+  if (!data) return;
+  const r = rowToReq(data); const i = all.findIndex((x) => x.id === id);
+  if (i >= 0) all[i] = r; else all.unshift(r);
+  detectNews(); render();
+}
+async function start() {
+  const [{ data: st }, { data: set }] = await Promise.all([
+    SB.from('profiles').select('id,first_name,last_name,role').in('role', ['manager', 'admin']),
+    SB.from('settings').select('key,value').in('key', ['rates', 'templates']),
+  ]);
+  staff = (st || []).map((p) => ({ id: p.id, name: [p.first_name, p.last_name].filter(Boolean).join(' ') || 'Менеджер' }));
+  for (const s of set || []) { if (s.key === 'rates') rates = s.value || rates; if (s.key === 'templates') templates = s.value?.list || []; }
+  if (!templates.length) templates = DEF_TPL;
+  await loadAll();
+  SB.channel('m-requests').on('postgres_changes', { event: '*', schema: 'public', table: 'requests' }, (p) => { const id = p.new?.id || p.old?.id; if (id) loadOne(id); }).subscribe();
+  SB.channel('m-settings').on('postgres_changes', { event: '*', schema: 'public', table: 'settings' }, (p) => { if (p.new?.key === 'rates') rates = p.new.value; if (p.new?.key === 'templates') templates = p.new.value?.list || DEF_TPL; }).subscribe();
+  setInterval(() => { if (view === 'chats') renderList(); }, 30000);
+  document.addEventListener('pointerdown', () => { try { if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)(); if (window.Notification && Notification.permission === 'default') Notification.requestPermission(); } catch { /* ignore */ } }, { passive: true });
+}
+async function push(r, item, patch) {
+  const p = { ...(patch || {}) }; delete p.thread;
+  const { error } = await SB.rpc('push_thread', { req_id: r.id, item: item || null, patch: Object.keys(p).length ? p : null });
+  if (error) { console.error(error); toast('Не сохранилось. Проверьте связь.'); return false; }
+  const i = all.findIndex((x) => x.id === r.id);
+  if (i >= 0) { const nr = { ...all[i], ...p }; if (item) nr.thread = (all[i].thread || []).concat([item]); all[i] = nr; }
+  render(); setTimeout(() => loadOne(r.id), 1200);
+  return true;
+}
+async function upload(file, reqId) {
+  const ext = (file.name.split('.').pop() || 'bin').toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 5) || 'bin';
+  const path = reqId + '/' + rid() + '.' + ext;
+  const { error } = await SB.storage.from('media').upload(path, file, { contentType: file.type || undefined, upsert: false });
+  if (error) throw error;
+  const { data } = SB.storage.from('media').getPublicUrl(path);
+  const type = file.type.startsWith('image/') ? 'photo' : file.type.startsWith('video/') ? 'video' : file.type.startsWith('audio/') ? 'audio' : 'doc';
+  return { type, url: data.publicUrl, name: file.name, size: file.size };
+}
+
+/* ---------- звук и уведомления ---------- */
+let seen = null, audioCtx = null;
+function beep() { try { if (!audioCtx) return; const t = audioCtx.currentTime; [880, 1320].forEach((f, i) => { const o = audioCtx.createOscillator(), g = audioCtx.createGain(); o.frequency.value = f; g.gain.setValueAtTime(.0001, t + i * .15); g.gain.exponentialRampToValueAtTime(.22, t + i * .15 + .02); g.gain.exponentialRampToValueAtTime(.0001, t + i * .15 + .14); o.connect(g).connect(audioCtx.destination); o.start(t + i * .15); o.stop(t + i * .15 + .15); }); } catch { /* ignore */ } }
+function notify(title, body, id) { beep(); try { if (window.Notification && Notification.permission === 'granted' && (document.hidden || sel !== id)) { const n = new Notification(title, { body, tag: id }); n.onclick = () => { window.focus(); openChat(id); n.close(); }; } } catch { /* ignore */ } }
+function detectNews() {
+  const next = {};
+  for (const r of all) { const m = lastTalk(r); next[r.id] = { c: m && m.from === 'client' ? m.at : 0, acc: r.decision === 'accept' ? 1 : 0 }; }
+  if (seen) for (const r of all) {
+    const a = seen[r.id], b = next[r.id], who = r.clientName || 'Клиент';
+    if (!a) { notify('Новая заявка', who + ' — ' + (r.title || ''), r.id); continue; }
+    if (b.acc && !a.acc) notify('Клиент оформил заказ', who, r.id);
+    else if (b.c > a.c) notify(who, preview(r), r.id);
+  }
+  seen = next;
+}
+
+/* ---------- отрисовка ---------- */
+function render() {
+  const app = $('#app');
+  if (!app.firstChild) app.append(rail(), h('section', { class: 'list', id: 'list' }), h('main', { class: 'chat', id: 'chat' }), h('aside', { class: 'info', id: 'info', 'aria-label': 'Данные заявки' }));
+  app.classList.toggle('open', !!sel);
+  updateRail();
+  if (view === 'board') { renderBoard(); return; }
+  $('#list').hidden = false; $('#info').hidden = !sel;
+  renderList(); renderChat(); renderInfo();
+}
+let railEls = {};
+function rail() {
+  const b = (key, icon, label) => (railEls[key] = h('button', { type: 'button', 'aria-label': label, title: label, onclick: () => { view = key; const bd = document.getElementById('board'); if (bd) bd.remove(); render(); } }, ic(icon, 22)));
+  return h('nav', { class: 'rail', 'aria-label': 'Разделы' }, h('span', { class: 'logo', text: 'З.' }),
+    b('chats', 'chat', 'Чаты'), b('board', 'board', 'Доска по этапам'), h('span', { class: 'sp' }),
+    h('a', { href: '../panel/', title: 'Старая панель и настройки (курс, контакты, напоминания)', 'aria-label': 'Старая панель и настройки' }, ic('gear', 22)),
+    h('button', { type: 'button', 'aria-label': 'Выйти', title: 'Выйти', onclick: async () => { await SB.auth.signOut(); location.reload(); } }, ic('back', 22)));
+}
+function updateRail() {
+  for (const [k, el] of Object.entries(railEls)) el.classList.toggle('on', k === view);
+  const n = all.filter((r) => needsReply(r) || unread(r) > 0).length;
+  const cb = railEls.chats; cb.querySelector('.badge')?.remove(); if (n) cb.append(h('span', { class: 'badge', text: String(n) }));
+  document.title = (n ? '(' + n + ') ' : '') + 'Закупщик · Чаты';
+}
+const isMine = (r) => r.assignee?.id === me.id;
+const isFree = (r) => !r.assignee?.id;
+const snoozed = (r) => r.snoozeUntil && Date.now() < r.snoozeUntil && !(lastTalk(r)?.from === 'client' && lastTalk(r).at > (r.snoozeAt || 0));
+function inFilt(r, f) {
+  if (f === 'mine') return isMine(r);
+  if (f === 'free') return isFree(r) && !['done', 'declined', 'rejected'].includes(r.status);
+  if (f === 'unread') return needsReply(r) || unread(r) > 0;
+  if (f === 'snoozed') return snoozed(r);
+  return !snoozed(r);
+}
+function sortKey(r) { const m = lastItem(r); return Math.max(m?.at || 0, r.createdAt || 0); }
+function renderList() {
+  const box = $('#list'); if (!box) return;
+  const hit = (r) => !q || [r.num, r.title, r.clientName, r.clientPhone, r.clientCode, r.city].join(' ').toLowerCase().includes(q);
+  const list = all.filter((r) => inFilt(r, filt) && hit(r)).sort((a, b) => (needsReply(b) - needsReply(a)) || (sortKey(b) - sortKey(a)));
+  const cnt = (f) => all.filter((r) => inFilt(r, f)).length;
+  const prevScroll = box.querySelector('.rows')?.scrollTop || 0;
+  const searchEl = box.querySelector('.search');
+  const hadFocus = document.activeElement === searchEl;
+  const seg = (k, l) => h('button', { type: 'button', 'aria-pressed': String(filt === k), onclick: () => { filt = k; renderList(); } }, l, k === 'all' ? null : h('span', { class: 'n', text: ' · ' + cnt(k) }));
+  const s = h('input', { class: 'search', type: 'search', placeholder: 'Поиск: имя, телефон, товар, №', 'aria-label': 'Поиск', value: q, oninput: (e) => { q = e.target.value.trim().toLowerCase(); renderList(); } });
+  put(box, 
+    h('div', { class: 'lh' }, h('h1', {}, 'Чаты', h('small', { text: 'курс ' + (rates?.cny || '—') + ' ₸ / ¥' })), s,
+      h('div', { class: 'seg', role: 'group', 'aria-label': 'Фильтр' }, seg('all', 'Все'), seg('mine', 'Мои'), seg('free', 'Свободные'), seg('unread', 'Непрочит.'), cnt('snoozed') ? seg('snoozed', 'Отложенные') : null)),
+    h('div', { class: 'rows' }, list.length ? list.map(rowEl) : h('div', { class: 'empty', text: q ? 'Ничего не нашлось' : 'Здесь пусто' })));
+  box.querySelector('.rows').scrollTop = prevScroll;
+  if (hadFocus) { const el = box.querySelector('.search'); el.focus(); el.setSelectionRange(el.value.length, el.value.length); }
+  updateRail();
+}
+function rowEl(r) {
+  const name = r.clientName || 'Клиент', m = lastItem(r), nr = needsReply(r), un = unread(r), lt = lastTalk(r);
+  const [st, cls] = statusChip(r);
+  const pv = r.handoff && r.handoffQuestion ? 'ИИ спрашивает: ' + r.handoffQuestion : preview(r);
+  return h('button', { type: 'button', class: 'row' + (sel === r.id ? ' sel' : ''), onclick: () => openChat(r.id) },
+    h('span', { class: 'av', style: 'background:' + avColor(r.ownerId || r.id), text: initials(name) }),
+    h('span', { class: 'rm' },
+      h('span', { class: 'r1' }, h('b', { text: name }), h('span', { class: 't' + (nr ? ' urg' : un ? ' hot' : ''), text: nr && lt ? 'ждёт ' + waitTxt(lt.at) : ago(m?.at || r.createdAt) })),
+      h('span', { class: 'r2', text: (r.service === 'support' ? 'Поддержка' : (r.title || '') + ' · №' + r.num) }),
+      h('span', { class: 'r3' }, h('span', { class: nr && r.handoff ? 'urg' : '', text: pv }),
+        nr && r.handoff ? h('span', { class: 'cnt red', text: '!' }) : un ? h('span', { class: 'cnt', text: String(un) }) : (m?.from === 'manager' ? h('span', { class: 'tk' + ((r.clientReadAt || 0) >= m.at ? ' r' : ''), text: '✓✓' }) : null)),
+      h('span', { class: 'chips' }, h('span', { class: 'chip ' + cls, text: st }), aiOn(r) && !r.handoff ? h('span', { class: 'chip c-blu', text: 'ИИ отвечает' }) : null,
+        r.assignee?.name ? h('span', { class: 'chip', text: isMine(r) ? 'Ведёте вы' : 'Ведёт: ' + r.assignee.name.split(' ')[0] }) : null,
+        snoozed(r) ? h('span', { class: 'chip', text: 'Отложено' }) : null)));
+}
+function openChat(id) {
+  view = 'chats'; document.getElementById('board')?.remove();
+  sel = id; menuOpen = false; tplOpen = false;
+  const r = all.find((x) => x.id === id);
+  if (r) { const lt = lastTalk(r); if (lt?.from === 'client' && (r.staffReadAt || 0) < lt.at) push(r, null, { staffReadAt: Date.now() }); }
+  render();
+  setTimeout(() => { const ta = $('#ta'); if (ta) ta.focus(); }, 50);
+}
+const cur = () => all.find((x) => x.id === sel);
+
+/* ---------- чат ---------- */
+let menuOpen = false, tplOpen = false, rec = null, recChunks = [];
+function renderChat() {
+  const box = $('#chat'); if (!box) return;
+  const r = cur();
+  if (!r) { put(box, h('div', { class: 'nochat' }, ic('chat', 40), h('b', { style: 'font-size:16px;color:var(--fg)', text: 'Выберите чат слева' }), h('span', { text: 'Новые и непрочитанные — сверху.' }))); return; }
+  const msgsOld = box.querySelector('.msgs'); const pinned = !msgsOld || msgsOld.scrollHeight - msgsOld.scrollTop - msgsOld.clientHeight < 80; const prevTop = msgsOld?.scrollTop;
+  const taOld = $('#ta'); const draft = taOld ? taOld.value : (drafts[r.id] || ''); const focus = document.activeElement === taOld;
+  const name = r.clientName || 'Клиент', tel = String(r.clientPhone || '').replace(/[^\d+]/g, '');
+  const [st, cls] = statusChip(r);
+  const head = h('header', { class: 'ch' },
+    h('button', { class: 'ib', type: 'button', 'aria-label': 'К списку', style: 'display:none', id: 'backBtn', onclick: () => { sel = null; render(); } }, ic('back', 18)),
+    h('span', { class: 'av', style: 'background:' + avColor(r.ownerId || r.id), text: initials(name) }),
+    h('span', { class: 'chm' }, h('b', {}, name, ' ', h('span', { text: '· ' + (r.service === 'support' ? 'Поддержка' : (r.title || '') + ' · №' + r.num) })),
+      h('small', {}, [r.city || r.clientCity, r.clientPhone].filter(Boolean).join(' · '), ' · ', h('span', { class: 'chip ' + cls, text: st }))),
+    tel ? h('a', { class: 'ib', href: 'tel:' + tel, 'aria-label': 'Позвонить', title: 'Позвонить' }, ic('phone', 17)) : null,
+    tel ? h('a', { class: 'pillb', href: 'https://wa.me/' + tel.replace('+', ''), target: '_blank', rel: 'noopener' }, 'WhatsApp') : null,
+    isMine(r) ? h('button', { class: 'pillb g', type: 'button', title: 'Нажмите, чтобы освободить', onclick: () => push(r, null, { assignee: null }) }, 'Ведёте вы')
+      : r.assignee?.id ? h('button', { class: 'pillb', type: 'button', title: 'Забрать себе', onclick: () => { if (confirm('Клиента ведёт ' + r.assignee.name + '. Забрать себе?')) push(r, null, { assignee: { id: me.id, name: me.name } }); } }, 'Ведёт: ' + r.assignee.name.split(' ')[0])
+      : h('button', { class: 'pillb a', type: 'button', onclick: () => push(r, null, { assignee: { id: me.id, name: me.name } }) }, 'Беру'),
+    snoozeBtn(r),
+    h('button', { class: 'ib', type: 'button', 'aria-label': 'Данные заявки', title: 'Данные заявки', onclick: () => { infoOpen = !infoOpen; renderInfo(); } }, ic('info', 18)));
+  const th = r.thread || [];
+  let lastKp = null, lastVar = null; th.forEach((m) => { if (!m.deleted && m.kind === 'kp') lastKp = m; if (!m.deleted && m.kind === 'variants') lastVar = m; });
+  const items = []; let lastDay = '';
+  th.forEach((m) => { const d = new Date(m.at).toDateString(); if (d !== lastDay) { lastDay = d; items.push(h('div', { class: 'day', text: d === new Date().toDateString() ? 'Сегодня' : new Date(m.at).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' }) })); } items.push(msgEl(r, m, lastKp, lastVar)); });
+  const msgs = h('div', { class: 'msgs', id: 'msgs' }, items.length ? items : h('div', { class: 'empty', text: 'Сообщений пока нет' }));
+  put(box, head, msgs, suggestEl(r), composer(r, draft));
+  if (pinned) msgs.scrollTop = msgs.scrollHeight; else msgs.scrollTop = prevTop;
+  if (focus) { const ta = $('#ta'); ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); }
+}
+const drafts = {};
+function snoozeBtn(r) {
+  if (snoozed(r)) return h('button', { class: 'pillb', type: 'button', title: 'Вернуть в список', onclick: () => push(r, null, { snoozeUntil: null }) }, 'Отложено до ' + ago(r.snoozeUntil));
+  const sel2 = h('select', { class: 'pillb', 'aria-label': 'Отложить', onchange: (e) => {
+    const v = e.target.value; if (!v) return; const now = new Date(); let until;
+    if (v === '1h') until = Date.now() + 3600000;
+    if (v === '3h') until = Date.now() + 3 * 3600000;
+    if (v === 'tom') { const t = new Date(now); t.setDate(t.getDate() + 1); t.setHours(10, 0, 0, 0); until = t.getTime(); }
+    if (v === 'week') until = Date.now() + 7 * 86400000;
+    push(r, null, { snoozeUntil: until, snoozeAt: Date.now() }); toast('Отложено. Вернётся раньше, если клиент напишет');
+  } }, h('option', { value: '', text: 'Отложить ▾' }), h('option', { value: '1h', text: 'на 1 час' }), h('option', { value: '3h', text: 'на 3 часа' }), h('option', { value: 'tom', text: 'до завтра 10:00' }), h('option', { value: 'week', text: 'на неделю' }));
+  return sel2;
+}
+function tick(r, m) {
+  if (m.from === 'client') return null;
+  const read = (r.clientReadAt || 0) >= m.at, seen2 = read || (r.clientSeenAt || 0) >= m.at;
+  return h('span', { class: 'tk' + (read ? ' r' : ''), title: read ? 'Прочитано' : seen2 ? 'Доставлено' : 'Отправлено', text: seen2 ? '✓✓' : '✓' });
+}
+function delBtn(r, m) { return h('button', { class: 'x', type: 'button', 'aria-label': 'Удалить', title: 'Удалить', onclick: (e) => { e.stopPropagation(); delItem(r, m); } }, ic('trash', 14)); }
+async function delItem(r, m) {
+  if (!confirm('Удалить? У клиента будет «Сообщение удалено».')) return;
+  const { data, error } = await SB.rpc('delete_thread_item', { req_id: r.id, item_at: m.at });
+  if (error) { toast('Не получилось удалить'); return; }
+  const urls = []; const add = (l) => (l || []).forEach((x) => x?.url && urls.push(x.url));
+  add((data || m).media); ((data || m).variants || []).forEach((v) => add(v.media)); add((data || m).dispatch?.media);
+  const paths = urls.map((u) => decodeURIComponent(u.split('/object/public/media/')[1] || '')).filter(Boolean);
+  if (paths.length) await SB.storage.from('media').remove(paths);
+  loadOne(r.id);
+}
+function mediaEl(list) {
+  if (!list?.length) return null;
+  return h('div', { class: 'media' }, list.map((x) => x.type === 'photo' ? h('img', { src: x.url, alt: x.name || 'Фото', loading: 'lazy', onclick: () => lightbox(x.url) })
+    : x.type === 'video' ? h('video', { src: x.url, controls: true, preload: 'metadata' })
+    : x.type === 'audio' ? h('audio', { src: x.url, controls: true, preload: 'metadata' })
+    : h('a', { class: 'doc', href: x.url, target: '_blank', rel: 'noopener' }, ic('doc', 16), x.name || 'Документ')));
+}
+function lightbox(src) { const lb = h('div', { class: 'lb', onclick: () => lb.remove() }, h('img', { src, alt: '' })); document.body.append(lb); }
+function bubble(r, m, kids) {
+  const c = m.from === 'client' ? 'cl' : m.from === 'ai' ? 'ai' : 'mg';
+  return h('div', { class: 'b ' + c }, m.from === 'ai' ? h('span', { class: 'who', text: 'ИИ-ассистент' }) : null, kids, h('span', { class: 'tm' }, hhmm(m.at), tick(r, m)), m.from !== 'client' ? delBtn(r, m) : null);
+}
+const thumb = (list) => { const p = (list || []).find((x) => x.type === 'photo'); return p ? h('img', { class: 'th', src: p.url, alt: '', onclick: () => lightbox(p.url) }) : h('span', { class: 'th', 'aria-hidden': 'true' }); };
+function yuan(v, rate) { const c = num(v.cny), qn = num(v.qty) || 1, s = num(v.chinaShip); if (!c || !rate) return ''; let b = c.toLocaleString('ru-RU') + ' ¥' + (qn !== 1 ? ' × ' + qn : ''); if (s) b = '(' + b + ' + ' + s + ' ¥ по Китаю)'; return '= ' + b + ' × ' + rate + ' ₸'; }
+function msgEl(r, m, lastKp, lastVar) {
+  if (m.deleted) return h('div', { class: 'del ' + (m.from === 'client' ? 'cl' : 'mg'), text: (m.from === 'client' ? 'Клиент удалил сообщение' : 'Сообщение удалено') + ' · ' + hhmm(m.deletedAt || m.at) });
+  if (m.kind === 'kp') {
+    if (m !== lastKp) return h('div', { class: 'sys', text: 'КП от ' + ago(m.at) + ' ' + hhmm(m.at) + ' (заменено новым)' });
+    const k = r.kp || {}; const kind = k.type || KIND(r);
+    const vs = k.variants?.length ? k.variants : (kind === 'cargo' ? [] : [{ name: k.product || r.title, price: k.price }]);
+    const logi = num(r.logiExact) || num(k.logi?.cost); const ch = r.chosenVariant != null ? Number(r.chosenVariant) : null;
+    const goods = num(vs[ch ?? 0]?.price); const total = kind === 'cargo' ? logi : goods && logi ? goods + logi : 0;
+    const foot = r.status === 'declined' && r.decision === 'decline' ? h('div', { class: 'foot r', text: '✕ Клиент отказался' + (r.rejectReason ? ': ' + r.rejectReason : '') })
+      : r.decision === 'accept' ? h('div', { class: 'foot g', text: '✓ Клиент оформил' + (vs.length > 1 && ch != null ? ' вариант ' + (ch + 1) : '') + (r.acceptedAt ? ' · ' + hhmm(r.acceptedAt) : '') })
+      : h('div', { class: 'foot', text: r.status === 'waiting' || (r.clientReadAt || 0) >= m.at ? 'Клиент открыл КП · ждём ответа' : 'Клиент ещё не открыл' });
+    return h('div', { class: 'card kp' }, h('div', { class: 'in' },
+      h('div', { class: 'hd' }, h('b', { text: (kind === 'cargo' ? 'Расчёт доставки' : 'КП') + ' №' + r.num }), h('span', { text: hhmm(m.at) })),
+      vs.map((v, i) => h('div', { class: 'vr' }, thumb(v.media), h('div', { class: 'vm' }, h('b', { text: (vs.length > 1 ? (i + 1) + ' · ' : '') + (v.name || '') }), yuan(v, num(k.rate)) ? h('small', { text: yuan(v, num(k.rate)) }) : v.term ? h('small', { text: v.term }) : null), h('span', { class: 'pr', text: num(v.price) ? money(num(v.price)) : '' }))),
+      kind !== 'translate' ? h('div', { class: 'kv2' }, h('span', { text: 'Доставка до Алматы' + (k.logi ? ' (' + (SHIP[k.logi.method] || '') + ')' : '') }), h('span', { text: logi ? (r.logiExact ? '' : '≈ ') + money(logi) : 'не указана' })) : null,
+      total && (vs.length < 2 || ch != null) ? h('div', { class: 'kv2 tot' }, h('span', { text: 'Итого' }), h('span', { text: (r.logiExact ? '' : '≈ ') + money(total) })) : null), foot, delBtn(r, m));
+  }
+  if (m.kind === 'variants') {
+    const vs = m.variants || []; const isLast = m === lastVar;
+    return h('div', { class: 'card var' }, h('div', { class: 'in' },
+      h('div', { class: 'hd' }, h('b', { text: 'Варианты на согласование' }), h('span', { text: hhmm(m.at) })),
+      vs.map((v, i) => h('div', { class: 'vr' }, thumb(v.media), h('div', { class: 'vm' }, h('b', { text: (vs.length > 1 ? (i + 1) + ' · ' : '') + (v.name || '') }), v.desc ? h('small', { text: v.desc }) : null)))),
+      !isLast ? h('div', { class: 'foot', text: 'Заменено новыми вариантами' }) : r.approvalNone ? h('div', { class: 'foot r', text: '✕ Не подошло: ' + r.approvalNone }) : r.approvalPick ? h('div', { class: 'foot g', text: '✓ Клиент выбрал: ' + r.approvalPick }) : h('div', { class: 'foot', text: 'Ждём выбора клиента' }), delBtn(r, m));
+  }
+  if (m.kind === 'exact') return h('div', { class: 'card ex' }, h('div', { class: 'in' }, h('div', { class: 'hd' }, h('b', { text: 'Товар на складе' }), h('span', { text: hhmm(m.at) })), h('div', { class: 'kv2 tot' }, h('span', { text: 'Точная доставка до Алматы' }), h('span', { text: money(m.cost || 0) })), m.weight || m.volume ? h('div', { class: 'kv2', text: [m.weight && m.weight + ' кг', m.volume && m.volume + ' м³'].filter(Boolean).join(' · ') }) : null), delBtn(r, m));
+  if (m.kind === 'dispatch') { const d = m.dispatch || {}; return h('div', { class: 'card dp' }, h('div', { class: 'in' }, h('div', { class: 'hd' }, h('b', { text: 'Отправили в ' + (r.delivery?.city || 'город') }), h('span', { text: hhmm(m.at) })), h('small', { style: 'color:var(--mut)', text: [d.method, d.driver, d.phone, [d.car, d.color].filter(Boolean).join(', '), d.plate, d.eta && 'приедет ' + d.eta].filter(Boolean).join(' · ') }), mediaEl(d.media)), delBtn(r, m)); }
+  if (m.kind === 'payment') return h('div', { class: 'sys g', text: '✓ ' + (m.text || 'Оплата получена') + ' · ' + hhmm(m.at) });
+  if (m.kind === 'received') return h('div', { class: 'sys g', text: '✓ Клиент подтвердил получение · ' + hhmm(m.at) });
+  if (m.kind === 'stage') return h('div', { class: 'sys', text: (STAGE_LABEL[m.stage] || 'Этап') + ' · ' + hhmm(m.at) });
+  if (m.kind === 'city') return h('div', { class: 'sys', text: 'Доставка Алматы → ' + (r.delivery?.city || 'город') + (m.cost ? ': ' + money(m.cost) : '') + (m.prepaid ? ' · оплачено' : '') });
+  if (m.kind === 'photo') return bubble(r, m, h('div', { class: 'media' }, h('img', { src: m.thumb, alt: 'Фото', onclick: async () => { const { data } = await SB.from('request_files').select('data').eq('id', m.fileId).maybeSingle(); lightbox(data?.data || m.thumb); } })));
+  if (m.kind === 'media') return bubble(r, m, [mediaEl(m.media), m.text ? h('span', { text: m.text }) : null]);
+  if (['client', 'manager', 'ai'].includes(m.from)) return bubble(r, m, h('span', { text: m.text || '' }));
+  const t = String(m.text || '').replace(/^Вы выбрали/, 'Клиент выбрал').replace(/^Вы оформили/, 'Клиент оформил').replace(/^Вы подтвердили/, 'Клиент подтвердил').replace(/^Вы отказались/, 'Клиент отказался').replace(/^Вы запросили/, 'Клиент запросил').replace(/^Вы /, 'Клиент ');
+  return h('div', { class: 'sys', text: t + ' · ' + hhmm(m.at) });
+}
+
+/* ---------- подсказка ИИ ---------- */
+function suggestEl(r) {
+  const lt = lastTalk(r);
+  if (!lt || lt.from !== 'client' || r.status === 'rejected') return null;
+  const c = sugCache[r.id];
+  if (!c || c.at !== lt.at) { sugCache[r.id] = { at: lt.at, loading: true }; fetchSuggest(r, lt.at); }
+  const s = sugCache[r.id];
+  if (s.hidden) return null;
+  return h('div', { class: 'sug' }, h('span', { style: 'color:var(--blu);margin-top:2px' }, ic('bulb', 18)),
+    h('div', { class: 't' }, h('small', { text: r.handoff && r.handoffQuestion ? 'ИИ спрашивает: ' + r.handoffQuestion + ' — вот черновик ответа' : 'ИИ предлагает ответ' }), h('span', { text: s.loading ? 'Думаю…' : s.error ? 'Не получилось предложить ответ' : s.text })),
+    s.loading || s.error ? null : h('div', { class: 'bb' },
+      h('button', { class: 'sb', type: 'button', onclick: () => sendText(r, s.text) }, 'Отправить'),
+      h('button', { class: 'sb gh', type: 'button', onclick: () => { const ta = $('#ta'); ta.value = s.text; drafts[r.id] = s.text; ta.focus(); autoGrow(ta); } }, 'Изменить'),
+      h('button', { class: 'sb gh', type: 'button', 'aria-label': 'Скрыть', onclick: () => { s.hidden = true; renderChat(); } }, '✕')));
+}
+async function fetchSuggest(r, at) {
+  try {
+    const { data, error } = await SB.functions.invoke('ai', { body: { task: 'suggest', request_id: r.id } });
+    if (error || data?.error) throw new Error('ai');
+    if (sugCache[r.id]?.at === at) sugCache[r.id] = { at, text: String(data.text || '').trim() };
+  } catch { if (sugCache[r.id]?.at === at) sugCache[r.id] = { at, error: true }; }
+  if (sel === r.id) renderChat();
+}
+
+/* ---------- поле ввода ---------- */
+function autoGrow(ta) { ta.style.height = 'auto'; ta.style.height = Math.min(160, ta.scrollHeight) + 'px'; }
+function composer(r, draft) {
+  const ta = h('textarea', { class: 'ta', id: 'ta', rows: '1', placeholder: 'Сообщение · «/» — шаблоны', 'aria-label': 'Сообщение', value: draft,
+    oninput: (e) => { drafts[r.id] = e.target.value; autoGrow(e.target); const v = e.target.value; if ((v === '/' && !tplOpen) || (tplOpen && !v.startsWith('/'))) { tplOpen = v.startsWith('/'); renderChat(); } else if (tplOpen) renderTplOnly(); },
+    onkeydown: (e) => { if (e.key === 'Enter' && !e.shiftKey && !tplOpen) { e.preventDefault(); const t = e.target.value.trim(); if (t) { e.target.value = ''; drafts[r.id] = ''; sendText(r, t); } } if (e.key === 'Escape') { tplOpen = false; menuOpen = false; renderChat(); } },
+    onpaste: (e) => { const fs = [...(e.clipboardData?.files || [])]; if (fs.length) { e.preventDefault(); sendFiles(r, fs); } } });
+  const fileIn = h('input', { type: 'file', multiple: true, hidden: true, accept: 'image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx', onchange: (e) => { const fs = [...e.target.files]; e.target.value = ''; sendFiles(r, fs); } });
+  const wrap = h('div', { class: 'comp' },
+    h('button', { class: 'cb plus', type: 'button', 'aria-label': 'Действия', 'aria-expanded': String(menuOpen), onclick: () => { menuOpen = !menuOpen; tplOpen = false; renderChat(); } }, '+'),
+    h('button', { class: 'cb', type: 'button', 'aria-label': 'Прикрепить файл', title: 'Фото, видео, документ', onclick: () => fileIn.click() }, ic('clip')),
+    ta,
+    h('button', { class: 'cb' + (rec ? ' rec' : ''), type: 'button', 'aria-label': rec ? 'Остановить и отправить' : 'Голосовое', title: rec ? 'Остановить и отправить' : 'Голосовое', onclick: () => toggleRec(r) }, rec ? '■' : ic('mic')),
+    h('button', { class: 'cb plus', type: 'button', 'aria-label': 'Отправить', style: 'font-size:16px', onclick: () => { const t = ta.value.trim(); if (t) { ta.value = ''; drafts[r.id] = ''; sendText(r, t); } } }, ic('send')),
+    fileIn, menuOpen ? menuEl(r) : null, tplOpen ? tplEl(r) : null);
+  setTimeout(() => autoGrow(ta), 0);
+  wrap.addEventListener('dragover', (e) => e.preventDefault());
+  wrap.addEventListener('drop', (e) => { e.preventDefault(); sendFiles(r, [...e.dataTransfer.files]); });
+  return wrap;
+}
+function tplEl(r) {
+  const qv = ($('#ta')?.value || '/').slice(1).toLowerCase();
+  const list = templates.filter((t) => t.toLowerCase().includes(qv));
+  return h('div', { class: 'tpl', id: 'tpl' }, list.length ? list.map((t) => h('button', { type: 'button', onclick: () => { const ta = $('#ta'); ta.value = t; drafts[r.id] = t; tplOpen = false; renderChat(); } }, t)) : h('div', { class: 'empty', text: 'Нет шаблонов' }),
+    h('button', { type: 'button', style: 'color:var(--accT)', onclick: () => { const t = prompt('Новый шаблон ответа:'); if (t && t.trim()) { templates = [...templates, t.trim()]; SB.from('settings').upsert({ key: 'templates', value: { list: templates }, updated_at: new Date().toISOString() }).then(() => toast('Шаблон сохранён')); renderChat(); } } }, '+ Добавить шаблон'));
+}
+function renderTplOnly() { const old = $('#tpl'); const r = cur(); if (old && r) old.replaceWith(tplEl(r)); }
+function menuEl(r) {
+  const it = (icon, bg, fg, title, sub, fn) => h('button', { type: 'button', onclick: () => { menuOpen = false; renderChat(); fn(); } }, h('span', { class: 'mi', style: 'background:' + bg + ';color:' + fg }, ic(icon, 18)), h('span', {}, h('b', { text: title }), h('small', { text: sub })));
+  return h('div', { class: 'menu', role: 'menu' },
+    it('var', 'var(--yelBg)', 'var(--yelT)', 'Варианты на согласование', 'Фото и характеристики, без цены', () => sheetVariants(r)),
+    it('doc', 'var(--accS)', 'var(--accT)', r.kp ? 'Новое КП' : 'КП с ценой', 'Цена в юанях → тенге, доставка', () => sheetKp(r)),
+    it('check', 'var(--grnBg)', 'var(--grnT)', 'Клиент оплатил', 'Товар · доставка · чек', () => sheetPay(r)),
+    it('truck', 'var(--bluBg)', 'var(--bluT)', 'Этап заказа', 'Выкупили · в пути · в Алматы · отправили', () => sheetStage(r)),
+    it('bulb', 'var(--s3)', 'var(--fg)', aiOn(r) ? 'ИИ отвечает — изменить' : 'Пусть ИИ отвечает', 'Указание, как отвечать клиенту', () => sheetAi(r)));
+}
+async function sendText(r, text) {
+  const at = Date.now();
+  const extra = r.handoff && (r.kp || r.aiNote) ? { mode: 'ai' } : {};
+  await push(r, { from: 'manager', text, at }, { staffReadAt: at + 1000, handoff: false, handoffQuestion: null, ...extra, ...(r.assignee?.id ? {} : { assignee: { id: me.id, name: me.name } }) });
+}
+async function sendFiles(r, fs) {
+  if (!fs.length) return;
+  toast('Загружаем ' + fs.length + ' файл(а)…');
+  try { const media = []; for (const f of fs.slice(0, 10)) media.push(await upload(f, r.id)); await push(r, { from: 'manager', kind: 'media', media, text: '', at: Date.now() }, { staffReadAt: Date.now() + 1000 }); }
+  catch (e) { console.error(e); toast('Не получилось загрузить. Файл до 200 МБ.'); }
+}
+async function toggleRec(r) {
+  if (rec) { rec.stop(); return; }
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const type = ['audio/mp4', 'audio/aac', 'audio/webm'].find((t) => window.MediaRecorder && MediaRecorder.isTypeSupported(t)) || '';
+    rec = new MediaRecorder(stream, type ? { mimeType: type } : undefined); recChunks = [];
+    rec.ondataavailable = (e) => recChunks.push(e.data);
+    rec.onstop = async () => { stream.getTracks().forEach((t) => t.stop()); const mt = rec.mimeType || 'audio/webm'; rec = null; renderChat(); const f = new File(recChunks, 'voice.' + (mt.includes('mp4') || mt.includes('aac') ? 'm4a' : 'webm'), { type: mt }); if (f.size > 2000) await sendFiles(r, [f]); };
+    rec.start(); renderChat(); toast('Идёт запись… нажмите ■, чтобы отправить');
+  } catch { toast('Нет доступа к микрофону'); }
+}
+
+/* ---------- данные справа ---------- */
+function renderInfo() {
+  const box = $('#info'); if (!box) return;
+  const r = cur(); box.classList.toggle('force', infoOpen);
+  if (!r) { put(box, ); return; }
+  const f = (l, v) => v ? h('div', { class: 'f' }, h('span', { text: l }), h('div', { text: v })) : null;
+  const p = pays(r);
+  const steps = r.service === 'support' ? [] : (() => {
+    const list = [['new', 'Заявка'], ['approval', 'Согласование'], ['kp', 'КП'], ['acc', 'Оформил'], ...stagesFor(r).map((k) => [k, STAGE_SHORT[k]]), ['received', 'Получил']];
+    let ci = 0;
+    if (r.status === 'approval') ci = 1; else if (['kp', 'waiting', 'delivery', 'declined'].includes(r.status)) ci = 2;
+    else if (['work', 'done'].includes(r.status)) { const si = list.findIndex(([k]) => k === r.stage); ci = r.receivedAt || r.stage === 'received' ? list.length - 1 : si >= 0 ? si : goodsPaid(r) && KIND(r) !== 'cargo' ? 4 : 3; }
+    return list.map(([k, l], i) => h('li', { class: i < ci ? 'd' : i === ci ? 'c' : '' }, h('i'), l));
+  })();
+  const note = h('textarea', { class: 'note', 'aria-label': 'Заметка', placeholder: 'Заметка о клиенте или заказе (клиент не видит)', value: r.note || '' });
+  put(box, 
+    infoOpen ? h('button', { class: 'pillb', type: 'button', style: 'align-self:flex-end', onclick: () => { infoOpen = false; renderInfo(); } }, 'Закрыть') : null,
+    h('h3', { text: r.service === 'support' ? 'Поддержка' : 'Заявка №' + r.num }),
+    (r.fields || []).map((x) => f(x.label, x.value)),
+    f('Получение', r.delivery ? (r.delivery.method === 'door' ? 'Доставка: ' + (r.delivery.city || '') + (r.delivery.address ? ', ' + r.delivery.address : '') : 'Самовывоз из Алматы') : ''),
+    f('Клиент', [r.clientCode, r.clientPhone, r.clientCompany].filter(Boolean).join(' · ')),
+    (r.photos || []).length ? h('div', { class: 'media' }, r.photos.map((x) => h('img', { src: x.thumb, alt: 'Фото клиента', style: 'width:72px;height:72px', onclick: async () => { const { data } = await SB.from('request_files').select('data').eq('id', x.fileId).maybeSingle(); lightbox(data?.data || x.thumb); } }))) : null,
+    steps.length ? h('hr') : null, steps.length ? h('h3', { text: 'Этап' }) : null, steps.length ? h('ol', { class: 'stp' }, steps) : null,
+    ['work', 'done'].includes(r.status) ? [h('hr'), h('h3', { text: 'Оплаты' }),
+      ['goods', 'china', 'city'].filter((k) => (k !== 'goods' || KIND(r) !== 'cargo') && (k !== 'city' || r.delivery?.method === 'door') && (k === 'goods' || KIND(r) !== 'translate')).map((k) => h('div', { class: 'payr' }, h('span', { text: k === 'goods' ? 'Товар' : k === 'china' ? 'Доставка до Алматы' : 'Доставка в город' }), h('span', { class: p[k]?.paid ? 'ok' : 'no', text: p[k]?.paid ? '✓ оплачено' : (payAmount(r, k) ? money(payAmount(r, k)) : '—') })))] : null,
+    h('hr'), note, h('button', { class: 'pillb', type: 'button', onclick: () => push(r, null, { note: note.value }).then(() => toast('Заметка сохранена')) }, 'Сохранить заметку'),
+    h('a', { class: 'pillb', href: '../panel/', style: 'justify-content:center', title: 'Все поля, ТЗ на китайском, отказ и прочее' }, 'Открыть в полной панели'));
+}
+
+/* ---------- окна действий ---------- */
+function sheet(title, bodyKids, footKids) {
+  const shade = h('div', { class: 'shade', onclick: (e) => { if (e.target === shade) shade.remove(); } });
+  const close = () => shade.remove();
+  shade.append(h('div', { class: 'sheet', role: 'dialog', 'aria-label': title }, h('div', { class: 'sh-h' }, h('b', { text: title }), h('button', { class: 'ib', type: 'button', 'aria-label': 'Закрыть', onclick: close }, '✕')), h('div', { class: 'sh-b' }, bodyKids), h('div', { class: 'sh-f' }, footKids(close))));
+  document.body.append(shade);
+  const onKey = (e) => { if (e.key === 'Escape') { close(); document.removeEventListener('keydown', onKey); } }; document.addEventListener('keydown', onKey);
+  return shade;
+}
+function filesBox(r, v, rerender) {
+  const fi = h('input', { type: 'file', multiple: true, hidden: true, accept: 'image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx', onchange: async (e) => { const fs = [...e.target.files]; e.target.value = ''; toast('Загружаем…'); for (const f of fs) { try { v.media.push(await upload(f, r.id)); } catch { toast('Не загрузилось: ' + f.name); } } rerender(); } });
+  const zone = h('div', { class: 'ph' }, v.media.map((x, i) => h('div', {}, x.type === 'photo' ? h('img', { src: x.url, alt: '' }) : h('span', { class: 'fd', text: x.name || 'файл' }), h('button', { type: 'button', 'aria-label': 'Убрать', onclick: () => { v.media.splice(i, 1); rerender(); } }, '×'))),
+    h('button', { class: 'pillb', type: 'button', style: 'height:60px', onclick: () => fi.click() }, '+ Фото / файл'), fi);
+  zone.addEventListener('dragover', (e) => e.preventDefault());
+  zone.addEventListener('drop', async (e) => { e.preventDefault(); for (const f of e.dataTransfer.files) { try { v.media.push(await upload(f, r.id)); } catch { /* skip */ } } rerender(); });
+  return zone;
+}
+function sheetVariants(r) {
+  const vars = [{ name: '', desc: '', media: [] }, { name: '', desc: '', media: [] }];
+  const body = h('div', { style: 'display:flex;flex-direction:column;gap:12px' });
+  const draw = () => put(body, 
+    h('div', { style: 'font-size:13px;color:var(--mut)', text: 'Клиент увидит фото и описание без цены и выберет подходящий. Пустые варианты не отправятся.' }),
+    vars.map((v, i) => h('div', { class: 'box' }, h('div', { class: 'bh' }, h('b', { text: 'Вариант ' + (i + 1) }), vars.length > 1 ? h('button', { class: 'pillb', type: 'button', onclick: () => { vars.splice(i, 1); draw(); } }, 'Убрать') : null),
+      h('label', { class: 'lab' }, 'Название', h('input', { class: 'inp', value: v.name, placeholder: 'Например: Weichai WP6D, 100 кВА', oninput: (e) => { v.name = e.target.value; } })),
+      h('label', { class: 'lab' }, 'Характеристики', h('textarea', { class: 'inp', value: v.desc, placeholder: '80 кВт · 21 л/ч · 2 050 кг · кожух', oninput: (e) => { v.desc = e.target.value; } })),
+      filesBox(r, v, draw))),
+    h('button', { class: 'pillb', type: 'button', style: 'align-self:flex-start', onclick: () => { vars.push({ name: '', desc: '', media: [] }); draw(); } }, '+ Ещё вариант'));
+  draw();
+  sheet('Варианты на согласование', body, (close) => [h('button', { class: 'bigb', type: 'button', onclick: async () => {
+    const vs = vars.filter((v) => v.name.trim() || v.desc.trim() || v.media.length).map((v) => ({ id: rid(), name: v.name.trim(), desc: v.desc.trim(), media: v.media }));
+    if (!vs.length) { toast('Заполните хотя бы один вариант'); return; }
+    close();
+    await push(r, { from: 'manager', kind: 'variants', variants: vs, text: vs.length > 1 ? 'Варианты на согласование' : 'Вариант на согласование', at: Date.now() }, { status: 'approval', approvals: vs, approvalPick: null, approvalNone: null, staffReadAt: Date.now() + 1000 });
+    toast('Отправлено на согласование');
+  } }, 'Отправить клиенту')]);
+}
+function sheetKp(r) {
+  const kind = KIND(r); const rate = num(rates?.cny) || 71;
+  const fromApproval = (r.approvals || []).length ? (r.approvalPick ? r.approvals.filter((v, i) => r.approvalPick.includes('Вариант ' + (i + 1)) || (v.name && r.approvalPick.includes(v.name))) : r.approvals) : [];
+  const prev = r.kp?.variants?.length ? r.kp.variants : fromApproval;
+  const yuanMode = kind === 'goods' || kind === 'buyout';
+  const vars = (prev.length ? prev : [{ name: r.title || '' }]).map((v) => ({ name: v.name || '', desc: v.desc || '', media: [...(v.media || [])], cny: v.cny || '', qty: v.qty || 1, chinaShip: v.chinaShip || '', term: v.term || '', price: yuanMode && v.cny ? '' : (v.price || '') }));
+  const lg = { method: r.kp?.logi?.method || r.shipping?.key || 'auto', cost: r.kp?.logi?.cost || '', term: r.kp?.logi?.term || '' };
+  if (!SHIP[lg.method]) lg.method = 'auto';
+  const extra = { terms: r.kp?.terms || '' };
+  const priceOf = (v) => yuanMode && num(v.cny) ? Math.round((num(v.cny) * (num(v.qty) || 1) + num(v.chinaShip)) * rate) : num(v.price);
+  const yLine = (v) => '= ' + num(v.cny).toLocaleString('ru-RU') + ' ¥' + (num(v.qty) > 1 ? ' × ' + num(v.qty) : '') + (num(v.chinaShip) ? ' + ' + num(v.chinaShip) + ' ¥ по Китаю' : '') + ' × ' + rate + ' ₸';
+  const body = h('div', { style: 'display:flex;flex-direction:column;gap:12px' });
+  const buildPrev = () => h('div', { class: 'prev' }, h('span', { class: 'cap', text: 'КЛИЕНТ УВИДИТ' }),
+    kind === 'cargo' ? null : vars.map((v, i) => [h('div', { class: 'kv2', style: 'color:var(--fg)' }, h('span', { text: (vars.length > 1 ? (i + 1) + ' · ' : '') + (v.name || '—') }), h('b', { text: priceOf(v) ? money(priceOf(v)) : '—' })), yuanMode && num(v.cny) ? h('small', { style: 'color:var(--mut);align-self:flex-end;font-size:11.5px', text: yLine(v) }) : null]),
+    kind !== 'translate' ? h('div', { class: 'kv2' }, h('span', { text: 'Доставка до Алматы (' + SHIP[lg.method] + ')' }), h('span', { text: num(lg.cost) ? '≈ ' + money(num(lg.cost)) : 'не указана' })) : null,
+    (vars.length === 1 || kind === 'cargo') && (kind === 'cargo' ? num(lg.cost) : priceOf(vars[0]) && num(lg.cost)) ? h('div', { class: 'kv2 tot' }, h('span', { text: 'Итого' }), h('span', { text: '≈ ' + money((kind === 'cargo' ? 0 : priceOf(vars[0])) + num(lg.cost)) })) : null,
+    h('small', { style: 'color:var(--mut);font-size:11.5px', text: 'Кнопка у клиента: «' + (kind === 'cargo' ? 'Отправить груз' : kind === 'translate' ? 'Записаться' : vars.length > 1 ? 'Оформить этот вариант' : 'Оформить заказ') + '»' }));
+  const refresh = () => { for (const v of vars) if (v.__tot) v.__tot.textContent = priceOf(v) ? money(priceOf(v)) : '—'; const old = body.querySelector('.prev'); if (old) old.replaceWith(buildPrev()); };
+  const fld = (v, key, label, ph, accent) => h('label', { class: 'lab' }, label, h('input', { class: 'inp', inputmode: 'decimal', value: v[key], placeholder: ph || '', style: accent ? 'border-color:var(--acc)' : null, oninput: (e) => { v[key] = e.target.value; refresh(); } }));
+  const draw = () => {
+    put(body, 
+      h('div', { style: 'font-size:13px;color:var(--mut)' }, 'Курс сегодня: ', h('b', { style: 'color:var(--fg)', text: rate + ' ₸ за 1 ¥' }), ' · меняется в настройках'),
+      kind === 'cargo' ? null : vars.map((v, i) => {
+        v.__tot = yuanMode ? h('b', { text: priceOf(v) ? money(priceOf(v)) : '—' }) : null;
+        return h('div', { class: 'box' }, h('div', { class: 'bh' }, h('b', { text: vars.length > 1 ? 'Вариант ' + (i + 1) : 'Товар' }), vars.length > 1 ? h('button', { class: 'pillb', type: 'button', onclick: () => { vars.splice(i, 1); draw(); } }, 'Убрать') : null),
+          h('label', { class: 'lab' }, 'Название', h('input', { class: 'inp', value: v.name, oninput: (e) => { v.name = e.target.value; refresh(); } })),
+          yuanMode ? h('div', { class: 'g3' }, fld(v, 'cny', 'Цена, ¥', '42 000', true), fld(v, 'qty', 'Кол-во'), fld(v, 'chinaShip', 'По Китаю, ¥', '0'))
+            : fld(v, 'price', kind === 'translate' ? 'Стоимость услуги, ₸' : 'Цена, ₸'),
+          yuanMode ? h('div', { class: 'tot' }, h('span', { text: 'по курсу ' + rate + ' ₸' }), v.__tot) : null,
+          h('label', { class: 'lab' }, kind === 'translate' ? 'Когда' : 'Срок', h('input', { class: 'inp', value: v.term, placeholder: kind === 'translate' ? 'Завтра в 11:00' : '15–20 дней', oninput: (e) => { v.term = e.target.value; } })),
+          h('label', { class: 'lab' }, 'Описание (необязательно)', h('textarea', { class: 'inp', value: v.desc, oninput: (e) => { v.desc = e.target.value; } })),
+          filesBox(r, v, draw));
+      }),
+      kind === 'cargo' ? null : h('button', { class: 'pillb', type: 'button', style: 'align-self:flex-start', onclick: () => { vars.push({ name: '', desc: '', media: [], cny: '', qty: 1, chinaShip: '', term: '', price: '' }); draw(); } }, '+ Ещё вариант'),
+      kind !== 'translate' ? h('div', { class: 'box' }, h('b', { text: 'Доставка Китай → Алматы, ₸' + (kind === 'cargo' ? '' : ' (примерно)') }),
+        h('div', { class: 'opts' }, Object.entries(SHIP).map(([k, l]) => h('button', { type: 'button', 'aria-pressed': String(lg.method === k), onclick: () => { lg.method = k; draw(); } }, l))),
+        h('div', { class: 'g2' }, fld(lg, 'cost', 'Стоимость, ₸', '300 000'), h('label', { class: 'lab' }, 'Срок', h('input', { class: 'inp', value: lg.term, placeholder: '10–14 дней', oninput: (e) => { lg.term = e.target.value; } })))) : null,
+      h('label', { class: 'lab' }, 'Условия и комментарий (необязательно)', h('textarea', { class: 'inp', value: extra.terms, placeholder: 'Предоплата 100%, гарантия 1 год', oninput: (e) => { extra.terms = e.target.value; } })),
+      buildPrev());
+  };
+  draw();
+  sheet(r.kp ? 'Новое КП для ' + (r.clientName || 'клиента') : 'КП для ' + (r.clientName || 'клиента'), body, (close) => [h('button', { class: 'bigb', type: 'button', onclick: async () => {
+    const variants = kind === 'cargo' ? [] : vars.map((v) => ({ id: rid(), name: v.name.trim(), desc: v.desc.trim(), term: v.term.trim(), media: v.media, cny: v.cny, qty: v.qty, chinaShip: v.chinaShip, price: priceOf(v) }));
+    if (kind !== 'cargo' && variants.some((v) => !v.price)) { toast('Укажите цену у каждого варианта'); return; }
+    if (kind !== 'cargo' && variants.some((v) => !v.name)) { toast('Укажите название у каждого варианта'); return; }
+    const logi = num(lg.cost) ? { method: lg.method, cost: num(lg.cost), term: lg.term.trim() } : null;
+    if (kind === 'cargo' && !logi) { toast('Укажите стоимость доставки'); return; }
+    const kp = { type: kind, variants, rate: yuanMode ? rate : null, logi, extras: '', terms: extra.terms.trim(), validUntil: '', note: '', sentAt: Date.now(), product: kind === 'cargo' ? 'Доставка груза' : variants[0].name, price: kind === 'cargo' ? '' : String(variants[0].price) };
+    const keep = ['work', 'done'].includes(r.status);
+    const patch = keep ? { kp } : { kp, status: 'kp', decision: null, rejectReason: null, chosenVariant: null, mode: r.mode === 'manager' ? 'manager' : 'ai' };
+    close();
+    await push(r, { from: 'manager', kind: 'kp', text: r.kp ? 'Новое КП' : (kind === 'cargo' ? 'Расчёт доставки' : 'КП'), at: Date.now() }, { ...patch, staffReadAt: Date.now() + 1000 });
+    toast('КП отправлено');
+  } }, 'Отправить КП в чат')]);
+}
+function sheetPay(r) {
+  const p = pays(r);
+  const keys = ['goods', 'china', 'city'].filter((k) => (k !== 'goods' || KIND(r) !== 'cargo') && (k !== 'city' || r.delivery?.method === 'door') && (k === 'goods' || KIND(r) !== 'translate'));
+  const label = (k) => (k === 'goods' ? (KIND(r) === 'translate' ? 'Услуга' : 'Товар') : k === 'china' ? 'Доставка Китай → Алматы' : 'Доставка Алматы → ' + (r.delivery?.city || 'город'));
+  const checks = keys.map((k) => h('label', { class: 'chk', style: p[k]?.paid ? 'opacity:.5' : '' }, h('input', { type: 'checkbox', value: k, checked: !p[k]?.paid && (k === 'goods' || !keys.includes('goods') || goodsPaid(r)) && !p[k]?.paid ? (k === keys.find((x) => !p[x]?.paid)) : false, disabled: !!p[k]?.paid }), h('span', { text: label(k) + (payAmount(r, k) ? ' — ' + money(payAmount(r, k)) : '') + (p[k]?.paid ? ' (уже оплачено)' : '') })));
+  const method = h('div', { class: 'opts' }); let mval = 'Kaspi';
+  const drawM = () => put(method, ...['Kaspi', 'Перевод на карту', 'Наличные', 'Счёт'].map((t) => h('button', { type: 'button', 'aria-pressed': String(mval === t), onclick: () => { mval = t; drawM(); } }, t))); drawM();
+  const amt = h('input', { class: 'inp', inputmode: 'decimal', placeholder: 'Сумма, если отличается' });
+  const file = h('input', { class: 'inp', type: 'file', accept: 'image/*,.pdf', style: 'padding:9px' });
+  sheet('Клиент оплатил', [h('b', { text: 'Что оплачено' }), checks, h('b', { text: 'Как' }), method, h('label', { class: 'lab' }, 'Сумма (необязательно)', amt), h('label', { class: 'lab' }, 'Фото чека (необязательно)', file)],
+    (close) => [h('button', { class: 'bigb g', type: 'button', onclick: async () => {
+      const selK = checks.map((c) => c.querySelector('input')).filter((i) => i.checked).map((i) => i.value);
+      if (!selK.length) { toast('Отметьте, что оплачено'); return; }
+      let receipt = null; if (file.files[0]) { try { receipt = (await upload(file.files[0], r.id)).url; } catch { toast('Чек не загрузился'); } }
+      const at = Date.now(); const payments = { ...(r.payments || {}) };
+      selK.forEach((k) => { payments[k] = { paid: true, at, method: mval, amount: selK.length === 1 && num(amt.value) ? num(amt.value) : payAmount(r, k), receipt }; });
+      const patch = { payments };
+      if (selK.includes('china')) patch.deliveryPrepaid = true;
+      if (selK.includes('city')) patch.cityDelivery = { ...(r.cityDelivery || {}), prepaid: true };
+      if (selK.includes('goods') && KIND(r) !== 'cargo' && (!r.stage || r.stage === 'paid')) { patch.stage = 'paid'; patch.stageAt = at; patch.status = 'work'; }
+      if (selK.includes('china') && r.stage === 'almaty') { patch.stage = 'delivery_paid'; patch.stageAt = at; }
+      const total = selK.reduce((s, k) => s + (payments[k].amount || 0), 0);
+      close();
+      await push(r, { from: 'sys', kind: 'payment', keys: selK, amount: total, at, text: 'Оплата получена: ' + selK.map((k) => (k === 'goods' ? (KIND(r) === 'translate' ? 'услуга' : 'товар') : k === 'china' ? 'доставка до Алматы' : 'доставка до ' + (r.delivery?.city || 'города'))).join(', ') + (total ? ' — ' + money(total) : '') }, patch);
+      toast('Оплата отмечена, клиенту ушло уведомление');
+    } }, 'Сохранить оплату')]);
+}
+function sheetStage(r) {
+  const list = stagesFor(r).filter((k) => k !== 'paid');
+  const curI = list.indexOf(r.stage);
+  const nextK = list.find((k, i) => i > curI);
+  const body = h('div', { style: 'display:flex;flex-direction:column;gap:12px' });
+  const exact = { cost: r.logiExact || '', w: '', v: '' };
+  const disp = { method: 'Такси', driver: '', phone: '', car: '', color: '', plate: '', eta: '', media: [] };
+  let mode = null;
+  const draw = () => put(body, 
+    !['work', 'done'].includes(r.status) ? h('div', { style: 'color:var(--org);font-size:13px', text: 'Заказ ещё не оформлен клиентом — этапы появятся после оформления.' }) : null,
+    h('div', { class: 'stg' }, list.map((k, i) => h('button', { type: 'button', class: k === nextK ? 'nx' : '', disabled: i <= curI || !['work', 'done'].includes(r.status), onclick: () => {
+      if (k === 'sent_city') { mode = 'dispatch'; draw(); return; }
+      if (k === 'delivery_paid') { document.querySelector('.shade')?.remove(); sheetPay(r); return; }
+      setStage(r, k); document.querySelector('.shade')?.remove();
+    } }, h('span', { text: STAGE_LABEL[k] }), h('small', { style: 'color:var(--mut)', text: i <= curI ? '✓ готово' : k === nextK ? 'следующий' : '' })))),
+    ['work', 'done'].includes(r.status) && KIND(r) !== 'translate' ? h('div', { class: 'box' }, h('b', { text: 'Точная стоимость доставки (после склада)' }),
+      h('div', { class: 'g3' }, h('label', { class: 'lab' }, 'Стоимость, ₸', h('input', { class: 'inp', inputmode: 'decimal', value: exact.cost, oninput: (e) => { exact.cost = e.target.value; } })),
+        h('label', { class: 'lab' }, 'Вес, кг', h('input', { class: 'inp', inputmode: 'decimal', oninput: (e) => { exact.w = e.target.value; } })),
+        h('label', { class: 'lab' }, 'Объём, м³', h('input', { class: 'inp', inputmode: 'decimal', oninput: (e) => { exact.v = e.target.value; } }))),
+      h('button', { class: 'pillb a', type: 'button', style: 'align-self:flex-start', onclick: async () => {
+        const v = num(exact.cost); if (!v) { toast('Укажите стоимость'); return; }
+        const goods = pays(r).goods?.paid ? 0 : payAmount(r, 'goods');
+        document.querySelector('.shade')?.remove();
+        await push(r, { from: 'sys', kind: 'exact', cost: v, weight: num(exact.w) || null, volume: num(exact.v) || null, total: goods + v, text: 'Товар на складе. Точная стоимость доставки: ' + money(v) + (goods ? '. Итого: ' + money(goods + v) : '') + '.', at: Date.now() }, { logiExact: v });
+        toast('Клиенту отправлена точная стоимость');
+      } }, 'Отправить клиенту')) : null,
+    mode === 'dispatch' ? h('div', { class: 'box' }, h('b', { text: 'Отправили в ' + (r.delivery?.city || 'город') + ' — данные (все необязательные)' }),
+      h('div', { class: 'opts' }, ['Такси', 'Транспортная компания', 'Автобус', 'Другое'].map((t) => h('button', { type: 'button', 'aria-pressed': String(disp.method === t), onclick: () => { disp.method = t; draw(); } }, t))),
+      h('div', { class: 'g2' }, ...[['driver', 'Водитель'], ['phone', 'Телефон водителя'], ['car', 'Машина'], ['color', 'Цвет'], ['plate', 'Госномер'], ['eta', 'Примерно приедет']].map(([k, l]) => h('label', { class: 'lab' }, l, h('input', { class: 'inp', value: disp[k], oninput: (e) => { disp[k] = e.target.value; } })))),
+      filesBox(r, disp, draw),
+      h('button', { class: 'pillb a', type: 'button', style: 'align-self:flex-start', onclick: async () => {
+        const d = { ...disp, at: Date.now() }; document.querySelector('.shade')?.remove();
+        await push(r, { from: 'sys', kind: 'dispatch', dispatch: d, text: 'Товар отправлен в ' + (r.delivery?.city || 'ваш город') + '.', at: Date.now() }, { dispatch: d, stage: 'sent_city', stageAt: Date.now(), status: 'work' });
+        toast('Клиенту отправлены данные машины');
+      } }, 'Отправить клиенту')) : null);
+  draw();
+  sheet('Этап заказа', body, (close) => [h('button', { class: 'ghb', type: 'button', onclick: close }, 'Закрыть')]);
+}
+async function setStage(r, k) {
+  const at = Date.now(); const extra = k === 'delivered' ? { status: 'done', doneAt: at } : { status: 'work' };
+  await push(r, { from: 'sys', kind: 'stage', stage: k, text: stageText(k, r), at }, { stage: k, stageAt: at, ...extra });
+  toast('Этап: ' + STAGE_LABEL[k]);
+}
+function sheetAi(r) {
+  const ta = h('textarea', { class: 'inp', style: 'min-height:110px', value: r.aiNote || 'Заявка в работе, ждём ответа от поставщиков в Китае. Цены и сроки не обещай.', 'aria-label': 'Указание для ИИ' });
+  sheet('ИИ отвечает клиенту', [h('div', { style: 'font-size:13px;color:var(--mut)', text: 'ИИ будет отвечать клиенту сам по этому указанию. Если клиент спросит то, чего ИИ не знает, — чат станет красным «ИИ спрашивает», и вы ответите.' }), ta],
+    (close) => [aiOn(r) ? h('button', { class: 'ghb', type: 'button', onclick: async () => { close(); await push(r, null, { aiNote: null, mode: 'manager' }); toast('ИИ выключен в этом чате'); } }, 'Выключить ИИ') : null,
+      h('button', { class: 'bigb', type: 'button', onclick: async () => { const t = ta.value.trim(); if (!t) { toast('Напишите указание'); return; } close(); await push(r, null, { aiNote: t, aiNoteAt: Date.now(), mode: 'ai', handoff: false }); toast('ИИ отвечает по вашему указанию'); } }, 'Включить')]);
+}
+
+/* ---------- доска ---------- */
+const COLS = [
+  ['new', 'Новые', (r) => r.status === 'new'],
+  ['appr', 'Согласование', (r) => r.status === 'approval'],
+  ['kp', 'КП отправлено', (r) => ['kp', 'waiting', 'delivery'].includes(r.status)],
+  ['pay', 'Ждут оплаты', (r) => awaitingPay(r) || delivDue(r)],
+  ['way', 'Китай → в пути', (r) => r.status === 'work' && !awaitingPay(r) && !delivDue(r) && ['paid', 'bought', 'wait_china', 'china', 'transit'].includes(r.stage || 'paid') && r.stage !== 'almaty'],
+  ['alm', 'Алматы → клиенту', (r) => r.status === 'work' && !delivDue(r) && ['almaty', 'delivery_paid', 'sent_city'].includes(r.stage)],
+];
+function renderBoard() {
+  $('#list').hidden = true; $('#info').hidden = true;
+  const chat = $('#chat');
+  put(chat, h('div', { class: 'board', id: 'board' },
+    h('div', { style: 'display:flex;align-items:center;gap:12px' }, h('h1', { style: 'flex:1', text: 'Доска · заказы по этапам' }), h('span', { style: 'color:var(--mut);font-size:13px', text: 'Нажмите на карточку — откроется чат' })),
+    h('div', { class: 'cols' }, COLS.map(([k, l, fn]) => {
+      const list = all.filter((r) => r.service !== 'support' && fn(r)).sort((a, b) => sortKey(b) - sortKey(a));
+      return h('section', { class: 'col' + (k === 'pay' ? ' pay' : '') }, h('div', { class: 'chd' }, h('span', { text: l }), h('span', { style: 'color:var(--mut)', text: String(list.length) })),
+        list.map((r) => { const lt = lastTalk(r); return h('button', { type: 'button', class: 'bc' + (goodsPaid(r) && r.status === 'work' && !delivDue(r) ? ' paid' : awaitingPay(r) || delivDue(r) ? ' wait' : ''), onclick: () => openChat(r.id) },
+          h('b', { text: r.title || '—' }), h('small', { text: (r.clientName || 'Клиент') + ' · №' + r.num }),
+          needsReply(r) && lt ? h('span', { class: 'chip c-red', style: 'align-self:flex-start', text: 'ждёт ' + waitTxt(lt.at) }) : h('small', { text: statusChip(r)[0] + (r.assignee?.name ? ' · ' + r.assignee.name.split(' ')[0] : '') })); }));
+    }))));
+}
+
+boot();
+})();
+</script>
+</body>
+</html>
