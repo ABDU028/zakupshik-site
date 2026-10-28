@@ -66,6 +66,7 @@ svg{flex-shrink:0}
 .pillb{height:36px;padding:0 13px;border-radius:18px;border:0;background:var(--s3);color:var(--fg);font-weight:700;font-size:12.5px;white-space:nowrap;display:inline-flex;align-items:center;gap:6px;text-decoration:none}
 .pillb.g{background:var(--grnBg);color:var(--grnT)}
 .pillb.a{background:var(--acc);color:#fff}
+select.pillb{appearance:none;-webkit-appearance:none;padding-right:13px}
 .ib{width:36px;height:36px;border-radius:18px;border:0;background:var(--s3);color:var(--fg);display:inline-flex;align-items:center;justify-content:center;text-decoration:none}
 .msgs{flex:1;overflow-y:auto;padding:16px 26px;display:flex;flex-direction:column;gap:8px}
 .msgs>*{flex-shrink:0}
@@ -485,7 +486,7 @@ function rowEl(r) {
       h('span', { class: 'r3' }, h('span', { class: nr && r.handoff ? 'urg' : '', text: pv }),
         nr && r.handoff ? h('span', { class: 'cnt red', text: '!' }) : un ? h('span', { class: 'cnt', text: String(un) }) : (m?.from === 'manager' ? h('span', { class: 'tk' + ((r.clientReadAt || 0) >= m.at ? ' r' : ''), text: '✓✓' }) : null)),
       h('span', { class: 'chips' }, h('span', { class: 'chip ' + cls, text: st }), aiOn(r) && !r.handoff ? h('span', { class: 'chip c-blu', text: 'ИИ отвечает' }) : null,
-        r.assignee?.name ? h('span', { class: 'chip', text: isMine(r) ? 'Ведёте вы' : 'Ведёт: ' + r.assignee.name.split(' ')[0] }) : null,
+        r.assignee?.name ? h('span', { class: 'chip', text: isMine(r) ? 'Мой клиент' : 'Ведёт: ' + r.assignee.name.split(' ')[0] }) : null,
         snoozed(r) ? h('span', { class: 'chip', text: 'Отложено' }) : null)));
 }
 function openChat(id) {
@@ -515,9 +516,9 @@ function renderChat() {
       h('small', {}, [r.city || r.clientCity, r.clientPhone].filter(Boolean).join(' · '), ' · ', h('span', { class: 'chip ' + cls, text: st }))),
     tel ? h('a', { class: 'ib', href: 'tel:' + tel, 'aria-label': 'Позвонить', title: 'Позвонить' }, ic('phone', 17)) : null,
     tel ? h('a', { class: 'pillb', href: 'https://wa.me/' + tel.replace('+', ''), target: '_blank', rel: 'noopener' }, 'WhatsApp') : null,
-    isMine(r) ? h('button', { class: 'pillb g', type: 'button', title: 'Нажмите, чтобы освободить', onclick: () => push(r, null, { assignee: null }) }, 'Ведёте вы')
+    isMine(r) ? h('button', { class: 'pillb g', type: 'button', title: 'Клиент закреплён за вами. Нажмите, чтобы открепить', onclick: () => { if (confirm('Открепить клиента от себя?')) push(r, null, { assignee: null }); } }, '✓ Мой клиент')
       : r.assignee?.id ? h('button', { class: 'pillb', type: 'button', title: 'Забрать себе', onclick: () => { if (confirm('Клиента ведёт ' + r.assignee.name + '. Забрать себе?')) push(r, null, { assignee: { id: me.id, name: me.name } }); } }, 'Ведёт: ' + r.assignee.name.split(' ')[0])
-      : h('button', { class: 'pillb a', type: 'button', onclick: () => push(r, null, { assignee: { id: me.id, name: me.name } }) }, 'Беру'),
+      : h('button', { class: 'pillb a', type: 'button', title: 'Закрепить клиента за вами — другие менеджеры увидят, что его ведёте вы', onclick: () => push(r, null, { assignee: { id: me.id, name: me.name } }) }, 'Взять клиента себе'),
     snoozeBtn(r),
     h('button', { class: 'ib', type: 'button', 'aria-label': 'Данные заявки', title: 'Данные заявки', onclick: () => { infoOpen = !infoOpen; renderInfo(); } }, ic('info', 18)));
   const th = r.thread || [];
