@@ -338,6 +338,8 @@ textarea.input{height:auto;min-height:88px;padding:12px 14px;resize:vertical}
 .jv-mic{width:52px;height:52px;flex-shrink:0;border-radius:50%;border:0;background:var(--accent);color:#fff;font-size:22px}
 .jv-mic.on{background:#EF4444}
 
+.jv-fab.capture{background:radial-gradient(circle at 30% 30%,#FF8A8A,#EF4444 60%,#7A1010)}
+.jv-fab.capture .jv-ring{border-color:#EF4444;animation:jvp 1s ease-out infinite}
 .jv-fab.always{background:radial-gradient(circle at 30% 30%,#7CF0B0,#2FB36D 60%,#0E5C33)}
 .jv-fab.always .jv-ring{border-color:#2FB36D;animation:jvp 2s ease-out infinite}
 .jv-hud{position:fixed;left:50%;transform:translateX(-50%);bottom:24px;z-index:58;display:flex;align-items:center;gap:12px;max-width:min(760px,calc(100vw - 140px));padding:10px 16px;border-radius:18px;background:var(--ink);color:var(--on-ink);box-shadow:0 10px 30px rgba(0,0,0,.35)}
@@ -4479,36 +4481,65 @@ async function jvSend(text) {
 // чат-окно: кнопка 🎤 там работает как «нажал-сказал», кружок — постоянное прослушивание
 function jvToggle(open) { jvOpen = open; jvPanel.hidden = !open; jvFab.classList.toggle('on', open); if (open) jvRender(); jvHudRender(); }
 /* ===================== конец v5 ===================== */
-/* ===================== Закупщик v6: Jarvis реагирует сразу, не ждёт тишины; «пробел — говорю» ===================== */
-let jvPTT = false, jvCmdTimer = null, jvCmdHard = null, jvCmdText = '', jvWakeAt = 0;
+/* ===================== Закупщик v6: голос как кнопка в чате — нажал, сказал, выполнил ===================== */
+// Режимы: 1) кружок J — нажал, говоришь, нажал ещё раз (или замолчал на секунду) → выполняет;
+// 2) пробел — держишь, говоришь, отпускаешь → выполняет; 3) «слушать постоянно» (по слову «Джарвис») — включается в полоске снизу.
+let jvPTT = false, jvCapture = false, jvCapTimer = null, jvCapHard = null, jvCmdTimer = null, jvCmdHard = null, jvCmdText = '';
+function jvStopRec() { const r = jvRecObj; jvRecObj = null; if (r) { try { r.abort(); } catch { /* ignore */ } } jvListening = false; jvFab.classList.remove('listen'); jvHudRender(); }
 function jvStartRec() {
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SR) { toast('Голос работает в Google Chrome или Microsoft Edge'); jvAlways = false; return; }
-  if (jvRecObj || jvSpeaking) return;
+  if (!SR) { toast('Голос работает в Google Chrome или Microsoft Edge'); jvAlways = false; jvCapture = false; return; }
+  if (jvRecObj) return;
   const rec = new SR(); jvRecObj = rec;
   rec.lang = 'ru-RU'; rec.interimResults = true; rec.continuous = true; rec.maxAlternatives = 1;
+  let fin = '';
   rec.onresult = (ev) => {
-    let interim = '', fin = '';
+    if (jvRecObj !== rec) return;
+    let interim = '';
     for (let i = ev.resultIndex; i < ev.results.length; i++) {
       const t = ev.results[i][0].transcript;
-      if (ev.results[i].isFinal) fin += t + ' '; else interim += t + ' ';
+      if (ev.results[i].isFinal) fin += ' ' + t; else interim += ' ' + t;
     }
-    if (jvPTT || !jvAlways) { if (fin.trim()) jvPushText += ' ' + fin.trim(); jvHeard = (jvPushText + ' ' + interim).trim(); jvHudRender(); const el = document.getElementById('jvText'); if (el && jvOpen && !jvAlways) el.value = jvHeard; return; }
-    const live = (fin + interim).trim();
-    if (live) { jvHeard = live; jvHudRender(); jvOnLive(live, !!fin.trim()); }
+    const live = (fin + ' ' + interim).replace(/\s+/g, ' ').trim();
+    jvHeard = live; jvHudRender();
+    if (jvPTT) return;                                         // пробел: ждём, когда отпустят
+    if (jvCapture) {                                          // кружок: ждём паузу 1,2 с, максимум 8 с
+      clearTimeout(jvCapTimer); jvCapTimer = setTimeout(jvFinishCapture, 1200);
+      if (!jvCapHard) jvCapHard = setTimeout(jvFinishCapture, 8000);
+      return;
+    }
+    if (jvAlways) jvOnLive(live, !interim.trim());
   };
-  rec.onerror = (ev) => { if (ev.error === 'not-allowed' || ev.error === 'service-not-allowed') { jvMicDenied = true; jvAlways = false; toast('Разрешите доступ к микрофону (значок слева от адреса сайта)'); } };
+  rec.onerror = (ev) => { if (ev.error === 'not-allowed' || ev.error === 'service-not-allowed') { jvMicDenied = true; jvAlways = false; jvCapture = false; toast('Разрешите доступ к микрофону: значок слева от адреса сайта → Микрофон → Разрешить'); } };
   rec.onend = () => {
+    if (jvRecObj !== rec) return;                            // старый сеанс — не трогаем новый
     jvRecObj = null; jvListening = false; jvFab.classList.remove('listen');
-    if ((jvPTT || !jvAlways) && jvPushText.trim()) { const t = jvPushText.trim(); jvPushText = ''; const el = document.getElementById('jvText'); if (el) el.value = ''; jvPTT = false; jvHandle(t); }
-    jvPTT = false;
+    if (jvPTT || jvCapture) { jvPTT = false; jvCapture = false; clearTimeout(jvCapTimer); clearTimeout(jvCapHard); jvCapHard = null; const t = jvHeard.trim(); jvFab.classList.remove('capture'); if (t) jvHandle(t); }
     if (jvAlways && !jvSpeaking && !jvMicDenied) setTimeout(jvStartRec, 150);
     jvHudRender(); if (jvOpen) jvRender();
   };
   try { rec.start(); jvListening = true; jvFab.classList.add('listen'); } catch { jvRecObj = null; }
   jvHudRender();
 }
-// живой разбор: как только услышали «Джарвис, …» — не ждём, пока вокруг замолчат
+function jvBeginCapture(ptt) {
+  try { speechSynthesis.cancel(); } catch { /* ignore */ }
+  jvSpeaking = false; jvHeard = ''; jvLastSaid = '';
+  jvStopRec();
+  jvPTT = !!ptt; jvCapture = !ptt; jvFab.classList.add('capture');
+  clearTimeout(jvCapTimer); clearTimeout(jvCapHard); jvCapHard = null;
+  if (!ptt) jvCapHard = setTimeout(jvFinishCapture, 9000);
+  jvStartRec();
+}
+function jvFinishCapture() { clearTimeout(jvCapTimer); clearTimeout(jvCapHard); jvCapHard = null; const r = jvRecObj; if (r) { try { r.stop(); } catch { /* ignore */ } } }
+function jvFabClick() { if (jvCapture || jvPTT) jvFinishCapture(); else jvBeginCapture(false); }
+jvFab.title = 'Jarvis: нажмите и говорите (или держите пробел)';
+
+// постоянное прослушивание по слову «Джарвис»
+function jvSetAlways(on) {
+  jvAlways = on; jvFab.classList.toggle('always', on);
+  if (on) { jvMicDenied = false; jvStartRec(); jvSay('Слушаю постоянно. Говорите: Джарвис и команду.'); } else { jvStopRec(); jvPending = null; }
+  jvHudRender();
+}
 function jvOnLive(text, isFinal) {
   const now = Date.now();
   if (jvPending && now < jvConfirmUntil) {
@@ -4518,26 +4549,31 @@ function jvOnLive(text, isFinal) {
   }
   const m = text.match(WAKE);
   let cmd = null;
-  if (m) { cmd = text.slice(m[0].length).trim(); if (!jvWakeAt) jvWakeAt = now; }
+  if (m) cmd = text.slice(m[0].length).trim();
   else if (now < jvAwaitUntil) cmd = text.trim();
-  if (cmd == null) { if (isFinal) jvResetRec(); return; } // чужая речь — сбрасываем
+  if (cmd == null) { if (isFinal) jvResetRec(); return; }
   if (!cmd) { if (isFinal) { jvAwaitUntil = now + 9000; jvResetRec(); jvSay('Да?'); } return; }
-  jvCmdText = cmd.split(/\s+/).slice(0, 40).join(' ');
-  // короткая команда навигации — выполняем сразу
-  if (jvLocal(jvCmdText, true)) return jvFire();
-  if (isFinal) return jvFire();
-  clearTimeout(jvCmdTimer); jvCmdTimer = setTimeout(jvFire, 900);           // пауза 0,9 с — команда закончилась
-  if (!jvCmdHard) jvCmdHard = setTimeout(jvFire, 6000);                    // не дольше 6 секунд, даже если вокруг говорят
+  jvCmdText = cmd;
+  if (jvLocal(jvCmdText, true) || isFinal) return jvFire();
+  clearTimeout(jvCmdTimer); jvCmdTimer = setTimeout(jvFire, 1000);
+  if (!jvCmdHard) jvCmdHard = setTimeout(jvFire, 6000);
 }
-function jvFire() {
-  clearTimeout(jvCmdTimer); clearTimeout(jvCmdHard); jvCmdTimer = jvCmdHard = null;
-  const t = jvCmdText.trim(); jvCmdText = ''; jvWakeAt = 0; jvAwaitUntil = 0;
-  jvResetRec();
-  if (t) jvHandle(t);
-}
+function jvFire() { clearTimeout(jvCmdTimer); clearTimeout(jvCmdHard); jvCmdTimer = jvCmdHard = null; const t = jvCmdText.trim(); jvCmdText = ''; jvAwaitUntil = 0; jvResetRec(); if (t) jvHandle(t); }
 function jvResetRec() { jvStopRec(); if (jvAlways && !jvSpeaking) setTimeout(jvStartRec, 120); }
+// пока Jarvis говорит — микрофон не слушает (чтобы не слышал сам себя), после — снова слушает, если включено «постоянно»
+function jvSay(text) {
+  jvLastSaid = text || ''; jvHudRender();
+  if (!jvSpeak || !text || !window.speechSynthesis) return;
+  try {
+    const u = new SpeechSynthesisUtterance(text.replace(/[«»"]/g, '').replace(/₸/g, ' тенге').replace(/¥/g, ' юаней').replace(/№/g, 'номер '));
+    u.lang = 'ru-RU'; u.rate = 1.1; if (jvVoice || (jvVoice = pickVoice())) u.voice = jvVoice;
+    if (jvAlways && !jvCapture && !jvPTT) { jvSpeaking = true; jvStopRec(); }
+    u.onend = u.onerror = () => { jvSpeaking = false; jvHudRender(); if (jvAlways && !jvRecObj) setTimeout(jvStartRec, 200); };
+    speechSynthesis.cancel(); speechSynthesis.speak(u);
+  } catch { jvSpeaking = false; }
+}
 
-// быстрые команды: dry=true — только проверить, подходит ли
+// быстрые команды: dry=true — только проверить
 const _jvLocalV5 = jvLocal;
 jvLocal = function (text, dry) {
   if (!dry) return _jvLocalV5(text);
@@ -4549,20 +4585,39 @@ jvLocal = function (text, dry) {
   return false;
 };
 
-// «Пробел — говорю»: держите пробел, говорите, отпустите (без «Джарвис», вокруг можно шуметь)
+// пробел: держишь — слушает, отпустил — выполняет (работает везде, кроме полей ввода)
 document.addEventListener('keydown', (e) => {
   if (current !== 'admin' || e.code !== 'Space' || e.repeat || e.ctrlKey || e.altKey || e.metaKey) return;
-  const tag = (document.activeElement?.tagName || '').toLowerCase();
-  if (['input', 'textarea', 'select', 'button'].includes(tag) || document.activeElement?.isContentEditable) return;
-  e.preventDefault();
-  try { speechSynthesis.cancel(); } catch { /* ignore */ }
-  jvSpeaking = false; jvPTT = true; jvPushText = ''; jvHeard = ''; jvStopRec(); jvStartRec(); jvHudRender();
-});
+  const el = document.activeElement; const tag = (el?.tagName || '').toLowerCase();
+  if (['input', 'textarea', 'select'].includes(tag) || el?.isContentEditable) return;
+  e.preventDefault(); if (tag === 'button') el.blur();
+  jvBeginCapture(true); jvHudRender();
+}, true);
 document.addEventListener('keyup', (e) => {
   if (e.code !== 'Space' || !jvPTT) return;
   e.preventDefault();
-  setTimeout(() => { if (jvRecObj) { try { jvRecObj.stop(); } catch { /* ignore */ } } }, 250);
-});
+  setTimeout(jvFinishCapture, 300);
+}, true);
+
+// полоска снизу: что услышал, что сделал; кнопка «слушать постоянно»
+function jvHudRender() {
+  const on = jvAlways || jvListening || jvBusy || jvSpeaking || jvPending || jvCapture || jvPTT || (jvLastSaid && Date.now() - (jvHudShownAt || 0) < 15000);
+  jvHud.hidden = !on || current !== 'admin';
+  if (jvHud.hidden) return;
+  const state = jvBusy ? 'Выполняю…' : jvPTT ? 'Говорите… отпустите пробел' : jvCapture ? 'Говорите… (нажмите J, чтобы закончить)' : jvSpeaking ? 'Говорю…' : jvPending ? 'Подтвердите: «да» или «нет»' : jvAlways ? 'Слушаю постоянно: «Джарвис, …»' : 'Jarvis';
+  jvHud.replaceChildren(...[
+    h('span', { class: 'jv-dot' + (jvListening ? ' on' : ''), 'aria-hidden': 'true' }),
+    h('div', { class: 'jv-hud-t' }, h('b', { text: state }),
+      jvHeard ? h('div', { class: 'heard', text: '«' + jvHeard + '»' }) : null,
+      jvLastSaid ? h('div', { class: 'said', text: jvLastSaid }) : null),
+    jvPending ? h('button', { class: 'btn btn-green', type: 'button', style: 'height:40px', onclick: () => jvConfirm(true) }, 'Да') : null,
+    jvPending ? h('button', { class: 'btn btn-ghost', type: 'button', style: 'height:40px', onclick: () => jvConfirm(false) }, 'Нет') : null,
+    h('button', { class: 'linkbtn', type: 'button', onclick: () => jvSetAlways(!jvAlways) }, jvAlways ? 'Не слушать постоянно' : 'Слушать постоянно'),
+    h('button', { class: 'linkbtn', type: 'button', onclick: () => jvToggle(!jvOpen) }, jvOpen ? 'Скрыть чат' : 'Чат')].filter(Boolean));
+}
+let jvHudShownAt = 0;
+const _jvSayV6 = jvSay;
+jvSay = function (text) { jvHudShownAt = Date.now(); _jvSayV6(text); };
 /* ===================== конец v6 ===================== */
 
 
