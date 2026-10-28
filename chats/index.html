@@ -439,6 +439,8 @@ async function start() {
 }
 async function push(r, item, patch) {
   const p = { ...(patch || {}) }; delete p.thread;
+  // менеджер что-то отправил клиенту (текст, КП, дозаказ, варианты) — вопрос ИИ закрыт
+  if (item && item.from === 'manager' && r.handoff && !('handoff' in p)) { p.handoff = false; p.handoffQuestion = null; }
   const { error } = await SB.rpc('push_thread', { req_id: r.id, item: item || null, patch: Object.keys(p).length ? p : null });
   if (error) { console.error(error); toast('Не сохранилось. Проверьте связь.'); return false; }
   const i = all.findIndex((x) => x.id === r.id);
