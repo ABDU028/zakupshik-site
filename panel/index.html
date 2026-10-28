@@ -352,6 +352,14 @@ textarea.input{height:auto;min-height:88px;padding:12px 14px;resize:vertical}
 .jv-hud .linkbtn{color:#F2A27A;text-decoration:none;font-size:12.5px;white-space:nowrap}
 @media (max-width:700px){.jv-hud{left:8px;right:96px;transform:none;max-width:none}}
 
+.jv-panel.mini{width:min(380px,calc(100vw - 32px));height:min(360px,60vh)}
+.jv-panel.mini .jv-hello{font-size:13px}
+.jv-h b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.jv-h .linkbtn{white-space:nowrap}
+.jv-panel.mini .jv-h .linkbtn:not(.jv-big){font-size:0}
+.jv-panel.mini .jv-h .linkbtn:not(.jv-big)::first-letter{font-size:16px}
+.jv-panel.mini .jv-m{font-size:13.5px;padding:7px 10px}
+
 /* admin */
 .agrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr));gap:16px;align-items:start}
 .ar{display:flex;gap:12px;align-items:center;text-align:left;width:100%;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:12px}
@@ -4601,8 +4609,8 @@ document.addEventListener('keyup', (e) => {
 
 // полоска снизу: что услышал, что сделал; кнопка «слушать постоянно»
 function jvHudRender() {
-  const on = jvAlways || jvListening || jvBusy || jvSpeaking || jvPending || jvCapture || jvPTT || (jvLastSaid && Date.now() - (jvHudShownAt || 0) < 15000);
-  jvHud.hidden = !on || current !== 'admin';
+  const on = jvAlways || jvListening || jvBusy || jvSpeaking || jvPending || jvCapture || jvPTT || (jvLastSaid && Date.now() - (jvHudShownAt || 0) < 3000);
+  jvHud.hidden = !on || current !== 'admin' || (jvOpen && !jvListening && !jvPending && !jvPTT && !jvCapture);
   if (jvHud.hidden) return;
   const state = jvBusy ? 'Выполняю…' : jvPTT ? 'Говорите… отпустите пробел' : jvCapture ? 'Говорите… (нажмите J, чтобы закончить)' : jvSpeaking ? 'Говорю…' : jvPending ? 'Подтвердите: «да» или «нет»' : jvAlways ? 'Слушаю постоянно: «Джарвис, …»' : 'Jarvis';
   jvHud.replaceChildren(...[
@@ -4619,6 +4627,35 @@ let jvHudShownAt = 0;
 const _jvSayV6 = jvSay;
 jvSay = function (text) { jvHudShownAt = Date.now(); _jvSayV6(text); };
 /* ===================== конец v6 ===================== */
+/* ===================== Закупщик v7: без голоса по умолчанию, маленький чат сбоку ===================== */
+jvSpeak = (() => { try { return localStorage.getItem('zk_jv_speak2') === '1'; } catch { return false; } })();
+let jvBig = false;
+jvPanel.classList.add('mini');
+const _jvRenderV6 = jvRender;
+jvRender = function () {
+  _jvRenderV6();
+  if (!jvOpen) return;
+  jvPanel.classList.toggle('mini', !jvBig);
+  const head = jvPanel.querySelector('.jv-h');
+  if (head && !head.querySelector('.jv-big')) {
+    const sp = [...head.querySelectorAll('.linkbtn')].find((b) => /голос/.test(b.textContent));
+    if (sp) { sp.textContent = jvSpeak ? '🔊 озвучка вкл' : '🔇 без озвучки'; sp.onclick = (e) => { e.stopImmediatePropagation(); jvSpeak = !jvSpeak; try { localStorage.setItem('zk_jv_speak2', jvSpeak ? '1' : '0'); } catch { /* ignore */ } if (!jvSpeak) { try { speechSynthesis.cancel(); } catch { /* ignore */ } } jvRender(); }; }
+    head.insertBefore(h('button', { class: 'linkbtn jv-big', type: 'button', onclick: () => { jvBig = !jvBig; jvRender(); } }, jvBig ? 'Свернуть' : 'Развернуть'), head.querySelector('.iconbtn'));
+  }
+};
+const _jvHandleV6 = jvHandle;
+jvHandle = function (text) { const st = jvState(); _jvHandleV6(text); if (!st.history.length || st.history[st.history.length - 1].text !== text) { /* быстрые команды тоже видно в чате */ } };
+// быстрые команды пишут в чат, а не только говорят
+const _jvSayV7 = jvSay;
+jvSay = function (text) {
+  const st = jvState(); const last = st.history[st.history.length - 1];
+  if (text && !(last && last.role === 'jv' && last.text === text)) {
+    if (jvHeard && !(st.history.length && st.history[st.history.length - 1].text === jvHeard)) st.history.push({ role: 'me', text: jvHeard, at: Date.now() });
+    st.history.push({ role: 'jv', text, at: Date.now() });
+  }
+  _jvSayV7(text); if (jvOpen) jvRender();
+};
+/* ===================== конец v7 ===================== */
 
 
 
