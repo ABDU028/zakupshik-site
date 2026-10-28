@@ -338,6 +338,18 @@ textarea.input{height:auto;min-height:88px;padding:12px 14px;resize:vertical}
 .jv-mic{width:52px;height:52px;flex-shrink:0;border-radius:50%;border:0;background:var(--accent);color:#fff;font-size:22px}
 .jv-mic.on{background:#EF4444}
 
+.jv-fab.always{background:radial-gradient(circle at 30% 30%,#7CF0B0,#2FB36D 60%,#0E5C33)}
+.jv-fab.always .jv-ring{border-color:#2FB36D;animation:jvp 2s ease-out infinite}
+.jv-hud{position:fixed;left:50%;transform:translateX(-50%);bottom:24px;z-index:58;display:flex;align-items:center;gap:12px;max-width:min(760px,calc(100vw - 140px));padding:10px 16px;border-radius:18px;background:var(--ink);color:var(--on-ink);box-shadow:0 10px 30px rgba(0,0,0,.35)}
+.jv-hud[hidden]{display:none}
+.jv-hud .jv-dot{flex-shrink:0}
+.jv-hud-t{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;font-size:13px}
+.jv-hud-t b{font-size:13.5px}
+.jv-hud .heard{opacity:.75;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.jv-hud .said{color:#9FE0BC;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.jv-hud .linkbtn{color:#F2A27A;text-decoration:none;font-size:12.5px;white-space:nowrap}
+@media (max-width:700px){.jv-hud{left:8px;right:96px;transform:none;max-width:none}}
+
 /* admin */
 .agrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr));gap:16px;align-items:start}
 .ar{display:flex;gap:12px;align-items:center;text-align:left;width:100%;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:12px}
@@ -4053,7 +4065,7 @@ function jvOverview() {
 }
 
 // ---------- кнопка и окно ----------
-const jvFab = h('button', { class: 'jv-fab', type: 'button', 'aria-label': 'Jarvis — голосовой помощник', title: 'Jarvis: нажмите и говорите', onclick: () => { if (!jvOpen) { jvToggle(true); jvListen(true); } else jvListen(!jvListening); } },
+const jvFab = h('button', { class: 'jv-fab', type: 'button', 'aria-label': 'Jarvis — голосовой помощник', title: 'Jarvis: нажмите и говорите', onclick: () => jvFabClick() },
   h('span', { class: 'jv-ring', 'aria-hidden': 'true' }), h('span', { class: 'jv-fab-t', text: 'J' }));
 const jvPanel = h('aside', { class: 'jv-panel', 'aria-label': 'Jarvis', hidden: true });
 document.body.append(jvFab, jvPanel);
@@ -4241,8 +4253,8 @@ function jvRender() {
     h('div', { class: 'jv-bar' },
       h('button', { class: 'jv-mic' + (jvListening ? ' on' : ''), type: 'button', 'aria-label': jvListening ? 'Остановить' : 'Говорить', onclick: () => jvListen(!jvListening) }, jvListening ? '■' : '🎤'),
       h('button', { class: 'cbtn', type: 'button', 'aria-label': 'Прикрепить файлы', title: ctxAll ? 'Откройте заявку, чтобы прикрепить файлы' : 'Фото, видео, техспецификации', onclick: () => fileIn.click() }, '📎'),
-      h('textarea', { id: 'jvText', rows: '2', placeholder: jvListening ? 'Слушаю… говорите' : 'Скажите или напишите Jarvis', onkeydown: (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); const v = e.target.value; e.target.value = ''; jvSend(v); } } }),
-      h('button', { class: 'cbtn send', type: 'button', 'aria-label': 'Отправить', disabled: jvBusy, onclick: () => { const el = document.getElementById('jvText'); const v = el.value; el.value = ''; jvSend(v); } }, svg('send'))),
+      h('textarea', { id: 'jvText', rows: '2', placeholder: jvListening ? 'Слушаю… говорите' : 'Скажите или напишите Jarvis', onkeydown: (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); const v = e.target.value; e.target.value = ''; jvHandle(v); } } }),
+      h('button', { class: 'cbtn send', type: 'button', 'aria-label': 'Отправить', disabled: jvBusy, onclick: () => { const el = document.getElementById('jvText'); const v = el.value; el.value = ''; jvHandle(v); } }, svg('send'))),
     fileIn].filter(Boolean));
   const ta = document.getElementById('jvText'); if (ta && keepText) ta.value = keepText;
   const box = document.getElementById('jvMsgs'); if (box) box.scrollTop = box.scrollHeight;
@@ -4251,6 +4263,223 @@ function jvRender() {
 const _renderAreqV3 = renderAreq;
 renderAreq = function (first) { _renderAreqV3(first); if (first) jvRender(); };
 /* ===================== конец v4 ===================== */
+/* ===================== Закупщик v5: Jarvis слушает всегда и управляет панелью ===================== */
+let jvAlways = false, jvHeard = '', jvLastSaid = '', jvPending = null, jvSpeaking = false, jvAwaitUntil = 0, jvConfirmUntil = 0, jvMicDenied = false;
+const WAKE = /^(.*?)(джарвис|джервис|жарвис|джарвиз|джарви|jarvis|чарльз|джа[рв]+и?с)[\s,.!:-]*/i;
+const YES = /^(да|давай|ага|угу|подтверждаю|отправляй|отправь|выполняй|выполни|делай|ок|окей|конечно|закрывай)\b/i;
+const NO = /^(нет|не надо|отмена|отмени|стоп|не отправляй)\b/i;
+const jvHud = h('div', { class: 'jv-hud', hidden: true, role: 'status', 'aria-live': 'polite' });
+document.body.append(jvHud);
+
+function jvHudRender() {
+  const on = jvAlways || jvListening || jvBusy || jvSpeaking;
+  jvHud.hidden = !on || current !== 'admin';
+  if (jvHud.hidden) return;
+  const state = jvBusy ? 'Думаю…' : jvSpeaking ? 'Говорю…' : jvPending ? 'Жду: «да» или «нет»' : Date.now() < jvAwaitUntil ? 'Слушаю команду…' : jvAlways ? 'Скажите: «Джарвис, …»' : 'Слушаю…';
+  jvHud.replaceChildren(
+    h('span', { class: 'jv-dot' + (jvListening ? ' on' : ''), 'aria-hidden': 'true' }),
+    h('div', { class: 'jv-hud-t' },
+      h('b', { text: state }),
+      jvHeard ? h('div', { class: 'heard', text: '«' + jvHeard + '»' }) : null,
+      jvLastSaid ? h('div', { class: 'said', text: jvLastSaid }) : null),
+    jvPending ? h('button', { class: 'btn btn-green', type: 'button', style: 'height:40px', onclick: () => jvConfirm(true) }, 'Да') : null,
+    jvPending ? h('button', { class: 'btn btn-ghost', type: 'button', style: 'height:40px', onclick: () => jvConfirm(false) }, 'Нет') : null,
+    h('button', { class: 'linkbtn', type: 'button', onclick: () => jvToggle(!jvOpen) }, jvOpen ? 'Скрыть чат' : 'Чат'),
+    h('button', { class: 'linkbtn', type: 'button', onclick: () => jvSetAlways(false) }, 'Выключить'));
+}
+setInterval(jvHudRender, 1000);
+
+// кружок: включить/выключить постоянное прослушивание
+function jvFabClick() { jvSetAlways(!jvAlways); }
+jvFab.title = 'Jarvis: включить — и говорите «Джарвис, …»';
+function jvSetAlways(on) {
+  jvAlways = on; jvFab.classList.toggle('always', on);
+  if (on) { jvMicDenied = false; jvStartRec(); jvSay('Я на связи.'); } else { jvStopRec(); jvPending = null; }
+  jvHudRender();
+}
+
+// ---------- распознавание: непрерывно, перезапуск при обрыве ----------
+let jvRecObj = null, jvPushText = '';
+function jvStartRec() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) { toast('Голос работает в Google Chrome или Microsoft Edge'); jvAlways = false; return; }
+  if (jvRecObj || jvSpeaking) return;
+  const rec = new SR(); jvRecObj = rec;
+  rec.lang = 'ru-RU'; rec.interimResults = true; rec.continuous = true;
+  rec.onresult = (ev) => {
+    let interim = '';
+    for (let i = ev.resultIndex; i < ev.results.length; i++) {
+      const t = ev.results[i][0].transcript.trim();
+      if (ev.results[i].isFinal) { if (t) jvOnFinal(t); } else interim += t + ' ';
+    }
+    jvHeard = interim.trim() || jvHeard; jvHudRender();
+    const el = document.getElementById('jvText'); if (el && !jvAlways && interim) el.value = (jvPushText + ' ' + interim).trim();
+  };
+  rec.onerror = (ev) => { if (ev.error === 'not-allowed' || ev.error === 'service-not-allowed') { jvMicDenied = true; jvAlways = false; toast('Разрешите доступ к микрофону (значок слева от адреса сайта)'); } };
+  rec.onend = () => {
+    jvRecObj = null; jvListening = false; jvFab.classList.remove('listen');
+    if (!jvAlways && jvPushText.trim()) { const t = jvPushText.trim(); jvPushText = ''; const el = document.getElementById('jvText'); if (el) el.value = ''; jvHandle(t); }
+    if (jvAlways && !jvSpeaking && !jvMicDenied) setTimeout(jvStartRec, 250);
+    jvHudRender(); if (jvOpen) jvRender();
+  };
+  try { rec.start(); jvListening = true; jvFab.classList.add('listen'); } catch { jvRecObj = null; }
+  jvHudRender();
+}
+function jvStopRec() { const r = jvRecObj; jvRecObj = null; if (r) { try { r.abort(); } catch { /* ignore */ } } jvListening = false; jvFab.classList.remove('listen'); jvHudRender(); }
+// кнопка 🎤 в окне чата: нажал — сказал — остановил
+function jvListen(on) {
+  if (jvAlways) { if (!on) jvSetAlways(false); return; }
+  if (on) { jvPushText = ''; jvStartRec(); } else if (jvRecObj) { try { jvRecObj.stop(); } catch { /* ignore */ } }
+  if (jvOpen) jvRender();
+}
+function jvOnFinal(t) {
+  jvHeard = t;
+  if (!jvAlways) { jvPushText += ' ' + t; return; }
+  const now = Date.now();
+  if (jvPending && now < jvConfirmUntil) {
+    const s = t.replace(WAKE, '').trim();
+    if (YES.test(s)) return jvConfirm(true);
+    if (NO.test(s)) return jvConfirm(false);
+  }
+  const m = t.match(WAKE);
+  if (m) {
+    const cmd = t.slice(m[0].length).trim();
+    if (cmd) jvHandle(cmd); else { jvAwaitUntil = now + 9000; jvSay('Да?'); }
+    return;
+  }
+  if (now < jvAwaitUntil) { jvAwaitUntil = 0; jvHandle(t); }
+}
+
+// ---------- голос: лучший доступный, микрофон на паузе пока говорит ----------
+let jvVoice = null;
+function pickVoice() {
+  const vs = (window.speechSynthesis?.getVoices() || []).filter((v) => /^ru/i.test(v.lang));
+  return vs.find((v) => /natural|online|neural/i.test(v.name)) || vs.find((v) => /google/i.test(v.name)) || vs.find((v) => /milena|yuri|svetlana|dariya|irina/i.test(v.name)) || vs[0] || null;
+}
+try { speechSynthesis.onvoiceschanged = () => { jvVoice = pickVoice(); }; jvVoice = pickVoice(); } catch { /* ignore */ }
+function jvSay(text) {
+  jvLastSaid = text || ''; jvHudRender();
+  if (!jvSpeak || !text || !window.speechSynthesis) return;
+  try {
+    const u = new SpeechSynthesisUtterance(text.replace(/[«»"]/g, '').replace(/₸/g, ' тенге').replace(/¥/g, ' юаней').replace(/№/g, 'номер '));
+    u.lang = 'ru-RU'; u.rate = 1.08; u.pitch = 1; if (jvVoice || (jvVoice = pickVoice())) u.voice = jvVoice;
+    jvSpeaking = true; jvStopRec();
+    u.onend = u.onerror = () => { jvSpeaking = false; jvHudRender(); if (jvAlways) setTimeout(jvStartRec, 200); };
+    speechSynthesis.cancel(); speechSynthesis.speak(u);
+  } catch { jvSpeaking = false; }
+}
+
+// ---------- быстрые команды без ИИ ----------
+const F_WORDS = [[/нужен ответ|без ответа|ответить/, 'reply'], [/ждут ответа|ответа на кп|кп/, 'kp'], [/оплат/, 'pay'], [/работ/, 'work'], [/нов/, 'new'], [/закрыт|заверш/, 'done'], [/согласован/, 'approval'], [/доставк.*посчит|посчитать/, 'logi'], [/перезвон/, 'call'], [/алмат|склад/, 'almaty'], [/после покупки/, 'post'], [/отказал/, 'rejected'], [/все|всё/, 'all']];
+const T_WORDS = [[/кп|предложени|расч[её]т/, 'kp'], [/оплат/, 'pay'], [/доставк/, 'dlv'], [/заявк|тз|детал/, 'info']];
+function jvLocal(text) {
+  const t = text.toLowerCase().replace(/ё/g, 'е').trim();
+  const numM = t.match(/(?:заявк[ауи]?|номер|№|#)?\s*(\d{3,6})\b/);
+  if (/^(открой|покажи|зайди|перейди|найди|давай)/.test(t) && numM && /\d{3,6}/.test(t)) {
+    const n = Number(numM[1]); const r = all.find((x) => Number(x.num) === n);
+    if (!r) { jvSay('Заявку ' + n + ' не нашёл.'); return true; }
+    if (amode !== 'req') setAmode('req');
+    if (!inFilter(r, afilter)) { afilter = 'all'; renderFilters(); renderAdminList(); }
+    openAreq(r.id); jvSay('Открыл заявку ' + n + (r.clientName ? ', ' + r.clientName.split(' ')[0] : '') + '. ' + (ST[r.status]?.label || '') + (r.stage ? ', ' + (STAGE_LABEL[r.stage] || '') : '') + '.');
+    return true;
+  }
+  if (/^(открой|покажи|перейди|зайди)/.test(t) && /вкладк|раздел/.test(t) && areq) {
+    const tab = T_WORDS.find(([re]) => re.test(t));
+    if (tab) { setTab(areq, tab[1]); jvSay('Открыл.'); return true; }
+  }
+  if (/^(открой|покажи|перейди|зайди)/.test(t) && /чат|поддержк/.test(t) && !/заявк/.test(t)) { setAmode('chats'); jvSay('Открыл чаты поддержки.'); return true; }
+  if (/^(открой|покажи|перейди|зайди)/.test(t) && /клиент/.test(t) && !/заявк/.test(t)) { setAmode('clients'); jvSay('Открыл клиентов.'); return true; }
+  if (/^(открой|покажи|перейди|зайди|что)/.test(t) && !/вкладк/.test(t)) {
+    const f = F_WORDS.find(([re]) => re.test(t));
+    if (f && !/что по|что у нас по|что там по/.test(t)) {
+      if (amode !== 'req') setAmode('req');
+      afilter = f[1]; renderFilters(); renderAdminList();
+      const list = all.filter((r) => inFilter(r, f[1]));
+      const label = FILTERS.find(([k]) => k === f[1])?.[1] || '';
+      jvSay('«' + label + '»: ' + (list.length ? list.length + ' ' + plural(list.length, 'заявка', 'заявки', 'заявок') + '. ' + list.slice(0, 3).map((r) => r.num + ' — ' + (r.clientName || '').split(' ')[0]).join(', ') + (list.length > 3 ? ' и другие.' : '.') : 'пусто.'));
+      return true;
+    }
+  }
+  if (/^(назад|к списку|закрой окно)/.test(t)) { $('#aPanes').classList.remove('show-detail'); jvSay('Хорошо.'); return true; }
+  if (/^(хватит|выключись|отключись|пока джарвис|спасибо,? пока)/.test(t)) { jvSay('До связи.'); setTimeout(() => jvSetAlways(false), 900); return true; }
+  return false;
+}
+const plural = (n, a, b, c) => { const m = n % 10, mm = n % 100; return m === 1 && mm !== 11 ? a : m >= 2 && m <= 4 && (mm < 10 || mm >= 20) ? b : c; };
+
+function jvHandle(text) {
+  jvHeard = text; jvHudRender();
+  if (jvPending && YES.test(text)) return jvConfirm(true);
+  if (jvPending && NO.test(text)) return jvConfirm(false);
+  if (jvState().draft.length && /^(отправляй|отправь( клиенту| это| всё| все)?|да,? отправляй)$/i.test(text.trim())) { jvAsk('Отправить клиенту ' + jvState().draft.length + ' ' + plural(jvState().draft.length, 'действие', 'действия', 'действий') + ' из черновика?', { type: 'draft' }); return; }
+  if (jvLocal(text)) return;
+  jvSend(text);
+}
+function jvAsk(question, pending) { jvPending = pending; jvConfirmUntil = Date.now() + 20000; jvSay(question); jvHudRender(); }
+async function jvConfirm(yes) {
+  const p = jvPending; jvPending = null; jvHudRender();
+  if (!p) return;
+  if (!yes) { jvSay('Отменил.'); return; }
+  if (p.type === 'draft') {
+    const st = jvState(); const items = [...st.draft];
+    for (const a of items) await jvExec(a, null);
+    jvSay(st.draft.length ? 'Не всё получилось, посмотрите черновик.' : 'Отправил.');
+  } else if (p.type === 'close') {
+    let n = 0;
+    for (const num0 of p.nums) {
+      const r = all.find((x) => Number(x.num) === Number(num0)); if (!r) continue;
+      const at = Date.now();
+      const patch = r.status === 'work' ? { status: 'done', doneAt: at } : { status: 'declined', decision: 'decline', rejectReason: p.reason || 'Закрыта менеджером' };
+      if (await pushThread(r.id, { from: 'sys', text: 'Заявка закрыта менеджером.', at }, patch)) n++;
+    }
+    jvSay('Закрыл ' + n + ' ' + plural(n, 'заявку', 'заявки', 'заявок') + '.');
+    setTimeout(() => { renderAdminList(); renderFilters(); if (areq) refreshA(); }, 1200);
+  } else if (p.type === 'status') {
+    const r = all.find((x) => Number(x.num) === Number(p.num)); if (!r) return;
+    if (areq?.id !== r.id) openAreq(r.id);
+    setTimeout(async () => { await patchA(p.patch, p.item || null); jvSay('Готово.'); }, areq?.id === r.id ? 0 : 900);
+  }
+}
+
+// ---------- запрос к ИИ: теперь он может управлять экраном ----------
+async function jvSend(text) {
+  text = String(text || '').trim(); if (!text || jvBusy) return;
+  const st = jvState(); const ctxId = jvKey();
+  st.history.push({ role: 'me', text, at: Date.now() });
+  jvBusy = true; jvHudRender(); if (jvOpen) jvRender();
+  const onScreen = all.filter((r) => inFilter(r, afilter)).slice(0, 30).map((r) => r.num).join(', ');
+  try {
+    const { data, error } = await window.SB.functions.invoke('ai', { body: {
+      task: 'jarvis', text, request_id: ctxId === 'all' ? null : ctxId, files: st.files, draft: st.draft,
+      history: st.history.slice(-10, -1), overview: jvOverview(), screen: 'Вкладка: ' + (FILTERS.find(([k]) => k === afilter)?.[1] || afilter) + '. На экране заявки: ' + (onScreen || 'нет') } });
+    if (error || data?.error) throw new Error(data?.error || 'ai');
+    const say = data.say || 'Готово.';
+    st.history.push({ role: 'jv', text: say, at: Date.now() });
+    const acts = (data.actions || []).filter((a) => a && a.type);
+    const nav = acts.filter((a) => ['open', 'filter', 'tab'].includes(a.type));
+    const close = acts.find((a) => a.type === 'close');
+    const status = acts.find((a) => a.type === 'set_status');
+    const draft = acts.filter((a) => !['open', 'filter', 'tab', 'close', 'set_status', 'answer'].includes(a.type));
+    for (const a of nav) {
+      if (a.type === 'filter' && FILTERS.some(([k]) => k === a.f)) { if (amode !== 'req') setAmode('req'); afilter = a.f; renderFilters(); renderAdminList(); }
+      if (a.type === 'open') { const r = all.find((x) => Number(x.num) === Number(a.num)); if (r) { if (amode !== 'req') setAmode('req'); if (!inFilter(r, afilter)) { afilter = 'all'; renderFilters(); } openAreq(r.id); } }
+      if (a.type === 'tab' && areq) setTab(areq, a.tab);
+    }
+    if (draft.length) st.draft = draft.map((a) => ({ ...a, _id: rid() }));
+    st.rate = data.rate;
+    if (close && Array.isArray(close.nums) && close.nums.length) jvAsk(say || ('Закрыть ' + close.nums.join(', ') + '?'), { type: 'close', nums: close.nums, reason: close.reason });
+    else if (status && status.num) jvAsk(say, { type: 'status', num: status.num, patch: status.patch || {} });
+    else jvSay(say);
+    if (draft.length && !jvOpen) jvToggle(true);
+  } catch (e) {
+    console.error(e);
+    st.history.push({ role: 'jv', text: 'Не получилось связаться с ИИ. Попробуйте ещё раз.', at: Date.now(), err: true });
+    jvSay('Не получилось, повторите.');
+  } finally { jvBusy = false; jvHudRender(); if (jvOpen) jvRender(); }
+}
+// чат-окно: кнопка 🎤 там работает как «нажал-сказал», кружок — постоянное прослушивание
+function jvToggle(open) { jvOpen = open; jvPanel.hidden = !open; jvFab.classList.toggle('on', open); if (open) jvRender(); jvHudRender(); }
+/* ===================== конец v5 ===================== */
+
 
 
 
