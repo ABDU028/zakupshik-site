@@ -806,14 +806,17 @@ function sheetKp(r) {
   const vars = (prev.length ? prev : [{ name: r.title || '' }]).map((v) => ({ name: v.name || '', desc: v.desc || '', media: [...(v.media || [])], cny: v.cny || '', qty: v.qty || 1, chinaShip: v.chinaShip || '', term: v.term || '', price: yuanMode && v.cny ? '' : (v.price || '') }));
   const lg = { method: r.kp?.logi?.method || r.shipping?.key || 'auto', cost: r.kp?.logi?.cost || '', term: r.kp?.logi?.term || '' };
   if (!SHIP[lg.method]) lg.method = 'auto';
+  lg.exact = !!r.logiExact && (!r.kp?.logi || num(r.logiExact) === num(r.kp.logi.cost));
+  if (lg.exact && !lg.cost) lg.cost = r.logiExact;
+  const ap = () => (lg.exact ? '' : '≈ ');
   const extra = { terms: r.kp?.terms || '' };
   const priceOf = (v) => yuanMode && num(v.cny) ? Math.round((num(v.cny) * (num(v.qty) || 1) + num(v.chinaShip)) * rate) : num(v.price);
   const yLine = (v) => '= ' + num(v.cny).toLocaleString('ru-RU') + ' ¥' + (num(v.qty) > 1 ? ' × ' + num(v.qty) : '') + (num(v.chinaShip) ? ' + ' + num(v.chinaShip) + ' ¥ по Китаю' : '') + ' × ' + rate + ' ₸';
   const body = h('div', { style: 'display:flex;flex-direction:column;gap:12px' });
   const buildPrev = () => h('div', { class: 'prev' }, h('span', { class: 'cap', text: 'КЛИЕНТ УВИДИТ' }),
     kind === 'cargo' ? null : vars.map((v, i) => [h('div', { class: 'kv2', style: 'color:var(--fg)' }, h('span', { text: (vars.length > 1 ? (i + 1) + ' · ' : '') + (v.name || '—') }), h('b', { text: priceOf(v) ? money(priceOf(v)) : '—' })), yuanMode && num(v.cny) ? h('small', { style: 'color:var(--mut);align-self:flex-end;font-size:11.5px', text: yLine(v) }) : null]),
-    kind !== 'translate' ? h('div', { class: 'kv2' }, h('span', { text: 'Доставка до Алматы (' + SHIP[lg.method] + ')' }), h('span', { text: num(lg.cost) ? '≈ ' + money(num(lg.cost)) : 'не указана' })) : null,
-    (vars.length === 1 || kind === 'cargo') && (kind === 'cargo' ? num(lg.cost) : priceOf(vars[0]) && num(lg.cost)) ? h('div', { class: 'kv2 tot' }, h('span', { text: 'Итого' }), h('span', { text: '≈ ' + money((kind === 'cargo' ? 0 : priceOf(vars[0])) + num(lg.cost)) })) : null,
+    kind !== 'translate' ? h('div', { class: 'kv2' }, h('span', { text: 'Доставка до Алматы (' + SHIP[lg.method] + ')' + (lg.exact ? ', точная' : '') }), h('span', { text: num(lg.cost) ? ap() + money(num(lg.cost)) : 'не указана' })) : null,
+    (vars.length === 1 || kind === 'cargo') && (kind === 'cargo' ? num(lg.cost) : priceOf(vars[0]) && num(lg.cost)) ? h('div', { class: 'kv2 tot' }, h('span', { text: 'Итого' }), h('span', { text: ap() + money((kind === 'cargo' ? 0 : priceOf(vars[0])) + num(lg.cost)) })) : null,
     h('small', { style: 'color:var(--mut);font-size:11.5px', text: 'Кнопка у клиента: «' + (kind === 'cargo' ? 'Отправить груз' : kind === 'translate' ? 'Записаться' : vars.length > 1 ? 'Оформить этот вариант' : 'Оформить заказ') + '»' }));
   const refresh = () => { for (const v of vars) if (v.__tot) v.__tot.textContent = priceOf(v) ? money(priceOf(v)) : '—'; const old = body.querySelector('.prev'); if (old) old.replaceWith(buildPrev()); };
   const fld = (v, key, label, ph, accent) => h('label', { class: 'lab' }, label, h('input', { class: 'inp', inputmode: 'decimal', value: v[key], placeholder: ph || '', style: accent ? 'border-color:var(--acc)' : null, oninput: (e) => { v[key] = e.target.value; refresh(); } }));
@@ -832,7 +835,9 @@ function sheetKp(r) {
           filesBox(r, v, draw));
       }),
       kind === 'cargo' ? null : h('button', { class: 'pillb', type: 'button', style: 'align-self:flex-start', onclick: () => { vars.push({ name: '', desc: '', media: [], cny: '', qty: 1, chinaShip: '', term: '', price: '' }); draw(); } }, '+ Ещё вариант'),
-      kind !== 'translate' ? h('div', { class: 'box' }, h('b', { text: 'Доставка Китай → Алматы, ₸' + (kind === 'cargo' ? '' : ' (примерно)') }),
+      kind !== 'translate' ? h('div', { class: 'box' }, h('b', { text: 'Доставка Китай → Алматы, ₸' }),
+        h('div', { class: 'opts' }, h('button', { type: 'button', 'aria-pressed': String(!lg.exact), onclick: () => { lg.exact = false; draw(); } }, 'Примерно'), h('button', { type: 'button', 'aria-pressed': String(lg.exact), onclick: () => { lg.exact = true; draw(); } }, 'Точно — знаем сумму')),
+        h('small', { style: 'color:var(--mut);font-size:12px', text: lg.exact ? 'Клиент увидит «Доставка до Алматы, точная» — без «≈» и без фразы про взвешивание.' : 'Клиент увидит «≈» и пояснение: точную сумму назовём после взвешивания на складе.' }),
         h('div', { class: 'opts' }, Object.entries(SHIP).map(([k, l]) => h('button', { type: 'button', 'aria-pressed': String(lg.method === k), onclick: () => { lg.method = k; draw(); } }, l))),
         h('div', { class: 'g2' }, fld(lg, 'cost', 'Стоимость, ₸', '300 000'), h('label', { class: 'lab' }, 'Срок', h('input', { class: 'inp', value: lg.term, placeholder: '10–14 дней', oninput: (e) => { lg.term = e.target.value; } })))) : null,
       h('label', { class: 'lab' }, 'Условия и комментарий (необязательно)', h('textarea', { class: 'inp', value: extra.terms, placeholder: 'Предоплата 100%, гарантия 1 год', oninput: (e) => { extra.terms = e.target.value; } })),
@@ -848,6 +853,7 @@ function sheetKp(r) {
     const kp = { type: kind, variants, rate: yuanMode ? rate : null, logi, extras: '', terms: extra.terms.trim(), validUntil: '', note: '', sentAt: Date.now(), product: kind === 'cargo' ? 'Доставка груза' : variants[0].name, price: kind === 'cargo' ? '' : String(variants[0].price) };
     const keep = ['work', 'done'].includes(r.status);
     const patch = keep ? { kp } : { kp, status: 'kp', decision: null, rejectReason: null, chosenVariant: null, mode: r.mode === 'manager' ? 'manager' : 'ai' };
+    if (logi && lg.exact) patch.logiExact = logi.cost; else if (!keep) patch.logiExact = null;
     close();
     await push(r, { from: 'manager', kind: 'kp', text: r.kp ? 'Новое КП' : (kind === 'cargo' ? 'Расчёт доставки' : 'КП'), at: Date.now() }, { ...patch, staffReadAt: Date.now() + 1000 });
     toast('КП отправлено');
