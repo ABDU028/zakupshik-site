@@ -74,6 +74,12 @@ svg{flex-shrink:0}
 .pillb{height:36px;padding:0 13px;border-radius:18px;border:0;background:var(--s3);color:var(--fg);font-weight:700;font-size:12.5px;white-space:nowrap;display:inline-flex;align-items:center;gap:6px;text-decoration:none}
 .pillb.g{background:var(--grnBg);color:var(--grnT)}
 .pillb.a{background:var(--acc);color:#fff}
+.callbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:9px 16px;background:var(--redBg);color:var(--redT);font-size:13.5px;font-weight:700}
+.callbar span{flex:1;min-width:200px}
+.zh{background:var(--s2);border-radius:11px;padding:10px;display:flex;flex-direction:column;gap:7px;font-size:13px;white-space:pre-wrap}
+.hist button{display:flex;justify-content:space-between;gap:8px;width:100%;text-align:left;border:0;background:var(--s2);border-radius:9px;padding:7px 9px;font-size:12.5px}
+.setw{flex:1;overflow-y:auto;padding:22px 26px;display:flex;flex-direction:column;gap:16px;max-width:760px}
+.setw h1{margin:0;font-size:21px}
 .pillb.ai{background:var(--bluBg);color:var(--bluT)}
 .tg{width:30px;height:18px;border-radius:9px;background:#4A5159;position:relative;flex-shrink:0}
 .tg::after{content:'';position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:7px;background:#fff;transition:left .15s}
@@ -240,7 +246,7 @@ const ICONS = {
   info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5h.01"/>', trash: '<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/>',
   var: '<rect x="3" y="4" width="8" height="8" rx="2"/><rect x="13" y="4" width="8" height="8" rx="2"/><path d="M3 17h18M3 21h12"/>', doc: '<path d="M6 3h9l3 3v15H6z"/><path d="M9 11h6M9 15h6"/>',
   check: '<path d="M5 12l5 5 9-10"/>', truck: '<path d="M3 6h11v10H3zM14 10h4l3 3v3h-7"/><circle cx="7" cy="18" r="1.8"/><circle cx="17" cy="18" r="1.8"/>',
-  back: '<path d="M15 5l-7 7 7 7"/>', plus: '<path d="M12 5v14M5 12h14"/>', old: '<path d="M4 4h16v16H4z"/><path d="M4 9h16M9 9v11"/>', bulb: '<path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.4 1 1.1 1 1.8V16h5v-.3c0-.7.4-1.4 1-1.8A6 6 0 0 0 12 3z"/>',
+  back: '<path d="M15 5l-7 7 7 7"/>', plus: '<path d="M12 5v14M5 12h14"/>', logout: '<path d="M15 4h4v16h-4M10 8l-4 4 4 4M6 12h10"/>', old: '<path d="M4 4h16v16H4z"/><path d="M4 9h16M9 9v11"/>', bulb: '<path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.4 1 1.1 1 1.8V16h5v-.3c0-.7.4-1.4 1-1.8A6 6 0 0 0 12 3z"/>',
 };
 function ic(name, size = 20) { const t = document.createElement('template'); t.innerHTML = '<svg width="' + size + '" height="' + size + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + ICONS[name] + '</svg>'; return t.content.firstChild; }
 let toastT;
@@ -288,9 +294,10 @@ const live = (r) => (r.thread || []).filter((m) => !m.deleted);
 function lastTalk(r) { const th = live(r); for (let i = th.length - 1; i >= 0; i--) if (['client', 'manager', 'ai'].includes(th[i].from)) return th[i]; return null; }
 function lastItem(r) { const th = live(r); return th[th.length - 1] || null; }
 const aiOn = (r) => r.mode === 'ai' && r.service !== 'support' && (!!r.kp || !!r.aiNote) && !['rejected', 'done', 'declined'].includes(r.status);
+const wantsCall = (r) => !!(r.callback?.requested && !r.callback?.done);
 function needsReply(r) {
   if (r.status === 'rejected') return false;
-  if (r.handoff) return true;
+  if (r.handoff || wantsCall(r)) return true;
   const m = lastTalk(r);
   return !!m && m.from === 'client' && (!aiOn(r) || Date.now() - m.at > 120000);
 }
@@ -368,7 +375,7 @@ function preview(r) {
 
 /* ---------- состояние ---------- */
 let me = null, staff = [], all = [], sel = null, view = 'chats', filt = 'new', q = '', infoOpen = false;
-let rates = { cny: 71 }, templates = [];
+let rates = { cny: 71 }, templates = [], contacts = {}, tariffs = {}, reminders = {};
 const sugCache = {}; // id -> { at, text, loading }
 const DEF_TPL = ['Здравствуйте! Заявку получили, уже ищем варианты у поставщиков в Китае.', 'Отправили вам варианты — посмотрите и выберите подходящий.', 'Цена указана с доставкой до нашего склада в Алматы. Точную стоимость доставки назовём после взвешивания на складе.', 'Оплатить можно через Kaspi по номеру +7 708 255 11 70. После оплаты пришлите, пожалуйста, чек сюда.', 'Товар выкуплен и едет на наш склад в Китае.', 'Спасибо за заказ! Если появятся вопросы — пишите сюда.'];
 const rowToReq = (row) => ({ ...(row.doc || {}), id: row.id, num: row.num, ownerId: row.owner_id, status: row.status, createdAt: Number(row.created_at), updatedAt: Number(row.updated_at) });
@@ -417,7 +424,7 @@ function markRead(r) {
 }
 async function loadOne(id) {
   const { data } = await SB.from('requests').select('*').eq('id', id).maybeSingle();
-  if (!data) return;
+  if (!data) { if (all.some((x) => x.id === id)) { all = all.filter((x) => x.id !== id); if (sel === id) sel = null; render(); } return; }
   const r = rowToReq(data); const i = all.findIndex((x) => x.id === id);
   if (i >= 0) all[i] = r; else all.unshift(r);
   if (sel === id && view === 'chats' && !document.hidden) markRead(r);
@@ -426,14 +433,14 @@ async function loadOne(id) {
 async function start() {
   const [{ data: st }, { data: set }] = await Promise.all([
     SB.from('profiles').select('id,first_name,last_name,role').in('role', ['manager', 'admin']),
-    SB.from('settings').select('key,value').in('key', ['rates', 'templates']),
+    SB.from('settings').select('key,value').in('key', ['rates', 'templates', 'contacts', 'tariffs', 'reminders']),
   ]);
   staff = (st || []).map((p) => ({ id: p.id, name: [p.first_name, p.last_name].filter(Boolean).join(' ') || 'Менеджер' }));
-  for (const s of set || []) { if (s.key === 'rates') rates = s.value || rates; if (s.key === 'templates') templates = s.value?.list || []; }
+  for (const s of set || []) { if (s.key === 'rates') rates = s.value || rates; if (s.key === 'templates') templates = s.value?.list || []; if (s.key === 'contacts') contacts = s.value || {}; if (s.key === 'tariffs') tariffs = s.value || {}; if (s.key === 'reminders') reminders = s.value || {}; }
   if (!templates.length) templates = DEF_TPL;
   await loadAll();
   SB.channel('m-requests').on('postgres_changes', { event: '*', schema: 'public', table: 'requests' }, (p) => { const id = p.new?.id || p.old?.id; if (id) loadOne(id); }).subscribe();
-  SB.channel('m-settings').on('postgres_changes', { event: '*', schema: 'public', table: 'settings' }, (p) => { if (p.new?.key === 'rates') rates = p.new.value; if (p.new?.key === 'templates') templates = p.new.value?.list || DEF_TPL; }).subscribe();
+  SB.channel('m-settings').on('postgres_changes', { event: '*', schema: 'public', table: 'settings' }, (p) => { const k = p.new?.key, v = p.new?.value; if (k === 'rates') rates = v; if (k === 'templates') templates = v?.list || DEF_TPL; if (k === 'contacts') contacts = v || {}; if (k === 'tariffs') tariffs = v || {}; if (k === 'reminders') reminders = v || {}; if (view === 'chats') renderList(); }).subscribe();
   setInterval(() => { if (view === 'chats') renderList(); }, 30000);
   document.addEventListener('pointerdown', () => { try { if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)(); if (window.Notification && Notification.permission === 'default') Notification.requestPermission(); } catch { /* ignore */ } }, { passive: true });
 }
@@ -481,16 +488,17 @@ function render() {
   app.classList.toggle('open', !!sel);
   updateRail();
   if (view === 'board') { renderBoard(); return; }
+  if (view === 'settings') { renderSettings(); return; }
   $('#list').hidden = false; $('#info').hidden = !sel;
   renderList(); renderChat(); renderInfo();
 }
 let railEls = {};
 function rail() {
-  const b = (key, icon, label) => (railEls[key] = h('button', { type: 'button', 'aria-label': label, title: label, onclick: () => { view = key; const bd = document.getElementById('board'); if (bd) bd.remove(); render(); } }, ic(icon, 22)));
+  const b = (key, icon, label) => (railEls[key] = h('button', { type: 'button', 'aria-label': label, title: label, onclick: () => { view = key; document.getElementById('board')?.remove(); document.getElementById('settings')?.remove(); render(); } }, ic(icon, 22)));
   return h('nav', { class: 'rail', 'aria-label': 'Разделы' }, h('span', { class: 'logo', text: 'З.' }),
     b('chats', 'chat', 'Чаты'), b('board', 'board', 'Доска по этапам'), h('span', { class: 'sp' }),
-    h('a', { href: '../panel/', title: 'Старая панель и настройки (курс, контакты, напоминания)', 'aria-label': 'Старая панель и настройки' }, ic('gear', 22)),
-    h('button', { type: 'button', 'aria-label': 'Выйти', title: 'Выйти', onclick: async () => { await SB.auth.signOut(); location.reload(); } }, ic('back', 22)));
+    b('settings', 'gear', 'Настройки: курс, контакты, тарифы, напоминания, шаблоны'),
+    h('button', { type: 'button', 'aria-label': 'Выйти', title: 'Выйти из панели', onclick: async () => { if (!confirm('Выйти из панели?')) return; await SB.auth.signOut(); location.reload(); } }, ic('logout', 22)));
 }
 function updateRail() {
   for (const [k, el] of Object.entries(railEls)) el.classList.toggle('on', k === view);
@@ -562,21 +570,21 @@ function rowEl(e) {
   const r = e.r, v = e.v, oid = e.oid;
   const name = r.clientName || 'Клиент', m = lastItem(r), nr = needsReply(r), un = unread(r), lt = lastTalk(r);
   const [st, cls] = statusChip(v);
-  const pv = r.handoff && r.handoffQuestion ? 'ИИ спрашивает: ' + r.handoffQuestion : preview(r);
+  const pv = wantsCall(r) ? '📞 Просит перезвонить' : r.handoff && r.handoffQuestion ? 'ИИ спрашивает: ' + r.handoffQuestion : preview(r);
   return h('button', { type: 'button', class: 'row' + (sel === r.id && (selOrder || null) === oid && !selMode ? ' sel' : '') + (snoozed(r) ? ' snz' : '') + (selMode && picked.has(r.id) ? ' pk' : ''), onclick: () => { if (selMode) { picked.has(r.id) ? picked.delete(r.id) : picked.add(r.id); renderList(); } else openChat(r.id, oid); } },
     selMode ? h('span', { class: 'ckb', 'aria-hidden': 'true', text: picked.has(r.id) ? '✓' : '' }) : null,
     h('span', { class: 'av', style: 'background:' + avColor(r.ownerId || r.id), text: initials(name) }),
     h('span', { class: 'rm' },
       h('span', { class: 'r1' }, h('b', { text: name }), h('span', { class: 't' + (nr ? ' urg' : un ? ' hot' : ''), text: nr && lt ? 'ждёт ' + waitTxt(lt.at) : ago(m?.at || r.createdAt) })),
       h('span', { class: 'r2', text: (r.service === 'support' ? 'Поддержка' : (v.title || '') + ' · №' + v.num) }),
-      h('span', { class: 'r3' }, h('span', { class: nr && r.handoff ? 'urg' : '', text: pv }),
-        nr && r.handoff ? h('span', { class: 'cnt red', text: '!' }) : un ? h('span', { class: 'cnt', text: String(un) }) : (m?.from === 'manager' ? h('span', { class: 'tk' + ((r.clientReadAt || 0) >= m.at ? ' r' : ''), text: '✓✓' }) : null)),
+      h('span', { class: 'r3' }, h('span', { class: nr && (r.handoff || wantsCall(r)) ? 'urg' : '', text: pv }),
+        nr && (r.handoff || wantsCall(r)) ? h('span', { class: 'cnt red', text: '!' }) : un ? h('span', { class: 'cnt', text: String(un) }) : (m?.from === 'manager' ? h('span', { class: 'tk' + ((r.clientReadAt || 0) >= m.at ? ' r' : ''), text: '✓✓' }) : null)),
       h('span', { class: 'chips' }, oid ? h('span', { class: 'chip c-yel', text: 'Дозаказ' }) : null, h('span', { class: 'chip ' + cls, text: st }), aiOn(r) && !r.handoff ? h('span', { class: 'chip c-blu', text: 'ИИ отвечает' }) : null,
         r.assignee?.name ? h('span', { class: 'chip', text: isMine(r) ? 'Мой клиент' : 'Ведёт: ' + r.assignee.name.split(' ')[0] }) : null,
         snoozed(r) ? h('span', { class: 'chip', text: 'Отложено' }) : null)));
 }
 function openChat(id, oid) {
-  view = 'chats'; document.getElementById('board')?.remove();
+  view = 'chats'; document.getElementById('board')?.remove(); document.getElementById('settings')?.remove();
   sel = id; selOrder = oid || null; menuOpen = false; tplOpen = false;
   const r = all.find((x) => x.id === id);
   if (r && !q) filt = tabOf(viewOf(r, selOrder));
@@ -613,7 +621,10 @@ function renderChat() {
   const items = []; let lastDay = '';
   th.forEach((m) => { const d = new Date(m.at).toDateString(); if (d !== lastDay) { lastDay = d; items.push(h('div', { class: 'day', text: d === new Date().toDateString() ? 'Сегодня' : new Date(m.at).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' }) })); } items.push(msgEl(r, m, lastKp, lastVar)); });
   const msgs = h('div', { class: 'msgs', id: 'msgs' }, items.length ? items : h('div', { class: 'empty', text: 'Сообщений пока нет' }));
-  put(box, head, msgs, composer(r, draft));
+  const callBar = wantsCall(r) ? h('div', { class: 'callbar' }, h('span', {}, '📞 Клиент просит перезвонить: ', h('b', { text: r.clientPhone || '' }), r.callback.reason ? ' · ' + r.callback.reason : ''),
+    tel ? h('a', { class: 'pillb', href: 'tel:' + tel }, 'Позвонить') : null,
+    h('button', { class: 'pillb g', type: 'button', onclick: () => push(r, { from: 'sys', text: 'Менеджер перезвонил.', at: Date.now() }, { callback: { ...r.callback, done: true } }) }, '✓ Перезвонил')) : null;
+  put(box, head, callBar, msgs, composer(r, draft));
   if (pinned) msgs.scrollTop = msgs.scrollHeight; else msgs.scrollTop = prevTop;
   if (focus) { const ta = $('#ta'); ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); }
 }
@@ -753,7 +764,7 @@ function composer(r, draft) {
     onpaste: (e) => { const fs = [...(e.clipboardData?.files || [])]; if (fs.length) { e.preventDefault(); sendFiles(r, fs); } } });
   const fileIn = h('input', { type: 'file', multiple: true, hidden: true, accept: 'image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx', onchange: (e) => { const fs = [...e.target.files]; e.target.value = ''; sendFiles(r, fs); } });
   const wrap = h('div', { class: 'comp' },
-    h('button', { class: 'cb plus', type: 'button', 'aria-label': 'Действия', 'aria-expanded': String(menuOpen), onclick: () => { menuOpen = !menuOpen; tplOpen = false; renderChat(); } }, '+'),
+    r.service === 'support' ? null : h('button', { class: 'cb plus', type: 'button', 'aria-label': 'Действия', 'aria-expanded': String(menuOpen), onclick: () => { menuOpen = !menuOpen; tplOpen = false; renderChat(); } }, '+'),
     h('button', { class: 'cb', type: 'button', 'aria-label': 'Прикрепить файл', title: 'Фото, видео, документ', onclick: () => fileIn.click() }, ic('clip')),
     ta,
     h('button', { class: 'cb' + (rec ? ' rec' : ''), type: 'button', 'aria-label': rec ? 'Остановить и отправить' : 'Голосовое', title: rec ? 'Остановить и отправить' : 'Голосовое', onclick: () => toggleRec(r) }, rec ? '■' : ic('mic')),
@@ -831,19 +842,66 @@ function renderInfo() {
     v._order && ['kp', 'declined'].includes(v.status) ? h('button', { class: 'pillb g', type: 'button', title: 'Если клиент согласился словами в чате', onclick: async () => { if (!confirm('Отметить, что клиент оформил дозаказ №' + v.num + '?')) return; const { error } = await SB.rpc('order_action', { req_id: r.id, order_id: v._order.id, action: 'accept', variant: 0 }); if (error) toast('Не получилось'); else { toast('Дозаказ оформлен'); loadOne(r.id); } } }, '✓ Клиент согласился') : null,
     v._order ? h('button', { class: 'pillb', type: 'button', style: 'color:var(--redT)', onclick: async () => { if (!confirm('Удалить дозаказ №' + v.num + '? Он пропадёт из списка, КП в чате останется.')) return; selOrder = null; await push(r, null, { orders: ordersOf(r).filter((o) => o.id !== v._order.id) }); toast('Дозаказ удалён'); } }, 'Удалить дозаказ') : null,
     v._order ? null : (r.fields || []).map((x) => f(x.label, x.value)),
+    !v._order && r.lang && r.lang !== 'ru' ? h('div', { class: 'zh', style: 'background:var(--bluBg);color:var(--bluT)' }, h('b', { text: 'Клиент пишет на ' + ({ kk: 'казахском', en: 'английском' }[r.lang] || r.lang) + '. Заявка выше переведена на русский.' }),
+      r.orig ? h('details', {}, h('summary', { style: 'cursor:pointer', text: 'Оригинал' }), (r.orig.fields || []).map((x) => h('div', { text: x.label + ': ' + x.value }))) : null) : null,
+    !v._order && r.estimate ? f('Клиент видел примерную цену', [r.estimate.auto ? 'авто ' + money(r.estimate.auto) : '', r.estimate.air ? 'авиа ' + money(r.estimate.air) : ''].filter(Boolean).join(', ')) : null,
+    !v._order && r.approvalPick && r.status === 'approval' ? h('div', { class: 'zh', style: 'background:var(--grnBg);color:var(--grnT)', text: 'Клиент выбрал для КП: ' + r.approvalPick }) : null,
+    !v._order && r.service !== 'support' && r.service !== 'translate' ? zhBox(r) : null,
     f('Получение', r.delivery ? (r.delivery.method === 'door' ? 'Доставка: ' + (r.delivery.city || '') + (r.delivery.address ? ', ' + r.delivery.address : '') : 'Самовывоз из Алматы') : ''),
     f('Клиент', [r.clientCode, r.clientPhone, r.clientCompany].filter(Boolean).join(' · ')),
     (r.photos || []).length ? h('div', { class: 'media' }, r.photos.map((x) => h('img', { src: x.thumb, alt: 'Фото клиента', style: 'width:72px;height:72px', onclick: async () => { const { data } = await SB.from('request_files').select('data').eq('id', x.fileId).maybeSingle(); lightbox(data?.data || x.thumb); } }))) : null,
+    v.status === 'declined' && v.kp ? h('div', { class: 'zh', style: 'background:var(--redBg);color:var(--redT)' }, h('span', { text: 'Клиент отказался от КП' + (v.rejectReason ? ': ' + v.rejectReason : '') + '. Договорились по телефону? Верните КП — у клиента снова появятся кнопки.' }),
+      h('button', { class: 'pillb', type: 'button', style: 'align-self:flex-start', onclick: () => (v._order ? pushTo(r, v._order.id, { from: 'sys', text: 'Менеджер снова открыл КП. Если всё устраивает — нажмите «Оформить».', at: Date.now() }, { status: 'kp', decision: null, rejectReason: null }) : push(r, { from: 'sys', text: 'Менеджер снова открыл КП. Если всё устраивает, нажмите «Оформить заказ».', at: Date.now() }, { status: 'waiting', decision: null, rejectReason: null })) }, 'Вернуть КП')) : null,
+    !v._order ? rejectEl(r) : null,
     steps.length ? h('hr') : null, steps.length ? h('h3', { text: 'Этап' }) : null, steps.length ? h('ol', { class: 'stp' }, steps) : null,
     ['work', 'done'].includes(v.status) ? [h('hr'), h('h3', { text: 'Оплаты' }),
       ['goods', 'china', 'city'].filter((k) => (k !== 'goods' || KIND(v) !== 'cargo') && (k !== 'city' || r.delivery?.method === 'door') && (k === 'goods' || KIND(v) !== 'translate')).map((k) => h('div', { class: 'payr' }, h('span', { text: k === 'goods' ? 'Товар' : k === 'china' ? 'Доставка до Алматы' : 'Доставка в город' }), h('span', { class: p[k]?.paid ? 'ok' : 'no', text: p[k]?.paid ? '✓ оплачено' : (payAmount(v, k) ? money(payAmount(v, k)) : '—') })))] : null,
     h('hr'), note, h('button', { class: 'pillb', type: 'button', onclick: () => push(r, null, { note: note.value }).then(() => toast('Заметка сохранена')) }, 'Сохранить заметку'),
-    h('a', { class: 'pillb', href: '../panel/', style: 'justify-content:center', title: 'Все поля, ТЗ на китайском, отказ и прочее' }, 'Открыть в полной панели'));
+    histEl(r));
+}
+function histEl(r) {
+  const others = all.filter((x) => x.ownerId === r.ownerId && x.id !== r.id).sort((a, b) => b.createdAt - a.createdAt);
+  if (!others.length) return null;
+  return [h('hr'), h('h3', { text: 'Другие заявки клиента (' + others.length + ')' }), h('div', { class: 'hist', style: 'display:flex;flex-direction:column;gap:5px' },
+    others.slice(0, 12).map((x) => h('button', { type: 'button', onclick: () => openChat(x.id) }, h('span', { text: (x.service === 'support' ? 'Поддержка' : '№' + x.num + ' · ' + (x.title || '')) }), h('span', { style: 'color:var(--mut);white-space:nowrap', text: statusChip(x)[0] }))))];
+}
+function zhBox(r) {
+  return h('div', { class: 'zh' }, h('b', { text: 'Для поставщиков · 中文' }), r.zh ? h('span', { lang: 'zh-CN', text: r.zh }) : h('span', { style: 'color:var(--mut)', text: 'Перевод ещё не сделан.' }),
+    h('span', { style: 'display:flex;gap:6px;flex-wrap:wrap' },
+      h('button', { class: 'pillb', type: 'button', onclick: async (e) => {
+        const btn = e.currentTarget; btn.disabled = true; btn.textContent = 'Переводим…';
+        try {
+          const { data, error } = await SB.functions.invoke('ai', { body: { task: 'staff_text', prompt: 'Переведи заявку на закупку на китайский язык (упрощённые иероглифы) для поставщика на фабрике. Деловой стиль, кратко, списком характеристик. Не добавляй цены и ничего от себя. Ответь только текстом перевода.\n\n' + (r.title ? 'Товар: ' + r.title + '\n' : '') + (r.fields || []).map((x) => x.label + ': ' + x.value).join('\n') } });
+          if (error || !data?.text) throw new Error('ai');
+          await push(r, null, { zh: data.text.trim() });
+        } catch { toast('Не получилось перевести. Попробуйте ещё раз'); btn.disabled = false; btn.textContent = 'Перевести на китайский'; }
+      } }, r.zh ? 'Перевести заново' : 'Перевести на китайский'),
+      r.zh ? h('button', { class: 'pillb', type: 'button', onclick: async () => { try { await navigator.clipboard.writeText(r.zh); toast('Скопировано'); } catch { toast('Не получилось скопировать'); } } }, 'Скопировать') : null));
+}
+const REJ_REASONS = ['Не нашли такой товар у поставщиков', 'Такой товар запрещён к ввозу или требует спецразрешений', 'Не работаем с этой категорией товаров', 'Слишком маленький объём, выгоднее купить в Казахстане'];
+function rejectEl(r) {
+  if (r.service === 'support') return null;
+  if (r.status === 'rejected') return h('div', { class: 'zh' }, h('b', { text: 'Вы отказали в заявке' }), h('span', { text: 'Причина: ' + (r.ourReason || '—') }),
+    h('button', { class: 'pillb', type: 'button', style: 'align-self:flex-start', onclick: () => push(r, { from: 'sys', text: 'Заявка снова в работе у менеджера.', at: Date.now() }, { status: 'new', ourReason: null, rejectedAt: null }) }, 'Вернуть в работу'));
+  if (['work', 'done'].includes(r.status)) return null;
+  return h('button', { class: 'pillb', type: 'button', style: 'color:var(--redT)', onclick: () => sheetReject(r) }, 'Не можем принять заявку');
+}
+function sheetReject(r) {
+  const ta = h('textarea', { class: 'inp', style: 'min-height:90px', 'aria-label': 'Причина для клиента', placeholder: 'Например: дроны сложно растаможить, есть риск, что груз развернут на границе.' });
+  sheet('Отказать в заявке №' + r.num, [h('b', { text: 'Почему не можем принять?' }), h('div', { class: 'stg' }, REJ_REASONS.map((t) => h('button', { type: 'button', onclick: () => { ta.value = t; ta.focus(); } }, t))),
+    h('label', { class: 'lab' }, 'Комментарий для клиента (обязательно)', ta), h('small', { style: 'color:var(--mut)', text: 'Клиент увидит это в чате. Заявка уйдёт во вкладку «Отказался».' })],
+    (close) => [h('button', { class: 'ghb', type: 'button', onclick: close }, 'Отмена'), h('button', { class: 'bigb', type: 'button', style: 'background:var(--red)', onclick: async () => {
+      const t = ta.value.trim(); if (t.length < 5) { toast('Напишите причину — клиент её увидит'); ta.focus(); return; }
+      close(); await push(r, { from: 'sys', text: 'К сожалению, мы не можем принять эту заявку. Причина: ' + t, at: Date.now() }, { status: 'rejected', ourReason: t, rejectedAt: Date.now(), callback: r.callback ? { ...r.callback, done: true } : null });
+      toast('Отказ отправлен клиенту');
+    } }, 'Отказать и сообщить клиенту')]);
+
 }
 
 /* ---------- окна действий ---------- */
 function sheet(title, bodyKids, footKids) {
-  const shade = h('div', { class: 'shade', onclick: (e) => { if (e.target === shade) shade.remove(); } });
+  let downOnShade = false;
+  const shade = h('div', { class: 'shade', onmousedown: (e) => { downOnShade = e.target === shade; }, onclick: (e) => { if (e.target === shade && downOnShade) shade.remove(); downOnShade = false; } });
   const close = () => shade.remove();
   shade.append(h('div', { class: 'sheet', role: 'dialog', 'aria-label': title }, h('div', { class: 'sh-h' }, h('b', { text: title }), h('button', { class: 'ib', type: 'button', 'aria-label': 'Закрыть', onclick: close }, '✕')), h('div', { class: 'sh-b' }, bodyKids), h('div', { class: 'sh-f' }, footKids(close))));
   document.body.append(shade);
@@ -1010,7 +1068,7 @@ function sheetPay(r, oid) {
 }
 function sheetStage(r, oid) {
   const vw = viewOf(r, oid);
-  const list = stagesFor(vw).filter((k) => k !== 'paid');
+  const list = KIND(vw) === 'translate' ? ['delivered'] : stagesFor(vw).filter((k) => k !== 'paid');
   const curI = list.indexOf(vw.stage);
   const nextK = list.find((k, i) => i > curI);
   const body = h('div', { style: 'display:flex;flex-direction:column;gap:12px' });
@@ -1024,7 +1082,7 @@ function sheetStage(r, oid) {
       if (k === 'sent_city') { mode = 'dispatch'; draw(); return; }
       if (k === 'delivery_paid') { document.querySelector('.shade')?.remove(); sheetPay(r, oid); return; }
       setStage(r, k, oid); document.querySelector('.shade')?.remove();
-    } }, h('span', { text: STAGE_LABEL[k] }), h('small', { style: 'color:var(--mut)', text: i <= curI ? '✓ готово' : k === nextK ? 'следующий' : '' })))),
+    } }, h('span', { text: KIND(vw) === 'translate' ? 'Услуга оказана — закрыть заявку' : STAGE_LABEL[k] }), h('small', { style: 'color:var(--mut)', text: i <= curI ? '✓ готово' : k === nextK ? 'следующий' : '' })))),
     ['work', 'done'].includes(vw.status) && KIND(vw) !== 'translate' ? h('div', { class: 'box' }, h('b', { text: 'Точная стоимость доставки (после склада)' }),
       h('div', { class: 'g3' }, h('label', { class: 'lab' }, 'Стоимость, ₸', h('input', { class: 'inp', inputmode: 'decimal', value: exact.cost, oninput: (e) => { exact.cost = e.target.value; } })),
         h('label', { class: 'lab' }, 'Вес, кг', h('input', { class: 'inp', inputmode: 'decimal', oninput: (e) => { exact.w = e.target.value; } })),
@@ -1036,6 +1094,15 @@ function sheetStage(r, oid) {
         await pushTo(r, oid, { from: 'sys', kind: 'exact', cost: v, weight: num(exact.w) || null, volume: num(exact.v) || null, total: goods + v, text: 'Товар на складе. Точная стоимость доставки: ' + money(v) + (goods ? '. Итого: ' + money(goods + v) : '') + '.', at: Date.now() }, { logiExact: v });
         toast('Клиенту отправлена точная стоимость');
       } }, 'Отправить клиенту')) : null,
+    ['work', 'done'].includes(vw.status) && r.delivery?.method === 'door' ? (() => { const cd = { cost: vw.cityDelivery?.cost || '', prepaid: !!vw.cityDelivery?.prepaid }; return h('div', { class: 'box' }, h('b', { text: 'Доставка Алматы → ' + (r.delivery.city || 'город клиента') }), h('small', { style: 'color:var(--mut)', text: 'Адрес: ' + (r.delivery.address || '—') }),
+      h('div', { class: 'g2' }, h('label', { class: 'lab' }, 'Стоимость, ₸', h('input', { class: 'inp', inputmode: 'decimal', value: cd.cost, placeholder: '15 000', oninput: (e) => { cd.cost = e.target.value; } })),
+        h('label', { class: 'chk', style: 'align-self:end' }, h('input', { type: 'checkbox', checked: cd.prepaid, onchange: (e) => { cd.prepaid = e.target.checked; } }), 'Оплачено заранее')),
+      h('button', { class: 'pillb a', type: 'button', style: 'align-self:flex-start', onclick: async () => {
+        const cost = num(cd.cost); if (!cost && !cd.prepaid) { toast('Укажите стоимость или отметьте «Оплачено заранее»'); return; }
+        document.querySelector('.shade')?.remove();
+        await pushTo(r, oid, { from: 'sys', kind: 'city', cost, prepaid: cd.prepaid, text: 'Доставка из Алматы в ' + (r.delivery.city || 'ваш город') + (cost ? ': ' + money(cost) : '') + (cd.prepaid ? '. Оплачено заранее.' : '. Оплата при получении.'), at: Date.now() }, { cityDelivery: { cost, prepaid: cd.prepaid } });
+        toast('Клиенту отправлена стоимость доставки по Казахстану');
+      } }, 'Сообщить клиенту')); })() : null,
     mode === 'dispatch' ? h('div', { class: 'box' }, h('b', { text: 'Отправили в ' + (r.delivery?.city || 'город') + ' — данные (все необязательные)' }),
       h('div', { class: 'opts' }, ['Такси', 'Транспортная компания', 'Автобус', 'Другое'].map((t) => h('button', { type: 'button', 'aria-pressed': String(disp.method === t), onclick: () => { disp.method = t; draw(); } }, t))),
       h('div', { class: 'g2' }, ...[['driver', 'Водитель'], ['phone', 'Телефон водителя'], ['car', 'Машина'], ['color', 'Цвет'], ['plate', 'Госномер'], ['eta', 'Примерно приедет']].map(([k, l]) => h('label', { class: 'lab' }, l, h('input', { class: 'inp', value: disp[k], oninput: (e) => { disp[k] = e.target.value; } })))),
@@ -1058,6 +1125,46 @@ function sheetAi(r) {
   sheet('ИИ отвечает клиенту', [h('div', { style: 'font-size:13px;color:var(--mut)', text: 'ИИ будет отвечать клиенту сам по этому указанию. Если клиент спросит то, чего ИИ не знает, — чат станет красным «ИИ спрашивает», и вы ответите.' }), ta],
     (close) => [aiOn(r) ? h('button', { class: 'ghb', type: 'button', onclick: async () => { close(); await push(r, null, { aiNote: null, mode: 'manager' }); toast('ИИ выключен в этом чате'); } }, 'Выключить ИИ') : null,
       h('button', { class: 'bigb', type: 'button', onclick: async () => { const t = ta.value.trim(); if (!t) { toast('Напишите указание'); return; } close(); await push(r, null, { aiNote: t, aiNoteAt: Date.now(), mode: 'ai', handoff: false }); toast('ИИ отвечает по вашему указанию'); } }, 'Включить')]);
+}
+
+/* ---------- настройки ---------- */
+async function saveSetting(key, value) {
+  const { error } = await SB.from('settings').upsert({ key, value, updated_at: new Date().toISOString() });
+  if (error) { toast('Не сохранилось. Попробуйте ещё раз'); return false; }
+  return true;
+}
+function renderSettings() {
+  $('#list').hidden = true; $('#info').hidden = true;
+  const inp = (val, ph, mode) => h('input', { class: 'inp', value: val ?? '', placeholder: ph || '', inputmode: mode || null });
+  const cny = inp(rates?.cny, '71', 'decimal'), ph = inp(contacts?.phone, '+7 7__ ___ __ __', 'tel'), wa = inp(contacts?.whatsapp, '+7 7__ ___ __ __', 'tel');
+  const tAir = inp(tariffs?.air_kg, '3500', 'decimal'), tKg = inp(tariffs?.auto_kg, '900', 'decimal'), tM3 = inp(tariffs?.auto_m3, '150000', 'decimal');
+  const rm = reminders || {};
+  const remRow = (key, title, def) => { const on = h('input', { type: 'checkbox', checked: key === 'seasonal' ? !!rm[key]?.on : rm[key]?.on !== false }); const tx = inp(rm[key]?.text, def); return { key, on, tx, el: h('div', { class: 'box' }, h('label', { class: 'chk', style: 'padding:0;background:none' }, on, h('b', { text: title })), tx) }; };
+  const rems = [remRow('kp', 'КП без ответа 2 дня', 'Менеджер подготовил предложение по заявке. Посмотрите, пока цена актуальна.'), remRow('after', 'Через месяц после получения заказа', 'Как вам товар? Если нужно что-то ещё из Китая — найдём и привезём.'), remRow('idle', 'Не заходил 30 дней', 'Нужно что-то найти в Китае? Пришлите фото — подберём за день.'), remRow('seasonal', 'Сезонное (всем в выбранный день)', 'С 10 февраля заводы Китая уходят на каникулы. Успейте заказать заранее.')];
+  const seaDate = h('input', { class: 'inp', type: 'date', value: rm.seasonal?.date || '' }); rems[3].el.append(h('label', { class: 'lab' }, 'День', seaDate));
+  const tplBox = h('div', { style: 'display:flex;flex-direction:column;gap:6px' });
+  const drawTpl = () => put(tplBox, templates.map((t, i) => h('div', { style: 'display:flex;gap:6px' }, h('input', { class: 'inp', value: t, style: 'font-weight:500;font-size:13.5px', onchange: (e) => { templates[i] = e.target.value.trim(); } }), h('button', { class: 'ib', type: 'button', 'aria-label': 'Удалить шаблон', onclick: () => { templates.splice(i, 1); drawTpl(); } }, ic('trash', 16)))),
+    h('button', { class: 'pillb', type: 'button', style: 'align-self:flex-start', onclick: () => { templates.push(''); drawTpl(); } }, '+ Шаблон')); drawTpl();
+  const card = (title, sub, kids, onSave) => h('section', { class: 'box', style: 'background:var(--s1)' }, h('b', { style: 'font-size:16px', text: title }), sub ? h('small', { style: 'color:var(--mut)', text: sub }) : null, kids, h('button', { class: 'pillb a', type: 'button', style: 'align-self:flex-start', onclick: onSave }, 'Сохранить'));
+  put($('#chat'), h('div', { class: 'setw', id: 'settings' }, h('h1', { text: 'Настройки' }),
+    card('Курс и контакты', 'Курс подставляется в новые КП. Номера клиент видит в кнопке «Связаться с менеджером».', [h('label', { class: 'lab' }, 'Курс юаня, ₸ за 1 ¥', cny), rates?.updatedAt ? h('small', { style: 'color:var(--mut)', text: 'Обновлён: ' + new Date(rates.updatedAt).toLocaleString('ru-RU') }) : null, h('div', { class: 'g2' }, h('label', { class: 'lab' }, 'Телефон для звонков', ph), h('label', { class: 'lab' }, 'WhatsApp', wa))], async () => {
+      const c = num(cny.value); if (!c) { toast('Укажите курс'); return; }
+      const nr = { cny: c, updatedAt: Date.now() }, nc = { phone: ph.value.trim(), whatsapp: wa.value.trim() };
+      if (await saveSetting('rates', nr) && await saveSetting('contacts', nc)) { rates = nr; contacts = nc; toast('Сохранено. Курс ' + c + ' ₸ будет в новых КП'); renderSettings(); }
+    }),
+    card('Тарифы доставки', 'По ним приложение показывает клиенту примерную цену доставки груза. Авто: большее из «вес × за кг» и «объём × за м³».', h('div', { class: 'g3' }, h('label', { class: 'lab' }, 'Авиа, ₸/кг', tAir), h('label', { class: 'lab' }, 'Авто, ₸/кг', tKg), h('label', { class: 'lab' }, 'Авто, ₸/м³', tM3)), async () => {
+      const t = { air_kg: num(tAir.value), auto_kg: num(tKg.value), auto_m3: num(tM3.value), updatedAt: Date.now() };
+      if (await saveSetting('tariffs', t)) { tariffs = t; toast('Тарифы сохранены'); }
+    }),
+    card('Напоминания клиентам', 'Приходят на телефон раз в день в 10:05 по Алматы, не чаще раза в неделю одному клиенту.', rems.map((x) => x.el), async () => {
+      const val = {}; for (const x of rems) val[x.key] = { on: x.on.checked, text: x.tx.value.trim() }; val.seasonal.date = seaDate.value;
+      if (val.seasonal.on && (!val.seasonal.text || !val.seasonal.date)) { toast('Для сезонного укажите день и текст'); return; }
+      if (await saveSetting('reminders', val)) { reminders = val; toast('Напоминания сохранены'); }
+    }),
+    card('Шаблоны ответов', 'В чате наберите «/», чтобы вставить шаблон.', tplBox, async () => {
+      templates = templates.map((t) => t.trim()).filter(Boolean);
+      if (await saveSetting('templates', { list: templates })) { toast('Шаблоны сохранены'); drawTpl(); }
+    })));
 }
 
 /* ---------- доска ---------- */
