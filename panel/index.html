@@ -4275,7 +4275,7 @@ function jvHudRender() {
   const on = jvAlways || jvListening || jvBusy || jvSpeaking;
   jvHud.hidden = !on || current !== 'admin';
   if (jvHud.hidden) return;
-  const state = jvBusy ? 'Думаю…' : jvSpeaking ? 'Говорю…' : jvPending ? 'Жду: «да» или «нет»' : Date.now() < jvAwaitUntil ? 'Слушаю команду…' : jvAlways ? 'Скажите: «Джарвис, …»' : 'Слушаю…';
+  const state = jvBusy ? 'Думаю…' : jvSpeaking ? 'Говорю…' : jvPending ? 'Жду: «да» или «нет»' : Date.now() < jvAwaitUntil ? 'Слушаю команду…' : jvPTT ? 'Говорите… отпустите пробел' : jvAlways ? 'Скажите «Джарвис, …» или держите пробел' : 'Слушаю…';
   jvHud.replaceChildren(
     h('span', { class: 'jv-dot' + (jvListening ? ' on' : ''), 'aria-hidden': 'true' }),
     h('div', { class: 'jv-hud-t' },
@@ -4479,6 +4479,92 @@ async function jvSend(text) {
 // чат-окно: кнопка 🎤 там работает как «нажал-сказал», кружок — постоянное прослушивание
 function jvToggle(open) { jvOpen = open; jvPanel.hidden = !open; jvFab.classList.toggle('on', open); if (open) jvRender(); jvHudRender(); }
 /* ===================== конец v5 ===================== */
+/* ===================== Закупщик v6: Jarvis реагирует сразу, не ждёт тишины; «пробел — говорю» ===================== */
+let jvPTT = false, jvCmdTimer = null, jvCmdHard = null, jvCmdText = '', jvWakeAt = 0;
+function jvStartRec() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) { toast('Голос работает в Google Chrome или Microsoft Edge'); jvAlways = false; return; }
+  if (jvRecObj || jvSpeaking) return;
+  const rec = new SR(); jvRecObj = rec;
+  rec.lang = 'ru-RU'; rec.interimResults = true; rec.continuous = true; rec.maxAlternatives = 1;
+  rec.onresult = (ev) => {
+    let interim = '', fin = '';
+    for (let i = ev.resultIndex; i < ev.results.length; i++) {
+      const t = ev.results[i][0].transcript;
+      if (ev.results[i].isFinal) fin += t + ' '; else interim += t + ' ';
+    }
+    if (jvPTT || !jvAlways) { if (fin.trim()) jvPushText += ' ' + fin.trim(); jvHeard = (jvPushText + ' ' + interim).trim(); jvHudRender(); const el = document.getElementById('jvText'); if (el && jvOpen && !jvAlways) el.value = jvHeard; return; }
+    const live = (fin + interim).trim();
+    if (live) { jvHeard = live; jvHudRender(); jvOnLive(live, !!fin.trim()); }
+  };
+  rec.onerror = (ev) => { if (ev.error === 'not-allowed' || ev.error === 'service-not-allowed') { jvMicDenied = true; jvAlways = false; toast('Разрешите доступ к микрофону (значок слева от адреса сайта)'); } };
+  rec.onend = () => {
+    jvRecObj = null; jvListening = false; jvFab.classList.remove('listen');
+    if ((jvPTT || !jvAlways) && jvPushText.trim()) { const t = jvPushText.trim(); jvPushText = ''; const el = document.getElementById('jvText'); if (el) el.value = ''; jvPTT = false; jvHandle(t); }
+    jvPTT = false;
+    if (jvAlways && !jvSpeaking && !jvMicDenied) setTimeout(jvStartRec, 150);
+    jvHudRender(); if (jvOpen) jvRender();
+  };
+  try { rec.start(); jvListening = true; jvFab.classList.add('listen'); } catch { jvRecObj = null; }
+  jvHudRender();
+}
+// живой разбор: как только услышали «Джарвис, …» — не ждём, пока вокруг замолчат
+function jvOnLive(text, isFinal) {
+  const now = Date.now();
+  if (jvPending && now < jvConfirmUntil) {
+    const s = text.replace(WAKE, '').trim();
+    if (YES.test(s)) { jvResetRec(); return jvConfirm(true); }
+    if (NO.test(s)) { jvResetRec(); return jvConfirm(false); }
+  }
+  const m = text.match(WAKE);
+  let cmd = null;
+  if (m) { cmd = text.slice(m[0].length).trim(); if (!jvWakeAt) jvWakeAt = now; }
+  else if (now < jvAwaitUntil) cmd = text.trim();
+  if (cmd == null) { if (isFinal) jvResetRec(); return; } // чужая речь — сбрасываем
+  if (!cmd) { if (isFinal) { jvAwaitUntil = now + 9000; jvResetRec(); jvSay('Да?'); } return; }
+  jvCmdText = cmd.split(/\s+/).slice(0, 40).join(' ');
+  // короткая команда навигации — выполняем сразу
+  if (jvLocal(jvCmdText, true)) return jvFire();
+  if (isFinal) return jvFire();
+  clearTimeout(jvCmdTimer); jvCmdTimer = setTimeout(jvFire, 900);           // пауза 0,9 с — команда закончилась
+  if (!jvCmdHard) jvCmdHard = setTimeout(jvFire, 6000);                    // не дольше 6 секунд, даже если вокруг говорят
+}
+function jvFire() {
+  clearTimeout(jvCmdTimer); clearTimeout(jvCmdHard); jvCmdTimer = jvCmdHard = null;
+  const t = jvCmdText.trim(); jvCmdText = ''; jvWakeAt = 0; jvAwaitUntil = 0;
+  jvResetRec();
+  if (t) jvHandle(t);
+}
+function jvResetRec() { jvStopRec(); if (jvAlways && !jvSpeaking) setTimeout(jvStartRec, 120); }
+
+// быстрые команды: dry=true — только проверить, подходит ли
+const _jvLocalV5 = jvLocal;
+jvLocal = function (text, dry) {
+  if (!dry) return _jvLocalV5(text);
+  const t = text.toLowerCase().replace(/ё/g, 'е').trim();
+  if (/^(открой|покажи|зайди|перейди|найди|давай)/.test(t) && /\d{3,6}\b/.test(t)) return true;
+  if (/^(открой|покажи|перейди|зайди)\s+(вкладку\s+)?(кп|оплат\w*|доставк\w*|заявк[уа]?)$/.test(t) && areq) return true;
+  if (/^(открой|покажи|перейди|зайди)\s+(в\s+)?(нов\w+|в работе|работ\w*|ждут оплаты|оплат\w*|нужен ответ|закрыт\w*|все|чаты|клиент\w*|согласовани\w*)$/.test(t)) return true;
+  if (/^(назад|к списку|хватит|выключись|отключись)$/.test(t)) return true;
+  return false;
+};
+
+// «Пробел — говорю»: держите пробел, говорите, отпустите (без «Джарвис», вокруг можно шуметь)
+document.addEventListener('keydown', (e) => {
+  if (current !== 'admin' || e.code !== 'Space' || e.repeat || e.ctrlKey || e.altKey || e.metaKey) return;
+  const tag = (document.activeElement?.tagName || '').toLowerCase();
+  if (['input', 'textarea', 'select', 'button'].includes(tag) || document.activeElement?.isContentEditable) return;
+  e.preventDefault();
+  try { speechSynthesis.cancel(); } catch { /* ignore */ }
+  jvSpeaking = false; jvPTT = true; jvPushText = ''; jvHeard = ''; jvStopRec(); jvStartRec(); jvHudRender();
+});
+document.addEventListener('keyup', (e) => {
+  if (e.code !== 'Space' || !jvPTT) return;
+  e.preventDefault();
+  setTimeout(() => { if (jvRecObj) { try { jvRecObj.stop(); } catch { /* ignore */ } } }, 250);
+});
+/* ===================== конец v6 ===================== */
+
 
 
 
