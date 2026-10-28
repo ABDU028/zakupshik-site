@@ -295,6 +295,49 @@ textarea.input{height:auto;min-height:88px;padding:12px 14px;resize:vertical}
 .zdlg::backdrop{background:rgba(0,0,0,.5)}
 .zx{white-space:pre-wrap}
 
+/* v4: Jarvis */
+.jv-fab{position:fixed;right:24px;bottom:24px;z-index:60;width:68px;height:68px;border-radius:50%;border:0;background:radial-gradient(circle at 30% 30%,#FF9A5C,var(--accent) 60%,#8A2A05);color:#fff;box-shadow:0 10px 30px rgba(240,106,42,.45);display:flex;align-items:center;justify-content:center;cursor:pointer}
+.jv-fab-t{font-family:var(--font-display);font-weight:700;font-size:26px;position:relative}
+.jv-ring{position:absolute;inset:-6px;border-radius:50%;border:2px solid var(--accent);opacity:0}
+.jv-fab.listen .jv-ring{animation:jvp 1.2s ease-out infinite}
+.jv-fab.on{box-shadow:0 0 0 4px var(--surface),0 10px 30px rgba(240,106,42,.45)}
+@keyframes jvp{0%{transform:scale(.9);opacity:.9}100%{transform:scale(1.35);opacity:0}}
+@media (prefers-reduced-motion:reduce){.jv-fab.listen .jv-ring{animation:none;opacity:1}}
+.jv-panel{position:fixed;right:24px;bottom:104px;z-index:59;width:min(440px,calc(100vw - 32px));height:min(78vh,760px);background:var(--surface);border:1px solid var(--line);border-radius:22px;box-shadow:0 20px 60px rgba(0,0,0,.35);display:flex;flex-direction:column;overflow:hidden}
+.jv-panel[hidden]{display:none}
+.jv-panel.drop{outline:3px dashed var(--accent);outline-offset:-8px}
+@media (max-width:600px){.jv-panel{right:8px;left:8px;width:auto;bottom:96px;height:calc(100vh - 120px)}}
+.jv-h{display:flex;align-items:center;gap:10px;padding:10px 12px 10px 16px;border-bottom:1px solid var(--line)}
+.jv-h b{flex:1;font-family:var(--font-display);font-size:16px}
+.jv-h .linkbtn{font-size:12.5px;text-decoration:none}
+.jv-h .iconbtn{width:36px;height:36px}
+.jv-dot{width:10px;height:10px;border-radius:5px;background:var(--surface-2)}
+.jv-dot.on{background:#EF4444}
+.jv-msgs{flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:8px}
+.jv-msgs>*{flex-shrink:0}
+.jv-hello{display:flex;flex-direction:column;gap:6px;padding:12px;border-radius:14px;background:var(--surface-2);font-size:14px;line-height:1.45}
+.jv-m{max-width:88%;padding:9px 12px;border-radius:14px;font-size:14.5px;line-height:1.45;white-space:pre-wrap}
+.jv-m.me{align-self:flex-end;background:var(--ink);color:var(--on-ink);border-bottom-right-radius:5px}
+.jv-m.jv{align-self:flex-start;background:var(--surface-2);border-bottom-left-radius:5px}
+.jv-m.err{background:var(--red-bg);color:var(--red-fg)}
+.jv-draft{display:flex;flex-direction:column;gap:10px;margin-top:6px}
+.jv-card{border:2px solid var(--accent);border-radius:16px;padding:12px;display:flex;flex-direction:column;gap:8px}
+.jv-ch{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.jv-v{display:flex;flex-direction:column;gap:4px;padding:8px;border-radius:10px;background:var(--surface-2)}
+.jv-desc{white-space:pre-wrap}
+.jv-th{display:flex;gap:6px;flex-wrap:wrap}
+.jv-th img{width:64px;height:64px;object-fit:cover;border-radius:8px}
+.jv-go{height:44px;font-size:14px}
+.jv-files{display:flex;gap:8px;overflow-x:auto;padding:8px 12px;border-top:1px solid var(--line)}
+.jv-file{position:relative;flex-shrink:0;width:64px;display:flex;flex-direction:column;align-items:center;gap:2px}
+.jv-file img,.jv-file>span{width:56px;height:56px;border-radius:10px;object-fit:cover;background:var(--surface-2);display:flex;align-items:center;justify-content:center;font-size:24px}
+.jv-file small{font-size:11px;color:var(--muted);font-weight:700}
+.jv-file button{position:absolute;top:-6px;right:0;width:22px;height:22px;border-radius:11px;border:0;background:var(--ink);color:var(--on-ink);font-weight:800;line-height:1}
+.jv-bar{display:flex;align-items:flex-end;gap:6px;padding:10px;border-top:1px solid var(--line)}
+.jv-bar textarea{flex:1;min-width:0;border:1.5px solid var(--line);border-radius:14px;background:var(--bg);padding:10px 12px;resize:none;font-size:15px;max-height:120px}
+.jv-mic{width:52px;height:52px;flex-shrink:0;border-radius:50%;border:0;background:var(--accent);color:#fff;font-size:22px}
+.jv-mic.on{background:#EF4444}
+
 /* admin */
 .agrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr));gap:16px;align-items:start}
 .ar{display:flex;gap:12px;align-items:center;text-align:left;width:100%;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:12px}
@@ -3557,7 +3600,7 @@ function renderAdminList() {
       : kpViewed(r) && ['kp', 'waiting'].includes(r.status) ? h('span', { class: 'tag s-blue', text: 'КП просмотрено' })
       : statusTag(r.status);
     const lt = lastTalk(r);
-    const line3 = reply && lt ? h('small', { class: 'urgent', text: (r.handoff ? 'ИИ передал менеджеру · ' : '') + 'Клиент ждёт ' + fmtWait(lt.at) })
+    const line3 = reply && lt ? h('small', { class: 'urgent', text: (r.handoffQuestion ? '❓ ' + r.handoffQuestion + ' · ' : r.handoff ? 'ИИ передал менеджеру · ' : '') + 'ждёт ' + fmtWait(lt.at) })
       : wait ? h('small', { text: deliveryDue(r) ? 'Товар в Алматы, доставка не оплачена' : 'Оформил ' + fmtAgo(r.acceptedAt || r.updatedAt) })
       : ['kp', 'waiting'].includes(r.status) ? h('small', { text: 'КП ' + fmtAgo(r.kp?.sentAt) + (kpViewed(r) ? ' · клиент открыл' : ' · ещё не открыл') })
       : r.status === 'work' && r.stage ? h('small', { text: 'Этап: ' + (STAGE_LABEL[r.stage] || r.stage) + ' · ' + fmtAgo(r.stageAt || r.updatedAt) })
@@ -3645,6 +3688,9 @@ function headCard(r) {
         chatBack && chatBack !== r.id ? h('button', { class: 'pill', type: 'button', onclick: () => openAreq(chatBack) }, '← К чату поддержки') : null,
         tel ? h('a', { class: 'pill', href: 'tel:' + tel, style: 'text-decoration:none;color:var(--fg)' }, '📞 Позвонить') : null,
         h('button', { class: 'btn ' + (ns.pay ? 'btn-green' : 'btn-accent'), type: 'button', disabled: !!ns.off, onclick: ns.go || null }, ns.t))),
+    r.handoff && r.handoffQuestion ? h('div', { class: 'notice', style: 'background:var(--red-bg);color:var(--red-fg);display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap' },
+      h('span', { text: '❓ ИИ спрашивает вас: ' + r.handoffQuestion }),
+      h('button', { class: 'pill', type: 'button', onclick: () => { jvToggle(true); jvListen(true); } }, '🎤 Ответить через Jarvis')) : null,
     r.status === 'rejected' ? null : h('ol', { class: 'zsteps', 'aria-label': 'Этапы заказа', style: 'grid-template-columns:repeat(' + steps.length + ',minmax(0,1fr))' },
       steps.map((s, i) => h('li', { class: i < cur ? 'done' : i === cur ? 'cur' : '' }, h('span', { class: 'bar' }), h('span', { class: 'lbl', text: s.l })))));
 }
@@ -3768,7 +3814,8 @@ function chatMirror(r) {
   const ai = aiActive(r);
   return h('section', { class: 'card zchat', 'aria-label': 'Чат с клиентом' },
     h('div', { class: 'zchat-h' }, h('b', { text: r.service === 'support' ? 'Чат поддержки' : 'Чат — как видит клиент' }),
-      r.service === 'support' || !r.kp ? h('span', { class: 'zsmall', text: 'Отвечает менеджер' })
+      r.service !== 'support' && !r.kp && r.aiNote && r.mode === 'ai' ? h('span', { class: 'zsmall', title: r.aiNote }, 'ИИ отвечает по указанию · ', h('button', { class: 'linkbtn', type: 'button', onclick: () => patchA({ aiNote: null, mode: 'manager' }) }, 'выключить'))
+      : r.service === 'support' || !r.kp ? h('span', { class: 'zsmall', text: 'Отвечает менеджер' })
         : h('span', { class: 'zsmall' }, 'Ведёт: ' + (ai ? 'ИИ-помощник · ' : 'менеджер · '),
           h('button', { class: 'linkbtn', type: 'button', onclick: () => patchA({ mode: ai ? 'manager' : 'ai', handoff: false }) }, ai ? 'переключить на себя' : 'включить ИИ'))),
     msgs,
@@ -3782,7 +3829,7 @@ function chatMirror(r) {
 async function sendMgr() {
   const ta = $('#mgrMsg'); const text = ta.value.trim(); if (!text) return;
   ta.value = '';
-  const ok = await patchA({ staffReadAt: Date.now() + 1000, handoff: false }, { from: 'manager', text, at: Date.now() });
+  const ok = await patchA({ staffReadAt: Date.now() + 1000, handoff: false, handoffQuestion: null, ...(areq.handoff && (areq.kp || areq.aiNote) ? { mode: 'ai' } : {}) }, { from: 'manager', text, at: Date.now() });
   if (!ok) ta.value = text;
 }
 
@@ -3990,6 +4037,221 @@ function draftMedia(v) {
       onclick: () => { v.media.splice(i, 1); renderAreq(false); } }, '×'))));
 }
 /* ===================== конец v3 ===================== */
+/* ===================== Закупщик v4: Jarvis — голосовой помощник менеджера ===================== */
+const JV = {}; // состояние по заявкам: { history, files, draft }
+let jvOpen = false, jvBusy = false, jvRec = null, jvListening = false;
+let jvSpeak = (() => { try { return localStorage.getItem('zk_jv_speak') !== '0'; } catch { return true; } })();
+const jvKey = () => (areq && amode !== 'clients' ? areq.id : 'all');
+const jvState = () => (JV[jvKey()] ||= { history: [], files: [], draft: [] });
+
+function jvOverview() {
+  return all.filter((r) => !['done', 'declined', 'rejected'].includes(r.status) || needsReply(r)).slice(0, 60).map((r) => {
+    const lt = lastTalk(r);
+    return '№' + r.num + ' · ' + (r.clientName || '') + ' · ' + (r.service === 'support' ? 'Поддержка' : r.title) + ' · ' + (ST[r.status]?.label || r.status)
+      + (needsReply(r) && lt ? ' · НУЖЕН ОТВЕТ (ждёт ' + fmtWait(lt.at) + ')' : '') + (awaitingPay(r) ? ' · ждёт оплаты' : '') + (r.stage ? ' · этап ' + (STAGE_LABEL[r.stage] || r.stage) : '');
+  }).join('\n');
+}
+
+// ---------- кнопка и окно ----------
+const jvFab = h('button', { class: 'jv-fab', type: 'button', 'aria-label': 'Jarvis — голосовой помощник', title: 'Jarvis: нажмите и говорите', onclick: () => { if (!jvOpen) { jvToggle(true); jvListen(true); } else jvListen(!jvListening); } },
+  h('span', { class: 'jv-ring', 'aria-hidden': 'true' }), h('span', { class: 'jv-fab-t', text: 'J' }));
+const jvPanel = h('aside', { class: 'jv-panel', 'aria-label': 'Jarvis', hidden: true });
+document.body.append(jvFab, jvPanel);
+function jvShowFab() { jvFab.hidden = current !== 'admin'; }
+setInterval(jvShowFab, 800);
+function jvToggle(open) { jvOpen = open; jvPanel.hidden = !open; jvFab.classList.toggle('on', open); if (open) jvRender(); else jvListen(false); }
+
+jvPanel.addEventListener('dragover', (e) => { e.preventDefault(); jvPanel.classList.add('drop'); });
+jvPanel.addEventListener('dragleave', () => jvPanel.classList.remove('drop'));
+jvPanel.addEventListener('drop', (e) => { e.preventDefault(); jvPanel.classList.remove('drop'); jvAddFiles([...e.dataTransfer.files]); });
+document.addEventListener('paste', (e) => { if (!jvOpen) return; const fs = [...(e.clipboardData?.files || [])]; if (fs.length) { e.preventDefault(); jvAddFiles(fs); } });
+
+async function jvAddFiles(fs) {
+  if (!fs.length) return;
+  if (!areq) { toast('Сначала откройте заявку — файлы прикрепятся к ней'); return; }
+  const st = jvState(); const reqId = areq.id;
+  toast('Загружаем ' + fs.length + ' файл(а)…');
+  for (const f of fs.slice(0, 8)) {
+    try { st.files.push(await zkUpload(f, reqId)); } catch (e) { console.error(e); toast('Не получилось загрузить ' + f.name); }
+  }
+  jvRender();
+}
+
+// ---------- голос ----------
+function jvListen(on) {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (on && !SR) { toast('Голос работает в Google Chrome. Здесь можно писать текстом.'); return; }
+  if (!on) { if (jvRec) { try { jvRec.stop(); } catch { /* ignore */ } } jvListening = false; jvFab.classList.remove('listen'); jvRender(); return; }
+  if (jvListening) return;
+  try { window.speechSynthesis?.cancel(); } catch { /* ignore */ }
+  const rec = new SR(); jvRec = rec;
+  rec.lang = 'ru-RU'; rec.interimResults = true; rec.continuous = true;
+  let finalText = '';
+  const ta = () => document.getElementById('jvText');
+  const base = (ta()?.value || '').trim();
+  rec.onresult = (ev) => {
+    let interim = '';
+    for (let i = ev.resultIndex; i < ev.results.length; i++) {
+      const t = ev.results[i][0].transcript;
+      if (ev.results[i].isFinal) finalText += t + ' '; else interim += t;
+    }
+    const el = ta(); if (el) el.value = (base ? base + ' ' : '') + finalText + interim;
+  };
+  rec.onerror = (ev) => { if (ev.error === 'not-allowed') toast('Разрешите доступ к микрофону в браузере'); };
+  rec.onend = () => {
+    jvListening = false; jvFab.classList.remove('listen');
+    const el = ta(); const text = (el?.value || '').trim();
+    jvRender();
+    if (finalText.trim() && text) { if (el) el.value = ''; jvSend(text); }
+  };
+  rec.start(); jvListening = true; jvFab.classList.add('listen'); jvRender();
+}
+function jvSay(text) {
+  if (!jvSpeak || !text || !window.speechSynthesis) return;
+  try { const u = new SpeechSynthesisUtterance(text); u.lang = 'ru-RU'; u.rate = 1.05; const v = speechSynthesis.getVoices().find((x) => /^ru/i.test(x.lang)); if (v) u.voice = v; speechSynthesis.cancel(); speechSynthesis.speak(u); } catch { /* ignore */ }
+}
+
+// ---------- разговор с Jarvis ----------
+async function jvSend(text) {
+  text = String(text || '').trim(); if (!text || jvBusy) return;
+  const st = jvState(); const ctxId = jvKey();
+  st.history.push({ role: 'me', text, at: Date.now() });
+  jvBusy = true; jvRender();
+  try {
+    const { data, error } = await window.SB.functions.invoke('ai', { body: {
+      task: 'jarvis', text, request_id: ctxId === 'all' ? null : ctxId, files: st.files, draft: st.draft,
+      history: st.history.slice(-10, -1), overview: ctxId === 'all' ? jvOverview() : '' } });
+    if (error || data?.error) throw new Error(data?.error || 'ai');
+    const say = data.say || 'Готово.';
+    st.history.push({ role: 'jv', text: say, at: Date.now() });
+    let actions = (data.actions || []).filter((a) => a && a.type);
+    const open = actions.find((a) => a.type === 'open');
+    actions = actions.filter((a) => a.type !== 'open');
+    if (actions.length) st.draft = actions.map((a) => ({ ...a, _id: rid() }));
+    st.rate = data.rate;
+    jvSay(say);
+    if (open) { const r = all.find((x) => Number(x.num) === Number(open.num)); if (r) { if (amode !== 'req') setAmode('req'); openAreq(r.id); } else st.history.push({ role: 'jv', text: 'Заявку №' + open.num + ' не нашёл.', at: Date.now() }); }
+  } catch (e) {
+    console.error(e);
+    st.history.push({ role: 'jv', text: 'Не получилось связаться с ИИ. Попробуйте ещё раз.', at: Date.now(), err: true });
+  } finally { jvBusy = false; jvRender(); }
+}
+
+// ---------- черновик: превью и отправка ----------
+const fileOf = (st, n) => st.files[Number(n) - 1];
+const mediaOf = (st, nums) => (nums || []).map((n) => fileOf(st, n)).filter(Boolean);
+function jvPrice(st, v) { const rate = num(st.rate) || num(rates?.cny) || 71; return num(v.price_kzt) || Math.round((num(v.cny) * (num(v.qty) || 1) + num(v.chinaShip)) * rate); }
+function jvCard(st, a) {
+  const rm = () => { st.draft = st.draft.filter((x) => x._id !== a._id); jvRender(); };
+  const go = h('button', { class: 'btn btn-accent jv-go', type: 'button', onclick: (e) => jvExec(a, e.currentTarget) }, a.type === 'message' ? 'Отправить клиенту' : a.type === 'variants' ? 'Отправить на согласование' : a.type === 'kp' ? 'Отправить КП' : 'Выполнить');
+  const head = (t) => h('div', { class: 'jv-ch' }, h('b', { text: t }), h('button', { class: 'linkbtn', type: 'button', onclick: rm }, 'Убрать'));
+  const thumbs = (list) => list.length ? h('div', { class: 'jv-th' }, list.map((m) => m.type === 'photo' ? h('img', { src: m.url, alt: '' }) : h('span', { class: 'pill', text: (m.type === 'video' ? '🎬 ' : '📄 ') + (m.name || 'файл') }))) : null;
+  let body = null;
+  if (a.type === 'message') body = h('textarea', { class: 'input', rows: '4', oninput: (e) => { a.text = e.target.value; } }, a.text || '');
+  else if (a.type === 'variants') body = (a.variants || []).map((v, i) => h('div', { class: 'jv-v' }, h('b', { text: 'Вариант ' + (i + 1) + (v.name ? ' · ' + v.name : '') }), v.desc ? h('div', { class: 'zsmall jv-desc', text: v.desc }) : null, thumbs(mediaOf(st, v.files))));
+  else if (a.type === 'kp') body = [
+    (a.variants || []).map((v, i) => h('div', { class: 'jv-v' },
+      h('div', { class: 'zrow2' }, h('b', { text: ((a.variants || []).length > 1 ? 'Вариант ' + (i + 1) + ' · ' : '') + (v.name || '') }), h('b', { text: money(jvPrice(st, v)) })),
+      num(v.cny) ? h('div', { class: 'zsmall', text: '= ' + num(v.cny) + ' ¥' + (num(v.qty) > 1 ? ' × ' + num(v.qty) : '') + (num(v.chinaShip) ? ' + ' + num(v.chinaShip) + ' ¥ по Китаю' : '') + ' × ' + (num(st.rate) || rates?.cny) + ' ₸' }) : null,
+      v.term ? h('div', { class: 'zsmall', text: 'Срок: ' + v.term }) : null,
+      v.desc ? h('div', { class: 'zsmall jv-desc', text: v.desc }) : null, thumbs(mediaOf(st, v.files)))),
+    a.logi && num(a.logi.cost) ? h('div', { class: 'zrow2' }, h('span', { text: 'Доставка до Алматы (' + (SHIP_NAMES[a.logi.method] || 'авто') + (a.logi.term ? ', ' + a.logi.term : '') + ')' }), h('span', { text: '≈ ' + money(num(a.logi.cost)) })) : h('div', { class: 'zsmall', text: 'Доставка не указана' }),
+    a.terms ? h('div', { class: 'zsmall', text: 'Условия: ' + a.terms }) : null,
+    a.note ? h('div', { class: 'zsmall', text: 'Комментарий: ' + a.note }) : null];
+  else if (a.type === 'payment') body = h('div', { text: 'Отметить оплату: ' + (a.keys || []).map((k) => PAY_LABEL[k] || k).join(', ') + (a.method ? ' · ' + a.method : '') });
+  else if (a.type === 'stage') body = h('div', { text: 'Этап: «' + (STAGE_LABEL[a.stage] || a.stage) + '» — клиенту уйдёт уведомление' });
+  else if (a.type === 'exact') body = h('div', { text: 'Точная доставка до Алматы: ' + money(num(a.cost)) + (a.weight ? ' · ' + a.weight + ' кг' : '') + (a.volume ? ' · ' + a.volume + ' м³' : '') });
+  else if (a.type === 'ai_note') body = [h('div', { class: 'zsmall', text: 'ИИ в чате будет отвечать клиенту так:' }), h('textarea', { class: 'input', rows: '3', oninput: (e) => { a.text = e.target.value; } }, a.text || '')];
+  const title = { message: 'Сообщение клиенту', variants: 'Варианты на согласование', kp: 'КП с ценой', payment: 'Оплата', stage: 'Этап заказа', exact: 'Точная доставка', ai_note: 'Указание для ИИ в чате' }[a.type] || a.type;
+  return h('div', { class: 'jv-card' }, head(title), body, go);
+}
+async function jvExec(a, btn) {
+  const st = jvState();
+  if (!areq || jvKey() === 'all') { toast('Откройте заявку, к которой это относится'); return; }
+  const r = areq; const at = Date.now();
+  if (btn) { btn.disabled = true; btn.textContent = 'Отправляем…'; }
+  let ok = false;
+  try {
+    if (a.type === 'message') ok = await patchA({ staffReadAt: at + 1000, handoff: false, handoffQuestion: null, ...(r.handoff && (r.kp || r.aiNote) ? { mode: 'ai' } : {}) }, { from: 'manager', text: String(a.text || '').trim(), at });
+    else if (a.type === 'variants') {
+      const variants = (a.variants || []).map((v) => ({ id: rid(), name: String(v.name || '').trim(), desc: String(v.desc || '').trim(), media: mediaOf(st, v.files) }));
+      ok = await patchA({ status: 'approval', approvals: variants, approvalPick: null, approvalNone: null }, { from: 'manager', kind: 'variants', variants, text: variants.length > 1 ? 'Варианты на согласование' : 'Вариант на согласование', at });
+    } else if (a.type === 'kp') {
+      const kind = SVC_KIND(r); const rate = num(st.rate) || num(rates?.cny) || 71;
+      const variants = (a.variants || []).map((v) => ({ id: rid(), name: String(v.name || '').trim(), desc: String(v.desc || '').trim(), term: String(v.term || '').trim(), media: mediaOf(st, v.files),
+        cny: v.cny ?? '', qty: v.qty ?? 1, chinaShip: v.chinaShip ?? '', price: jvPrice(st, v) }));
+      if (kind !== 'cargo' && variants.some((v) => !v.price)) { toast('У варианта нет цены — скажите Jarvis цену'); if (btn) { btn.disabled = false; btn.textContent = 'Отправить КП'; } return; }
+      const logi = a.logi && num(a.logi.cost) ? { method: a.logi.method || 'auto', cost: num(a.logi.cost), term: String(a.logi.term || '') } : null;
+      const kp = { type: kind, variants: kind === 'cargo' ? [] : variants, rate: kind === 'buyout' || kind === 'goods' ? rate : null, logi, extras: '', terms: String(a.terms || ''), validUntil: String(a.validUntil || ''), note: String(a.note || ''), sentAt: at,
+        product: kind === 'cargo' ? 'Доставка груза' : variants[0]?.name || r.title, price: kind === 'cargo' ? '' : String(variants[0]?.price || '') };
+      const keep = ['work', 'done'].includes(r.status);
+      const patch = keep ? { kp, mode: r.mode || 'ai' } : { kp, status: 'kp', decision: null, rejectReason: null, chosenVariant: null, mode: r.mode === 'manager' ? 'manager' : 'ai' };
+      ok = await patchA(patch, { from: 'manager', kind: 'kp', text: r.kp ? 'Новое КП' : (kind === 'cargo' ? 'Расчёт доставки' : 'КП'), at });
+    } else if (a.type === 'payment') {
+      const keys = (a.keys || []).filter((k) => ['goods', 'china', 'city'].includes(k));
+      const payments = { ...(r.payments || {}) };
+      keys.forEach((k) => { payments[k] = { paid: true, at, method: a.method || '', amount: payAmount(r, k) }; });
+      const patch = { payments };
+      if (keys.includes('china')) patch.deliveryPrepaid = true;
+      if (keys.includes('city')) patch.cityDelivery = { ...(r.cityDelivery || {}), prepaid: true };
+      if (keys.includes('goods') && SVC_KIND(r) !== 'cargo' && (!r.stage || r.stage === 'paid')) { patch.stage = 'paid'; patch.stageAt = at; patch.status = 'work'; }
+      if (keys.includes('china') && r.stage === 'almaty') { patch.stage = 'delivery_paid'; patch.stageAt = at; }
+      const total = keys.reduce((s, k) => s + (payments[k].amount || 0), 0);
+      ok = await patchA(patch, { from: 'sys', kind: 'payment', keys, amount: total, at,
+        text: 'Оплата получена: ' + keys.map((k) => (k === 'goods' ? 'товар' : k === 'china' ? 'доставка до Алматы' : 'доставка до ' + (r.delivery?.city || 'города'))).join(', ') + (total ? ' — ' + money(total) : '') });
+    } else if (a.type === 'stage') {
+      const k = a.stage; const extra = k === 'delivered' ? { status: 'done', doneAt: at } : { status: 'work' };
+      ok = await patchA({ stage: k, stageAt: at, ...extra }, { from: 'sys', kind: 'stage', stage: k, text: stageText(k, r), at });
+    } else if (a.type === 'exact') {
+      const v = num(a.cost); const goods = pays(r).goods?.paid ? 0 : payAmount(r, 'goods');
+      ok = await patchA({ logiExact: v }, { from: 'sys', kind: 'exact', cost: v, weight: num(a.weight) || null, volume: num(a.volume) || null, total: goods + v, text: 'Товар на складе. Точная стоимость доставки: ' + money(v) + (goods ? '. Итого: ' + money(goods + v) : '') + '.', at });
+    } else if (a.type === 'ai_note') ok = await patchA({ aiNote: String(a.text || '').trim(), aiNoteAt: at, mode: 'ai', handoff: false });
+  } catch (e) { console.error(e); ok = false; }
+  if (ok) { st.draft = st.draft.filter((x) => x._id !== a._id); st.history.push({ role: 'jv', text: '✓ ' + ({ message: 'Сообщение отправлено', variants: 'Варианты отправлены на согласование', kp: 'КП отправлено', payment: 'Оплата отмечена', stage: 'Этап обновлён', exact: 'Точная доставка отправлена', ai_note: 'ИИ в чате отвечает по вашему указанию' }[a.type] || 'Готово'), at: Date.now() }); }
+  else if (btn) { btn.disabled = false; btn.textContent = 'Повторить'; }
+  jvRender();
+}
+
+function jvRender() {
+  jvShowFab();
+  if (!jvOpen) return;
+  const st = jvState(); const ctxAll = jvKey() === 'all';
+  const prev = document.getElementById('jvText'); const keepText = prev ? prev.value : '';
+  const fileIn = h('input', { type: 'file', multiple: true, hidden: true, accept: 'image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx', onchange: (e) => { const fs = [...e.target.files]; e.target.value = ''; jvAddFiles(fs); } });
+  const msgs = h('div', { class: 'jv-msgs', id: 'jvMsgs' },
+    !st.history.length ? h('div', { class: 'jv-hello' },
+      h('b', { text: ctxAll ? 'Привет! Я Jarvis.' : 'Заявка №' + areq.num + ' · ' + (areq.clientName || '') }),
+      !ctxAll && areq.handoff && areq.handoffQuestion ? h('span', { style: 'color:var(--red-fg);font-weight:800', text: '❓ ' + areq.handoffQuestion + ' — скажите ответ, я красиво напишу клиенту.' }) : null,
+      h('span', { text: ctxAll ? 'Спросите «что у нас сегодня?» или скажите номер заявки: «открой 1060».' : 'Скажите, что сделать. Например: «вот два варианта, отправь на согласование» (перетащите фото и техспеку сюда), «сделай КП: 42 тысячи юаней, доставка авто 300 тысяч», «ответь, что ждём поставщиков», «клиент оплатил, Каспи».' })) : null,
+    st.history.map((m) => h('div', { class: 'jv-m ' + (m.role === 'me' ? 'me' : 'jv') + (m.err ? ' err' : ''), text: m.text })),
+    jvBusy ? h('div', { class: 'jv-m jv', text: 'Думаю…' }) : null,
+    st.draft.length ? h('div', { class: 'jv-draft' }, h('div', { class: 'label', text: 'Черновик — проверьте и отправьте' }), st.draft.map((a) => jvCard(st, a))) : null);
+  jvPanel.replaceChildren(...[
+    h('div', { class: 'jv-h' },
+      h('span', { class: 'jv-dot' + (jvListening ? ' on' : ''), 'aria-hidden': 'true' }),
+      h('b', { text: 'Jarvis' + (ctxAll ? '' : ' · №' + areq.num) }),
+      h('button', { class: 'linkbtn', type: 'button', title: 'Озвучивать ответы', onclick: () => { jvSpeak = !jvSpeak; try { localStorage.setItem('zk_jv_speak', jvSpeak ? '1' : '0'); } catch { /* ignore */ } if (!jvSpeak) speechSynthesis?.cancel(); jvRender(); } }, jvSpeak ? '🔊 голос вкл' : '🔇 голос выкл'),
+      st.history.length || st.draft.length || st.files.length ? h('button', { class: 'linkbtn', type: 'button', onclick: () => { if (confirm('Очистить разговор и черновик по этой заявке?')) { JV[jvKey()] = { history: [], files: [], draft: [] }; jvRender(); } } }, 'Очистить') : null,
+      h('button', { class: 'iconbtn', type: 'button', 'aria-label': 'Закрыть', onclick: () => jvToggle(false) }, '✕')),
+    msgs,
+    st.files.length ? h('div', { class: 'jv-files' }, st.files.map((f, i) => h('div', { class: 'jv-file' },
+      f.type === 'photo' ? h('img', { src: f.url, alt: '' }) : h('span', { text: f.type === 'video' ? '🎬' : '📄' }),
+      h('small', { text: 'Файл ' + (i + 1) }),
+      h('button', { type: 'button', 'aria-label': 'Убрать файл', onclick: () => { st.files.splice(i, 1); jvRender(); } }, '×')))) : null,
+    h('div', { class: 'jv-bar' },
+      h('button', { class: 'jv-mic' + (jvListening ? ' on' : ''), type: 'button', 'aria-label': jvListening ? 'Остановить' : 'Говорить', onclick: () => jvListen(!jvListening) }, jvListening ? '■' : '🎤'),
+      h('button', { class: 'cbtn', type: 'button', 'aria-label': 'Прикрепить файлы', title: ctxAll ? 'Откройте заявку, чтобы прикрепить файлы' : 'Фото, видео, техспецификации', onclick: () => fileIn.click() }, '📎'),
+      h('textarea', { id: 'jvText', rows: '2', placeholder: jvListening ? 'Слушаю… говорите' : 'Скажите или напишите Jarvis', onkeydown: (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); const v = e.target.value; e.target.value = ''; jvSend(v); } } }),
+      h('button', { class: 'cbtn send', type: 'button', 'aria-label': 'Отправить', disabled: jvBusy, onclick: () => { const el = document.getElementById('jvText'); const v = el.value; el.value = ''; jvSend(v); } }, svg('send'))),
+    fileIn].filter(Boolean));
+  const ta = document.getElementById('jvText'); if (ta && keepText) ta.value = keepText;
+  const box = document.getElementById('jvMsgs'); if (box) box.scrollTop = box.scrollHeight;
+}
+// при смене заявки — окно показывает её разговор
+const _renderAreqV3 = renderAreq;
+renderAreq = function (first) { _renderAreqV3(first); if (first) jvRender(); };
+/* ===================== конец v4 ===================== */
+
 
 
 async function sendKp() {
@@ -4036,6 +4298,7 @@ const leaveIntro = () => { store.set('snab_intro_seen', true); go(profile ? 'hom
 $('#introGo').addEventListener('click', leaveIntro);
 $('#introSkip').addEventListener('click', leaveIntro);
 $('#aboutBtn').addEventListener('click', () => go('intro'));
+let reminders = null;
 // soft = пришло обновление из базы: не трогаем поля, которые менеджер уже начал менять
 const setVal = (id, v, soft) => { const el = document.getElementById(id); if (!el) return; if (soft && el.dataset.dirty) return; if (el.type === 'checkbox') el.checked = !!v; else el.value = v ?? ''; };
 document.addEventListener('input', (e) => { if (e.target.closest?.('#tarForm,#setForm,#remForm')) e.target.dataset.dirty = '1'; });
