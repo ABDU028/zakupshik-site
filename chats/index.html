@@ -373,11 +373,21 @@ async function loadAll() {
   all = (data || []).map(rowToReq);
   detectNews(); render();
 }
+// прочитано: берём время позже последнего сообщения клиента (часы телефона клиента могут спешить)
+const readSent = {};
+function markRead(r) {
+  if (!unread(r)) return;
+  const maxAt = live(r).filter((m) => m.from === 'client').reduce((a, m) => Math.max(a, m.at || 0), 0);
+  if (readSent[r.id] === maxAt) { const i = all.findIndex((x) => x.id === r.id); if (i >= 0) all[i] = { ...all[i], staffReadAt: maxAt + 1 }; return; }
+  readSent[r.id] = maxAt;
+  push(r, null, { staffReadAt: Math.max(Date.now(), maxAt + 1) });
+}
 async function loadOne(id) {
   const { data } = await SB.from('requests').select('*').eq('id', id).maybeSingle();
   if (!data) return;
   const r = rowToReq(data); const i = all.findIndex((x) => x.id === id);
   if (i >= 0) all[i] = r; else all.unshift(r);
+  if (sel === id && view === 'chats' && !document.hidden) markRead(r);
   detectNews(); render();
 }
 async function start() {
@@ -532,7 +542,7 @@ function openChat(id) {
   sel = id; menuOpen = false; tplOpen = false;
   const r = all.find((x) => x.id === id);
   if (r && !q) filt = tabOf(r);
-  if (r) { const lt = lastTalk(r); if (lt?.from === 'client' && (r.staffReadAt || 0) < lt.at) push(r, null, { staffReadAt: Date.now() }); }
+  if (r) markRead(r);
   render();
   setTimeout(() => { const ta = $('#ta'); if (ta) ta.focus(); }, 50);
 }
@@ -713,7 +723,7 @@ function menuEl(r) {
 async function sendText(r, text) {
   const at = Date.now();
   const extra = r.handoff && (r.kp || r.aiNote) ? { mode: 'ai' } : {};
-  await push(r, { from: 'manager', text, at }, { staffReadAt: at + 1000, handoff: false, handoffQuestion: null, ...extra, ...(r.assignee?.id ? {} : { assignee: { id: me.id, name: me.name } }) });
+  await push(r, { from: 'manager', text, at }, { staffReadAt: Math.max(at, ...live(r).filter((m) => m.from === 'client').map((m) => m.at || 0)) + 1, handoff: false, handoffQuestion: null, ...extra, ...(r.assignee?.id ? {} : { assignee: { id: me.id, name: me.name } }) });
 }
 async function sendFiles(r, fs) {
   if (!fs.length) return;
@@ -959,6 +969,7 @@ function renderBoard() {
     }))));
 }
 
+document.addEventListener('visibilitychange', () => { const r = cur(); if (!document.hidden && r && view === 'chats') markRead(r); });
 boot();
 })();
 </script>
