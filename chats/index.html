@@ -33,7 +33,11 @@ svg{flex-shrink:0}
 .seg{display:flex;gap:6px;flex-wrap:wrap}
 .seg button{height:30px;padding:0 11px;border:0;border-radius:15px;background:var(--s2);color:#C9CDD2;font-weight:700;font-size:12.5px}
 .seg button[aria-pressed="true"]{background:var(--grnBg);color:var(--grnT)}
-.seg button .n{opacity:.8}
+.seg button{display:inline-flex;align-items:center}
+.seg button .n{opacity:.65;margin-left:4px}
+.mine{display:flex;gap:7px;align-items:center;font-size:12.5px;color:var(--mut);font-weight:700;cursor:pointer}
+.mine input{width:16px;height:16px;accent-color:var(--grn)}
+.row.snz{opacity:.55}
 .rows{flex:1;overflow-y:auto}
 .row{display:flex;gap:11px;padding:11px 14px;width:100%;text-align:left;border:0;background:transparent;border-bottom:1px solid #191D21}
 .row:hover{background:#171B1F}
@@ -326,7 +330,7 @@ function preview(r) {
 }
 
 /* ---------- состояние ---------- */
-let me = null, staff = [], all = [], sel = null, view = 'chats', filt = 'all', q = '', infoOpen = false;
+let me = null, staff = [], all = [], sel = null, view = 'chats', filt = 'new', q = '', infoOpen = false;
 let rates = { cny: 71 }, templates = [];
 const sugCache = {}; // id -> { at, text, loading }
 const DEF_TPL = ['Здравствуйте! Заявку получили, уже ищем варианты у поставщиков в Китае.', 'Отправили вам варианты — посмотрите и выберите подходящий.', 'Цена указана с доставкой до нашего склада в Алматы. Точную стоимость доставки назовём после взвешивания на складе.', 'Оплатить можно через Kaspi по номеру +7 708 255 11 70. После оплаты пришлите, пожалуйста, чек сюда.', 'Товар выкуплен и едет на наш склад в Китае.', 'Спасибо за заказ! Если появятся вопросы — пишите сюда.'];
@@ -448,27 +452,33 @@ function updateRail() {
 const isMine = (r) => r.assignee?.id === me.id;
 const isFree = (r) => !r.assignee?.id;
 const snoozed = (r) => r.snoozeUntil && Date.now() < r.snoozeUntil && !(lastTalk(r)?.from === 'client' && lastTalk(r).at > (r.snoozeAt || 0));
-function inFilt(r, f) {
-  if (f === 'mine') return isMine(r);
-  if (f === 'free') return isFree(r) && !['done', 'declined', 'rejected'].includes(r.status);
-  if (f === 'unread') return needsReply(r) || unread(r) > 0;
-  if (f === 'snoozed') return snoozed(r);
-  return !snoozed(r);
+function tabOf(r) {
+  if (r.service === 'support') return 'work';
+  if (['new', 'approval'].includes(r.status)) return 'new';
+  if (r.status === 'done') return 'closed';
+  if (['declined', 'rejected'].includes(r.status)) return 'declined';
+  return 'work';
 }
+let onlyMine = false;
+try { onlyMine = localStorage.getItem('zk-only-mine') === '1'; } catch { /* ignore */ }
+function inFilt(r, f) { return tabOf(r) === f && (!onlyMine || isMine(r)); }
 function sortKey(r) { const m = lastItem(r); return Math.max(m?.at || 0, r.createdAt || 0); }
 function renderList() {
   const box = $('#list'); if (!box) return;
   const hit = (r) => !q || [r.num, r.title, r.clientName, r.clientPhone, r.clientCode, r.city].join(' ').toLowerCase().includes(q);
-  const list = all.filter((r) => inFilt(r, filt) && hit(r)).sort((a, b) => (needsReply(b) - needsReply(a)) || (sortKey(b) - sortKey(a)));
+  const list = all.filter((r) => (q ? (!onlyMine || isMine(r)) : inFilt(r, filt)) && hit(r)).sort((a, b) => (snoozed(a) - snoozed(b)) || (needsReply(b) - needsReply(a)) || (sortKey(b) - sortKey(a)));
   const cnt = (f) => all.filter((r) => inFilt(r, f)).length;
+  const hot = (f) => all.filter((r) => inFilt(r, f) && (needsReply(r) || unread(r) > 0)).length;
   const prevScroll = box.querySelector('.rows')?.scrollTop || 0;
   const searchEl = box.querySelector('.search');
   const hadFocus = document.activeElement === searchEl;
-  const seg = (k, l) => h('button', { type: 'button', 'aria-pressed': String(filt === k), onclick: () => { filt = k; renderList(); } }, l, k === 'all' ? null : h('span', { class: 'n', text: ' · ' + cnt(k) }));
+  const seg = (k, l) => h('button', { type: 'button', 'aria-pressed': String(!q && filt === k), onclick: () => { filt = k; q = ''; renderList(); } }, l, h('span', { class: 'n', text: ' ' + cnt(k) }), hot(k) ? h('span', { class: 'cnt red', style: 'margin-left:5px;min-width:18px;height:18px;font-size:10.5px', title: 'Ждут ответа', text: String(hot(k)) }) : null);
   const s = h('input', { class: 'search', type: 'search', placeholder: 'Поиск: имя, телефон, товар, №', 'aria-label': 'Поиск', value: q, oninput: (e) => { q = e.target.value.trim().toLowerCase(); renderList(); } });
   put(box, 
     h('div', { class: 'lh' }, h('h1', {}, 'Чаты', h('small', { text: 'курс ' + (rates?.cny || '—') + ' ₸ / ¥' })), s,
-      h('div', { class: 'seg', role: 'group', 'aria-label': 'Фильтр' }, seg('all', 'Все'), seg('mine', 'Мои'), seg('free', 'Свободные'), seg('unread', 'Непрочит.'), cnt('snoozed') ? seg('snoozed', 'Отложенные') : null)),
+      h('div', { class: 'seg', role: 'group', 'aria-label': 'Статус' }, seg('new', 'Новые · ждут КП'), seg('work', 'В работе'), seg('closed', 'Закрыт'), seg('declined', 'Отказался')),
+      h('label', { class: 'mine' }, h('input', { type: 'checkbox', checked: onlyMine, onchange: (e) => { onlyMine = e.target.checked; try { localStorage.setItem('zk-only-mine', onlyMine ? '1' : '0'); } catch { /* ignore */ } renderList(); } }), 'Только мои клиенты'),
+      q ? h('small', { style: 'color:var(--mut)', text: 'Поиск по всем статусам' }) : null),
     h('div', { class: 'rows' }, list.length ? list.map(rowEl) : h('div', { class: 'empty', text: q ? 'Ничего не нашлось' : 'Здесь пусто' })));
   box.querySelector('.rows').scrollTop = prevScroll;
   if (hadFocus) { const el = box.querySelector('.search'); el.focus(); el.setSelectionRange(el.value.length, el.value.length); }
@@ -478,7 +488,7 @@ function rowEl(r) {
   const name = r.clientName || 'Клиент', m = lastItem(r), nr = needsReply(r), un = unread(r), lt = lastTalk(r);
   const [st, cls] = statusChip(r);
   const pv = r.handoff && r.handoffQuestion ? 'ИИ спрашивает: ' + r.handoffQuestion : preview(r);
-  return h('button', { type: 'button', class: 'row' + (sel === r.id ? ' sel' : ''), onclick: () => openChat(r.id) },
+  return h('button', { type: 'button', class: 'row' + (sel === r.id ? ' sel' : '') + (snoozed(r) ? ' snz' : ''), onclick: () => openChat(r.id) },
     h('span', { class: 'av', style: 'background:' + avColor(r.ownerId || r.id), text: initials(name) }),
     h('span', { class: 'rm' },
       h('span', { class: 'r1' }, h('b', { text: name }), h('span', { class: 't' + (nr ? ' urg' : un ? ' hot' : ''), text: nr && lt ? 'ждёт ' + waitTxt(lt.at) : ago(m?.at || r.createdAt) })),
@@ -493,6 +503,7 @@ function openChat(id) {
   view = 'chats'; document.getElementById('board')?.remove();
   sel = id; menuOpen = false; tplOpen = false;
   const r = all.find((x) => x.id === id);
+  if (r && !q) filt = tabOf(r);
   if (r) { const lt = lastTalk(r); if (lt?.from === 'client' && (r.staffReadAt || 0) < lt.at) push(r, null, { staffReadAt: Date.now() }); }
   render();
   setTimeout(() => { const ta = $('#ta'); if (ta) ta.focus(); }, 50);
