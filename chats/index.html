@@ -240,7 +240,7 @@ const ICONS = {
   info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5h.01"/>', trash: '<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/>',
   var: '<rect x="3" y="4" width="8" height="8" rx="2"/><rect x="13" y="4" width="8" height="8" rx="2"/><path d="M3 17h18M3 21h12"/>', doc: '<path d="M6 3h9l3 3v15H6z"/><path d="M9 11h6M9 15h6"/>',
   check: '<path d="M5 12l5 5 9-10"/>', truck: '<path d="M3 6h11v10H3zM14 10h4l3 3v3h-7"/><circle cx="7" cy="18" r="1.8"/><circle cx="17" cy="18" r="1.8"/>',
-  back: '<path d="M15 5l-7 7 7 7"/>', old: '<path d="M4 4h16v16H4z"/><path d="M4 9h16M9 9v11"/>', bulb: '<path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.4 1 1.1 1 1.8V16h5v-.3c0-.7.4-1.4 1-1.8A6 6 0 0 0 12 3z"/>',
+  back: '<path d="M15 5l-7 7 7 7"/>', plus: '<path d="M12 5v14M5 12h14"/>', old: '<path d="M4 4h16v16H4z"/><path d="M4 9h16M9 9v11"/>', bulb: '<path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.4 1 1.1 1 1.8V16h5v-.3c0-.7.4-1.4 1-1.8A6 6 0 0 0 12 3z"/>',
 };
 function ic(name, size = 20) { const t = document.createElement('template'); t.innerHTML = '<svg width="' + size + '" height="' + size + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + ICONS[name] + '</svg>'; return t.content.firstChild; }
 let toastT;
@@ -327,10 +327,38 @@ function statusChip(r) {
   if (r.status === 'work') return [r.stage ? (STAGE_SHORT[r.stage] || 'В работе') : 'В работе', goodsPaid(r) ? 'c-grn' : ''];
   return [r.status, ''];
 }
+/* ---------- дозаказы ---------- */
+const ORDER_KEYS = ['kp', 'status', 'decision', 'rejectReason', 'chosenVariant', 'acceptedAt', 'payments', 'stage', 'stageAt', 'logiExact', 'deliveryPrepaid', 'cityDelivery', 'dispatch', 'doneAt', 'receivedAt'];
+const ordersOf = (r) => (Array.isArray(r.orders) ? r.orders : []);
+function viewOf(r, oid) {
+  if (!oid) return r;
+  const o = ordersOf(r).find((x) => x.id === oid); if (!o) return r;
+  const v = { ...r }; for (const k of ORDER_KEYS) v[k] = o[k];
+  v.num = r.num + '-' + o.n; v.title = o.title || 'Дозаказ'; v._order = o; v.approvalPick = null; v.approvalNone = null; v.approvals = null;
+  return v;
+}
+const oLabel = (r, o) => 'Дозаказ №' + r.num + '-' + o.n + (o.title ? ' (' + o.title + ')' : '');
+async function pushTo(r, oid, item, fields) {
+  if (!oid) return push(r, item, fields);
+  const o = ordersOf(r).find((x) => x.id === oid); if (!o) { toast('Дозаказ не найден'); return false; }
+  const ordF = {}, top = {};
+  for (const [k, val] of Object.entries(fields || {})) (ORDER_KEYS.includes(k) ? ordF : top)[k] = val;
+  const orders = ordersOf(r).map((x) => (x.id === oid ? { ...x, ...ordF } : x));
+  const it = item ? (item.order ? item : { ...item, order: oid, text: item.text ? oLabel(r, o) + ': ' + item.text : item.text }) : null;
+  return push(r, it, { ...top, orders });
+}
+function entries() { const out = []; for (const r of all) { out.push({ r, v: r, oid: null }); for (const o of ordersOf(r)) out.push({ r, v: viewOf(r, o.id), oid: o.id }); } return out; }
+// переключатель «для какого заказа» в окнах действий
+function orderSwitch(r, oid, reopen) {
+  if (!ordersOf(r).length) return null;
+  const b = (id, label) => h('button', { type: 'button', 'aria-pressed': String((oid || null) === id), onclick: () => { if ((oid || null) === id) return; document.querySelector('.shade')?.remove(); reopen(id); } }, label);
+  return h('div', { class: 'box' }, h('b', { text: 'Для какого заказа' }), h('div', { class: 'opts' }, b(null, '№' + r.num + ' · ' + (r.title || 'основной').slice(0, 24)), ordersOf(r).map((o) => b(o.id, '№' + r.num + '-' + o.n + ' · ' + (o.title || 'дозаказ').slice(0, 24)))));
+}
 function preview(r) {
   const m = lastItem(r); if (!m) return '';
   const who = m.from === 'manager' ? 'Вы: ' : m.from === 'ai' ? 'ИИ: ' : '';
   if (m.kind === 'kp') return who + 'КП отправлено';
+  if (m.kind === 'kp2') return who + 'КП на дозаказ';
   if (m.kind === 'variants') return who + 'Варианты на согласование';
   if (m.kind === 'media' || m.kind === 'photo') return who + ((m.media || [])[0]?.type === 'audio' ? 'Голосовое' : 'Файл');
   if (m.kind === 'payment') return m.text || 'Оплата получена';
@@ -434,11 +462,11 @@ function beep() { try { if (!audioCtx) return; const t = audioCtx.currentTime; [
 function notify(title, body, id) { beep(); try { if (window.Notification && Notification.permission === 'granted' && (document.hidden || sel !== id)) { const n = new Notification(title, { body, tag: id }); n.onclick = () => { window.focus(); openChat(id); n.close(); }; } } catch { /* ignore */ } }
 function detectNews() {
   const next = {};
-  for (const r of all) { const m = lastTalk(r); next[r.id] = { c: m && m.from === 'client' ? m.at : 0, acc: r.decision === 'accept' ? 1 : 0 }; }
+  for (const r of all) { const m = lastTalk(r); next[r.id] = { c: m && m.from === 'client' ? m.at : 0, acc: (r.decision === 'accept' ? 1 : 0) + ordersOf(r).filter((o) => o.decision === 'accept').length }; }
   if (seen) for (const r of all) {
     const a = seen[r.id], b = next[r.id], who = r.clientName || 'Клиент';
     if (!a) { notify('Новая заявка', who + ' — ' + (r.title || ''), r.id); continue; }
-    if (b.acc && !a.acc) notify('Клиент оформил заказ', who, r.id);
+    if (b.acc > a.acc) notify('Клиент оформил заказ', who, r.id);
     else if (b.c > a.c) notify(who, preview(r), r.id);
   }
   seen = next;
@@ -481,7 +509,8 @@ function tabOf(r) {
 let onlyMine = false, selMode = false;
 const picked = new Set();
 try { onlyMine = localStorage.getItem('zk-only-mine') === '1'; } catch { /* ignore */ }
-function inFilt(r, f) { return tabOf(r) === f && (!onlyMine || isMine(r)); }
+function inFilt(e, f) { return tabOf(e.v) === f && (!onlyMine || isMine(e.r)); }
+let selOrder = null;
 async function deleteReqs(ids) {
   ids = ids.filter(Boolean); if (!ids.length) return;
   const names = ids.map((id) => { const r = all.find((x) => x.id === id); return r ? (r.clientName || 'Клиент') + ' №' + r.num : id; });
@@ -503,10 +532,11 @@ async function deleteReqs(ids) {
 function sortKey(r) { const m = lastItem(r); return Math.max(m?.at || 0, r.createdAt || 0); }
 function renderList() {
   const box = $('#list'); if (!box) return;
-  const hit = (r) => !q || [r.num, r.title, r.clientName, r.clientPhone, r.clientCode, r.city].join(' ').toLowerCase().includes(q);
-  const list = all.filter((r) => (q ? (!onlyMine || isMine(r)) : inFilt(r, filt)) && hit(r)).sort((a, b) => (snoozed(a) - snoozed(b)) || (needsReply(b) - needsReply(a)) || (sortKey(b) - sortKey(a)));
-  const cnt = (f) => all.filter((r) => inFilt(r, f)).length;
-  const hot = (f) => all.filter((r) => inFilt(r, f) && (needsReply(r) || unread(r) > 0)).length;
+  const hit = (e) => !q || [e.v.num, e.v.title, e.r.title, e.r.clientName, e.r.clientPhone, e.r.clientCode, e.r.city].join(' ').toLowerCase().includes(q);
+  const ents = entries();
+  const list = ents.filter((e) => (q ? (!onlyMine || isMine(e.r)) : inFilt(e, filt)) && hit(e)).sort((a, b) => (snoozed(a.r) - snoozed(b.r)) || (needsReply(b.r) - needsReply(a.r)) || (sortKey(b.r) - sortKey(a.r)) || ((a.oid ? 1 : 0) - (b.oid ? 1 : 0)));
+  const cnt = (f) => ents.filter((e) => inFilt(e, f)).length;
+  const hot = (f) => new Set(ents.filter((e) => inFilt(e, f) && (needsReply(e.r) || unread(e.r) > 0)).map((e) => e.r.id)).size;
   const prevScroll = box.querySelector('.rows')?.scrollTop || 0;
   const searchEl = box.querySelector('.search');
   const hadFocus = document.activeElement === searchEl;
@@ -526,27 +556,28 @@ function renderList() {
   if (hadFocus) { const el = box.querySelector('.search'); el.focus(); el.setSelectionRange(el.value.length, el.value.length); }
   updateRail();
 }
-function rowEl(r) {
+function rowEl(e) {
+  const r = e.r, v = e.v, oid = e.oid;
   const name = r.clientName || 'Клиент', m = lastItem(r), nr = needsReply(r), un = unread(r), lt = lastTalk(r);
-  const [st, cls] = statusChip(r);
+  const [st, cls] = statusChip(v);
   const pv = r.handoff && r.handoffQuestion ? 'ИИ спрашивает: ' + r.handoffQuestion : preview(r);
-  return h('button', { type: 'button', class: 'row' + (sel === r.id && !selMode ? ' sel' : '') + (snoozed(r) ? ' snz' : '') + (selMode && picked.has(r.id) ? ' pk' : ''), onclick: () => { if (selMode) { picked.has(r.id) ? picked.delete(r.id) : picked.add(r.id); renderList(); } else openChat(r.id); } },
+  return h('button', { type: 'button', class: 'row' + (sel === r.id && (selOrder || null) === oid && !selMode ? ' sel' : '') + (snoozed(r) ? ' snz' : '') + (selMode && picked.has(r.id) ? ' pk' : ''), onclick: () => { if (selMode) { picked.has(r.id) ? picked.delete(r.id) : picked.add(r.id); renderList(); } else openChat(r.id, oid); } },
     selMode ? h('span', { class: 'ckb', 'aria-hidden': 'true', text: picked.has(r.id) ? '✓' : '' }) : null,
     h('span', { class: 'av', style: 'background:' + avColor(r.ownerId || r.id), text: initials(name) }),
     h('span', { class: 'rm' },
       h('span', { class: 'r1' }, h('b', { text: name }), h('span', { class: 't' + (nr ? ' urg' : un ? ' hot' : ''), text: nr && lt ? 'ждёт ' + waitTxt(lt.at) : ago(m?.at || r.createdAt) })),
-      h('span', { class: 'r2', text: (r.service === 'support' ? 'Поддержка' : (r.title || '') + ' · №' + r.num) }),
+      h('span', { class: 'r2', text: (r.service === 'support' ? 'Поддержка' : (v.title || '') + ' · №' + v.num) }),
       h('span', { class: 'r3' }, h('span', { class: nr && r.handoff ? 'urg' : '', text: pv }),
         nr && r.handoff ? h('span', { class: 'cnt red', text: '!' }) : un ? h('span', { class: 'cnt', text: String(un) }) : (m?.from === 'manager' ? h('span', { class: 'tk' + ((r.clientReadAt || 0) >= m.at ? ' r' : ''), text: '✓✓' }) : null)),
-      h('span', { class: 'chips' }, h('span', { class: 'chip ' + cls, text: st }), aiOn(r) && !r.handoff ? h('span', { class: 'chip c-blu', text: 'ИИ отвечает' }) : null,
+      h('span', { class: 'chips' }, oid ? h('span', { class: 'chip c-yel', text: 'Дозаказ' }) : null, h('span', { class: 'chip ' + cls, text: st }), aiOn(r) && !r.handoff ? h('span', { class: 'chip c-blu', text: 'ИИ отвечает' }) : null,
         r.assignee?.name ? h('span', { class: 'chip', text: isMine(r) ? 'Мой клиент' : 'Ведёт: ' + r.assignee.name.split(' ')[0] }) : null,
         snoozed(r) ? h('span', { class: 'chip', text: 'Отложено' }) : null)));
 }
-function openChat(id) {
+function openChat(id, oid) {
   view = 'chats'; document.getElementById('board')?.remove();
-  sel = id; menuOpen = false; tplOpen = false;
+  sel = id; selOrder = oid || null; menuOpen = false; tplOpen = false;
   const r = all.find((x) => x.id === id);
-  if (r && !q) filt = tabOf(r);
+  if (r && !q) filt = tabOf(viewOf(r, selOrder));
   if (r) markRead(r);
   render();
   setTimeout(() => { const ta = $('#ta'); if (ta) ta.focus(); }, 50);
@@ -566,7 +597,7 @@ function renderChat() {
   const head = h('header', { class: 'ch' },
     h('button', { class: 'ib', type: 'button', 'aria-label': 'К списку', style: 'display:none', id: 'backBtn', onclick: () => { sel = null; render(); } }, ic('back', 18)),
     h('span', { class: 'av', style: 'background:' + avColor(r.ownerId || r.id), text: initials(name) }),
-    h('span', { class: 'chm' }, h('b', {}, name, ' ', h('span', { text: '· ' + (r.service === 'support' ? 'Поддержка' : (r.title || '') + ' · №' + r.num) })),
+    h('span', { class: 'chm' }, h('b', {}, name, ' ', h('span', { text: '· ' + (r.service === 'support' ? 'Поддержка' : (r.title || '') + ' · №' + r.num + (ordersOf(r).length ? ' + дозаказ: ' + ordersOf(r).length : '')) })),
       h('small', {}, [r.city || r.clientCity, r.clientPhone].filter(Boolean).join(' · '), ' · ', h('span', { class: 'chip ' + cls, text: st }))),
     tel ? h('a', { class: 'pillb', href: 'https://wa.me/' + tel.replace('+', ''), target: '_blank', rel: 'noopener' }, 'WhatsApp') : null,
     isMine(r) ? h('button', { class: 'pillb g', type: 'button', title: 'Клиент закреплён за вами. Нажмите, чтобы открепить', onclick: () => { if (confirm('Открепить клиента от себя?')) push(r, null, { assignee: null }); } }, '✓ Мой клиент')
@@ -627,23 +658,35 @@ function bubble(r, m, kids) {
 }
 const thumb = (list) => { const p = (list || []).find((x) => x.type === 'photo'); return p ? h('img', { class: 'th', src: p.url, alt: '', onclick: () => lightbox(p.url) }) : h('span', { class: 'th', 'aria-hidden': 'true' }); };
 function yuan(v, rate) { const c = num(v.cny), qn = num(v.qty) || 1, s = num(v.chinaShip); if (!c || !rate) return ''; let b = c.toLocaleString('ru-RU') + ' ¥' + (qn !== 1 ? ' × ' + qn : ''); if (s) b = '(' + b + ' + ' + s + ' ¥ по Китаю)'; return '= ' + b + ' × ' + rate + ' ₸'; }
+function kpCardEl(r, v, m, title) {
+    const k = v.kp || {}; const kind = k.type || KIND(v);
+    const vs = k.variants?.length ? k.variants : (kind === 'cargo' ? [] : [{ name: k.product || v.title, price: k.price }]);
+    const logi = num(v.logiExact) || num(k.logi?.cost); const ch = v.chosenVariant != null ? Number(v.chosenVariant) : null;
+    const goods = num(vs[ch ?? 0]?.price); const total = kind === 'cargo' ? logi : goods && logi ? goods + logi : 0;
+    const foot = v.status === 'declined' && v.decision === 'decline' ? h('div', { class: 'foot r', text: '✕ Клиент отказался' + (v.rejectReason ? ': ' + v.rejectReason : '') })
+      : v.decision === 'accept' ? h('div', { class: 'foot g', text: '✓ Клиент оформил' + (vs.length > 1 && ch != null ? ' вариант ' + (ch + 1) : '') + (v.acceptedAt ? ' · ' + hhmm(v.acceptedAt) : '') })
+      : h('div', { class: 'foot', text: v.status === 'waiting' || (r.clientReadAt || 0) >= m.at ? 'Клиент открыл КП · ждём ответа' : 'Клиент ещё не открыл' });
+    return h('div', { class: 'card kp' }, h('div', { class: 'in' },
+      h('div', { class: 'hd' }, h('b', { text: title || ((kind === 'cargo' ? 'Расчёт доставки' : 'КП') + ' №' + r.num) }), h('span', { text: hhmm(m.at) })),
+      vs.map((x, i) => h('div', { class: 'vr' }, thumb(x.media), h('div', { class: 'vm' }, h('b', { text: (vs.length > 1 ? (i + 1) + ' · ' : '') + (x.name || '') }), yuan(x, num(k.rate)) ? h('small', { text: yuan(x, num(k.rate)) }) : x.term ? h('small', { text: x.term }) : null), h('span', { class: 'pr', text: num(x.price) ? money(num(x.price)) : '' }))),
+      kind !== 'translate' ? h('div', { class: 'kv2' }, h('span', { text: 'Доставка до Алматы' + (k.logi ? ' (' + (SHIP[k.logi.method] || '') + ')' : '') }), h('span', { text: logi ? (v.logiExact ? '' : '≈ ') + money(logi) : 'не указана' })) : null,
+      total && (vs.length < 2 || ch != null) ? h('div', { class: 'kv2 tot' }, h('span', { text: 'Итого' }), h('span', { text: (v.logiExact ? '' : '≈ ') + money(total) })) : null), foot, delBtn(r, m));
+  }
 function msgEl(r, m, lastKp, lastVar) {
   if (m.deleted) return h('div', { class: 'del ' + (m.from === 'client' ? 'cl' : 'mg'), text: (m.from === 'client' ? 'Клиент удалил сообщение' : 'Сообщение удалено') + ' · ' + hhmm(m.deletedAt || m.at) });
+  if (m.kind === 'kp2') {
+    const o = ordersOf(r).find((x) => x.id === m.order);
+    const lastOf = [...(r.thread || [])].reverse().find((x) => !x.deleted && x.kind === 'kp2' && x.order === m.order);
+    if (!o) return h('div', { class: 'sys', text: (m.text || 'КП на дозаказ') + ' · ' + hhmm(m.at) });
+    if (m !== lastOf) return h('div', { class: 'sys', text: 'КП дозаказа от ' + hhmm(m.at) + ' (заменено новым)' });
+    return kpCardEl(r, viewOf(r, o.id), m, 'Дозаказ №' + r.num + '-' + o.n);
+  }
+  if (m.kind === 'order_accept') return h('div', { class: 'sys g', text: '✓ ' + (m.text || '') + ' · ' + hhmm(m.at) });
   if (m.kind === 'kp') {
     if (m !== lastKp) return h('div', { class: 'sys', text: 'КП от ' + ago(m.at) + ' ' + hhmm(m.at) + ' (заменено новым)' });
-    const k = r.kp || {}; const kind = k.type || KIND(r);
-    const vs = k.variants?.length ? k.variants : (kind === 'cargo' ? [] : [{ name: k.product || r.title, price: k.price }]);
-    const logi = num(r.logiExact) || num(k.logi?.cost); const ch = r.chosenVariant != null ? Number(r.chosenVariant) : null;
-    const goods = num(vs[ch ?? 0]?.price); const total = kind === 'cargo' ? logi : goods && logi ? goods + logi : 0;
-    const foot = r.status === 'declined' && r.decision === 'decline' ? h('div', { class: 'foot r', text: '✕ Клиент отказался' + (r.rejectReason ? ': ' + r.rejectReason : '') })
-      : r.decision === 'accept' ? h('div', { class: 'foot g', text: '✓ Клиент оформил' + (vs.length > 1 && ch != null ? ' вариант ' + (ch + 1) : '') + (r.acceptedAt ? ' · ' + hhmm(r.acceptedAt) : '') })
-      : h('div', { class: 'foot', text: r.status === 'waiting' || (r.clientReadAt || 0) >= m.at ? 'Клиент открыл КП · ждём ответа' : 'Клиент ещё не открыл' });
-    return h('div', { class: 'card kp' }, h('div', { class: 'in' },
-      h('div', { class: 'hd' }, h('b', { text: (kind === 'cargo' ? 'Расчёт доставки' : 'КП') + ' №' + r.num }), h('span', { text: hhmm(m.at) })),
-      vs.map((v, i) => h('div', { class: 'vr' }, thumb(v.media), h('div', { class: 'vm' }, h('b', { text: (vs.length > 1 ? (i + 1) + ' · ' : '') + (v.name || '') }), yuan(v, num(k.rate)) ? h('small', { text: yuan(v, num(k.rate)) }) : v.term ? h('small', { text: v.term }) : null), h('span', { class: 'pr', text: num(v.price) ? money(num(v.price)) : '' }))),
-      kind !== 'translate' ? h('div', { class: 'kv2' }, h('span', { text: 'Доставка до Алматы' + (k.logi ? ' (' + (SHIP[k.logi.method] || '') + ')' : '') }), h('span', { text: logi ? (r.logiExact ? '' : '≈ ') + money(logi) : 'не указана' })) : null,
-      total && (vs.length < 2 || ch != null) ? h('div', { class: 'kv2 tot' }, h('span', { text: 'Итого' }), h('span', { text: (r.logiExact ? '' : '≈ ') + money(total) })) : null), foot, delBtn(r, m));
+    return kpCardEl(r, r, m, null);
   }
+
   if (m.kind === 'variants') {
     const vs = m.variants || []; const isLast = m === lastVar;
     return h('div', { class: 'card var' }, h('div', { class: 'in' },
@@ -651,11 +694,11 @@ function msgEl(r, m, lastKp, lastVar) {
       vs.map((v, i) => h('div', { class: 'vr' }, thumb(v.media), h('div', { class: 'vm' }, h('b', { text: (vs.length > 1 ? (i + 1) + ' · ' : '') + (v.name || '') }), v.desc ? h('small', { text: v.desc }) : null)))),
       !isLast ? h('div', { class: 'foot', text: 'Заменено новыми вариантами' }) : r.approvalNone ? h('div', { class: 'foot r', text: '✕ Не подошло: ' + r.approvalNone }) : r.approvalPick ? h('div', { class: 'foot g', text: '✓ Клиент выбрал: ' + r.approvalPick }) : h('div', { class: 'foot', text: 'Ждём выбора клиента' }), delBtn(r, m));
   }
-  if (m.kind === 'exact') return h('div', { class: 'card ex' }, h('div', { class: 'in' }, h('div', { class: 'hd' }, h('b', { text: 'Точная доставка до Алматы' }), h('span', { text: hhmm(m.at) })), h('div', { class: 'kv2 tot' }, h('span', { text: 'К оплате за доставку' }), h('span', { text: money(m.cost || 0) })), m.weight || m.volume ? h('div', { class: 'kv2', text: [m.weight && m.weight + ' кг', m.volume && m.volume + ' м³'].filter(Boolean).join(' · ') }) : null), delBtn(r, m));
+  if (m.kind === 'exact') return h('div', { class: 'card ex' }, h('div', { class: 'in' }, h('div', { class: 'hd' }, h('b', { text: 'Точная доставка до Алматы' + (m.order ? ' · дозаказ' : '') }), h('span', { text: hhmm(m.at) })), h('div', { class: 'kv2 tot' }, h('span', { text: 'К оплате за доставку' }), h('span', { text: money(m.cost || 0) })), m.weight || m.volume ? h('div', { class: 'kv2', text: [m.weight && m.weight + ' кг', m.volume && m.volume + ' м³'].filter(Boolean).join(' · ') }) : null), delBtn(r, m));
   if (m.kind === 'dispatch') { const d = m.dispatch || {}; return h('div', { class: 'card dp' }, h('div', { class: 'in' }, h('div', { class: 'hd' }, h('b', { text: 'Отправили в ' + (r.delivery?.city || 'город') }), h('span', { text: hhmm(m.at) })), h('small', { style: 'color:var(--mut)', text: [d.method, d.driver, d.phone, [d.car, d.color].filter(Boolean).join(', '), d.plate, d.eta && 'приедет ' + d.eta].filter(Boolean).join(' · ') }), mediaEl(d.media)), delBtn(r, m)); }
   if (m.kind === 'payment') return h('div', { class: 'sys g', text: '✓ ' + (m.text || 'Оплата получена') + ' · ' + hhmm(m.at) });
   if (m.kind === 'received') return h('div', { class: 'sys g', text: '✓ Клиент подтвердил получение · ' + hhmm(m.at) });
-  if (m.kind === 'stage') return h('div', { class: 'sys', text: (STAGE_LABEL[m.stage] || 'Этап') + ' · ' + hhmm(m.at) });
+  if (m.kind === 'stage') { const o = m.order && ordersOf(r).find((x) => x.id === m.order); return h('div', { class: 'sys', text: (o ? 'Дозаказ №' + r.num + '-' + o.n + ': ' : '') + (STAGE_LABEL[m.stage] || 'Этап') + ' · ' + hhmm(m.at) }); }
   if (m.kind === 'city') return h('div', { class: 'sys', text: 'Доставка Алматы → ' + (r.delivery?.city || 'город') + (m.cost ? ': ' + money(m.cost) : '') + (m.prepaid ? ' · оплачено' : '') });
   if (m.kind === 'photo') return bubble(r, m, h('div', { class: 'media' }, h('img', { src: m.thumb, alt: 'Фото', onclick: async () => { const { data } = await SB.from('request_files').select('data').eq('id', m.fileId).maybeSingle(); lightbox(data?.data || m.thumb); } })));
   if (m.kind === 'media') return bubble(r, m, [mediaEl(m.media), m.text ? h('span', { text: m.text }) : null]);
@@ -730,9 +773,10 @@ function menuEl(r) {
   const it = (icon, bg, fg, title, sub, fn) => h('button', { type: 'button', onclick: () => { menuOpen = false; renderChat(); fn(); } }, h('span', { class: 'mi', style: 'background:' + bg + ';color:' + fg }, ic(icon, 18)), h('span', {}, h('b', { text: title }), h('small', { text: sub })));
   return h('div', { class: 'menu', role: 'menu' },
     it('var', 'var(--yelBg)', 'var(--yelT)', 'Варианты на согласование', 'Фото и характеристики, без цены', () => sheetVariants(r)),
-    it('doc', 'var(--accS)', 'var(--accT)', r.kp ? 'КП / доставка' : 'КП с ценой', 'Товар, доставка или всё вместе', () => sheetKp(r)),
-    it('check', 'var(--grnBg)', 'var(--grnT)', 'Клиент оплатил', 'Товар · доставка · чек', () => sheetPay(r)),
-    it('truck', 'var(--bluBg)', 'var(--bluT)', 'Этап заказа', 'Выкупили · в пути · в Алматы · отправили', () => sheetStage(r)),
+    it('doc', 'var(--accS)', 'var(--accT)', r.kp ? 'КП / доставка' : 'КП с ценой', 'Товар, доставка или всё вместе', () => sheetKp(r, selOrder)),
+    r.kp && r.service !== 'support' ? it('plus', 'var(--yelBg)', 'var(--yelT)', 'Дозаказ', 'Клиент хочет ещё товар — отдельное КП в этот же чат', () => sheetKp(r, null, true)) : null,
+    it('check', 'var(--grnBg)', 'var(--grnT)', 'Клиент оплатил', 'Товар · доставка · чек', () => sheetPay(r, selOrder)),
+    it('truck', 'var(--bluBg)', 'var(--bluT)', 'Этап заказа', 'Выкупили · в пути · в Алматы · отправили', () => sheetStage(r, selOrder)),
     it('bulb', 'var(--s3)', 'var(--fg)', 'Указание для ИИ', 'Что ИИ можно говорить клиенту', () => sheetAi(r)));
 }
 async function sendText(r, text) {
@@ -764,25 +808,33 @@ function renderInfo() {
   const r = cur(); box.classList.toggle('force', infoOpen);
   if (!r) { put(box, ); return; }
   const f = (l, v) => v ? h('div', { class: 'f' }, h('span', { text: l }), h('div', { text: v })) : null;
-  const p = pays(r);
+  if (selOrder && !ordersOf(r).some((o) => o.id === selOrder)) selOrder = null;
+  const v = viewOf(r, selOrder);
+  const p = pays(v);
   const steps = r.service === 'support' ? [] : (() => {
-    const list = [['new', 'Заявка'], ['approval', 'Согласование'], ['kp', 'КП'], ['acc', 'Оформил'], ...stagesFor(r).map((k) => [k, STAGE_SHORT[k]]), ['received', 'Получил']];
+    const head = v._order ? [['kp', 'КП'], ['acc', 'Оформил']] : [['new', 'Заявка'], ['approval', 'Согласование'], ['kp', 'КП'], ['acc', 'Оформил']];
+    const list = [...head, ...stagesFor(v).map((k) => [k, STAGE_SHORT[k]]), ['received', 'Получил']];
+    const off = v._order ? 2 : 0;
     let ci = 0;
-    if (r.status === 'approval') ci = 1; else if (['kp', 'waiting', 'delivery', 'declined'].includes(r.status)) ci = 2;
-    else if (['work', 'done'].includes(r.status)) { const si = list.findIndex(([k]) => k === r.stage); ci = r.receivedAt || r.stage === 'received' ? list.length - 1 : si >= 0 ? si : goodsPaid(r) && KIND(r) !== 'cargo' ? 4 : 3; }
+    if (v.status === 'approval') ci = 1; else if (['kp', 'waiting', 'delivery', 'declined'].includes(v.status)) ci = 2 - off;
+    else if (['work', 'done'].includes(v.status)) { const si = list.findIndex(([k]) => k === v.stage); ci = v.receivedAt || v.stage === 'received' ? list.length - 1 : si >= 0 ? si : goodsPaid(v) && KIND(v) !== 'cargo' ? 4 - off : 3 - off; }
     return list.map(([k, l], i) => h('li', { class: i < ci ? 'd' : i === ci ? 'c' : '' }, h('i'), l));
   })();
   const note = h('textarea', { class: 'note', 'aria-label': 'Заметка', placeholder: 'Заметка о клиенте или заказе (клиент не видит)', value: r.note || '' });
   put(box, 
     infoOpen ? h('button', { class: 'pillb', type: 'button', style: 'align-self:flex-end', onclick: () => { infoOpen = false; renderInfo(); } }, 'Закрыть') : null,
-    h('h3', { text: r.service === 'support' ? 'Поддержка' : 'Заявка №' + r.num }),
-    (r.fields || []).map((x) => f(x.label, x.value)),
+    ordersOf(r).length ? h('div', { class: 'opts' }, h('button', { type: 'button', 'aria-pressed': String(!selOrder), onclick: () => { selOrder = null; renderInfo(); renderList(); } }, '№' + r.num), ordersOf(r).map((o) => h('button', { type: 'button', 'aria-pressed': String(selOrder === o.id), onclick: () => { selOrder = o.id; renderInfo(); renderList(); } }, '№' + r.num + '-' + o.n))) : null,
+    h('h3', { text: r.service === 'support' ? 'Поддержка' : v._order ? 'Дозаказ №' + v.num + (v.title ? ' · ' + v.title : '') : 'Заявка №' + r.num }),
+    v._order ? h('div', { class: 'f' }, h('span', { text: 'Статус' }), h('div', { text: statusChip(v)[0] })) : null,
+    v._order && ['kp', 'declined'].includes(v.status) ? h('button', { class: 'pillb g', type: 'button', title: 'Если клиент согласился словами в чате', onclick: async () => { if (!confirm('Отметить, что клиент оформил дозаказ №' + v.num + '?')) return; const { error } = await SB.rpc('order_action', { req_id: r.id, order_id: v._order.id, action: 'accept', variant: 0 }); if (error) toast('Не получилось'); else { toast('Дозаказ оформлен'); loadOne(r.id); } } }, '✓ Клиент согласился') : null,
+    v._order ? h('button', { class: 'pillb', type: 'button', style: 'color:var(--redT)', onclick: async () => { if (!confirm('Удалить дозаказ №' + v.num + '? Он пропадёт из списка, КП в чате останется.')) return; selOrder = null; await push(r, null, { orders: ordersOf(r).filter((o) => o.id !== v._order.id) }); toast('Дозаказ удалён'); } }, 'Удалить дозаказ') : null,
+    v._order ? null : (r.fields || []).map((x) => f(x.label, x.value)),
     f('Получение', r.delivery ? (r.delivery.method === 'door' ? 'Доставка: ' + (r.delivery.city || '') + (r.delivery.address ? ', ' + r.delivery.address : '') : 'Самовывоз из Алматы') : ''),
     f('Клиент', [r.clientCode, r.clientPhone, r.clientCompany].filter(Boolean).join(' · ')),
     (r.photos || []).length ? h('div', { class: 'media' }, r.photos.map((x) => h('img', { src: x.thumb, alt: 'Фото клиента', style: 'width:72px;height:72px', onclick: async () => { const { data } = await SB.from('request_files').select('data').eq('id', x.fileId).maybeSingle(); lightbox(data?.data || x.thumb); } }))) : null,
     steps.length ? h('hr') : null, steps.length ? h('h3', { text: 'Этап' }) : null, steps.length ? h('ol', { class: 'stp' }, steps) : null,
-    ['work', 'done'].includes(r.status) ? [h('hr'), h('h3', { text: 'Оплаты' }),
-      ['goods', 'china', 'city'].filter((k) => (k !== 'goods' || KIND(r) !== 'cargo') && (k !== 'city' || r.delivery?.method === 'door') && (k === 'goods' || KIND(r) !== 'translate')).map((k) => h('div', { class: 'payr' }, h('span', { text: k === 'goods' ? 'Товар' : k === 'china' ? 'Доставка до Алматы' : 'Доставка в город' }), h('span', { class: p[k]?.paid ? 'ok' : 'no', text: p[k]?.paid ? '✓ оплачено' : (payAmount(r, k) ? money(payAmount(r, k)) : '—') })))] : null,
+    ['work', 'done'].includes(v.status) ? [h('hr'), h('h3', { text: 'Оплаты' }),
+      ['goods', 'china', 'city'].filter((k) => (k !== 'goods' || KIND(v) !== 'cargo') && (k !== 'city' || r.delivery?.method === 'door') && (k === 'goods' || KIND(v) !== 'translate')).map((k) => h('div', { class: 'payr' }, h('span', { text: k === 'goods' ? 'Товар' : k === 'china' ? 'Доставка до Алматы' : 'Доставка в город' }), h('span', { class: p[k]?.paid ? 'ok' : 'no', text: p[k]?.paid ? '✓ оплачено' : (payAmount(v, k) ? money(payAmount(v, k)) : '—') })))] : null,
     h('hr'), note, h('button', { class: 'pillb', type: 'button', onclick: () => push(r, null, { note: note.value }).then(() => toast('Заметка сохранена')) }, 'Сохранить заметку'),
     h('a', { class: 'pillb', href: '../panel/', style: 'justify-content:center', title: 'Все поля, ТЗ на китайском, отказ и прочее' }, 'Открыть в полной панели'));
 }
@@ -823,7 +875,25 @@ function sheetVariants(r) {
     toast('Отправлено на согласование');
   } }, 'Отправить клиенту')]);
 }
-function sheetKp(r) {
+function sheetKp(r0, oid, isNew) {
+  const r = isNew ? { ...r0, kp: null, decision: null, status: 'kp', logiExact: null, approvals: null, approvalPick: null, title: '', payments: null, stage: null } : viewOf(r0, oid);
+  const kpText = (o) => oLabel(r0, o) + ': ' + ((o.kp?.variants || []).map((x) => (x.name || 'товар') + ' — ' + money(num(x.price))).join('; ') || 'товар') + (o.kp?.logi?.cost ? '. Доставка до Алматы ' + (o.logiExact ? '' : '≈ ') + money(num(o.kp.logi.cost)) : '') + '. Чтобы оформить — нажмите «Оформить» на карточке или напишите нам здесь.';
+  const commit = async (item, fields) => {
+    const ordF = {}, top = {}; for (const [kk, val] of Object.entries(fields || {})) (ORDER_KEYS.includes(kk) ? ordF : top)[kk] = val;
+    if (isNew) {
+      const n = ordersOf(r0).reduce((m, o) => Math.max(m, o.n || 1), 1) + 1;
+      const o = { id: 'o' + rid(), n, title: String(ordF.kp?.variants?.[0]?.name || 'Дозаказ').slice(0, 60), createdAt: Date.now(), ...ordF, status: 'kp' };
+      delete top.mode;
+      return push(r0, { ...item, kind: 'kp2', order: o.id, text: kpText(o) }, { ...top, orders: [...ordersOf(r0), o] });
+    }
+    if (oid) {
+      const o0 = ordersOf(r0).find((x) => x.id === oid) || {};
+      const it = item && item.kind === 'kp' ? { ...item, kind: 'kp2', order: oid, text: kpText({ ...o0, ...ordF }) } : item;
+      delete fields.mode;
+      return pushTo(r0, oid, it, fields);
+    }
+    return push(r0, item, fields);
+  };
   const kind = KIND(r); const rate = num(rates?.cny) || 71;
   const fromApproval = (r.approvals || []).length ? (r.approvalPick ? r.approvals.filter((v, i) => r.approvalPick.includes('Вариант ' + (i + 1)) || (v.name && r.approvalPick.includes(v.name))) : r.approvals) : [];
   const prev = r.kp?.variants?.length ? r.kp.variants : fromApproval;
@@ -834,7 +904,7 @@ function sheetKp(r) {
   lg.exact = !!r.logiExact && (!r.kp?.logi || num(r.logiExact) === num(r.kp.logi.cost));
   if (lg.exact && !lg.cost) lg.cost = r.logiExact;
   const ap = () => (lg.exact ? '' : '≈ ');
-  let what = kind === 'cargo' ? 'logi' : kind === 'translate' ? 'goods' : (r.decision === 'accept' ? 'logi' : 'both');
+  let what = kind === 'cargo' ? 'logi' : kind === 'translate' ? 'goods' : (isNew ? 'both' : r.decision === 'accept' ? 'logi' : 'both');
   const showG = () => what !== 'logi' && kind !== 'cargo';
   const showL = () => what !== 'goods' && kind !== 'translate';
   const extra = { terms: r.kp?.terms || '' };
@@ -850,8 +920,9 @@ function sheetKp(r) {
   const fld = (v, key, label, ph, accent) => h('label', { class: 'lab' }, label, h('input', { class: 'inp', inputmode: 'decimal', value: v[key], placeholder: ph || '', style: accent ? 'border-color:var(--acc)' : null, oninput: (e) => { v[key] = e.target.value; refresh(); } }));
   const draw = () => {
     put(body, 
+      isNew ? h('div', { style: 'font-size:13px;color:var(--mut)', text: 'Клиент хочет ещё товар. Уйдёт отдельное КП в этот же чат со своим номером; оплата и этапы у него будут свои.' }) : orderSwitch(r0, oid, (id) => sheetKp(r0, id)),
       kind === 'cargo' || kind === 'translate' ? null : h('div', { class: 'box' }, h('b', { text: 'Что отправляем' }),
-        h('div', { class: 'opts' }, [['both', 'Товар + доставка'], ['goods', 'Только товар'], ['logi', 'Только доставка']].map(([key, l]) => h('button', { type: 'button', 'aria-pressed': String(what === key), onclick: () => { what = key; draw(); } }, l)))),
+        h('div', { class: 'opts' }, [['both', 'Товар + доставка'], ['goods', 'Только товар'], ['logi', 'Только доставка']].filter(([key]) => !isNew || key !== 'logi').map(([key, l]) => h('button', { type: 'button', 'aria-pressed': String(what === key), onclick: () => { what = key; draw(); } }, l)))),
       !showG() ? null : h('div', { style: 'font-size:13px;color:var(--mut)' }, 'Курс сегодня: ', h('b', { style: 'color:var(--fg)', text: rate + ' ₸ за 1 ¥' }), ' · меняется в настройках'),
       !showG() ? null : vars.map((v, i) => {
         v.__tot = yuanMode ? h('b', { text: priceOf(v) ? money(priceOf(v)) : '—' }) : null;
@@ -874,7 +945,7 @@ function sheetKp(r) {
       buildPrev());
   };
   draw();
-  sheet(r.kp ? 'Новое КП для ' + (r.clientName || 'клиента') : 'КП для ' + (r.clientName || 'клиента'), body, (close) => [h('button', { class: 'bigb', type: 'button', onclick: async () => {
+  sheet(isNew ? 'Дозаказ для ' + (r.clientName || 'клиента') + ' (№' + r0.num + '-' + (ordersOf(r0).reduce((m, o) => Math.max(m, o.n || 1), 1) + 1) + ')' : r._order ? 'КП дозаказа №' + r.num : r.kp ? 'Новое КП для ' + (r.clientName || 'клиента') : 'КП для ' + (r.clientName || 'клиента'), body, (close) => [h('button', { class: 'bigb', type: 'button', onclick: async () => {
     const logi = num(lg.cost) ? { method: lg.method, cost: num(lg.cost), term: lg.term.trim() } : null;
     if (what === 'logi' && kind !== 'cargo') {
       if (!logi) { toast('Укажите стоимость доставки'); return; }
@@ -882,12 +953,12 @@ function sheetKp(r) {
       const at = Date.now(); const keep = !r.kp || ['work', 'done'].includes(r.status);
       const kpPatch = r.kp ? { kp: { ...r.kp, logi } } : {};
       if (!keep) {
-        await push(r, { from: 'manager', kind: 'kp', text: 'Обновили доставку в КП', at }, { ...kpPatch, kp: { ...r.kp, logi, sentAt: at }, logiExact: lg.exact ? logi.cost : null, staffReadAt: at + 1000 });
+        await commit({ from: 'manager', kind: 'kp', text: 'Обновили доставку в КП', at }, { ...kpPatch, kp: { ...r.kp, logi, sentAt: at }, logiExact: lg.exact ? logi.cost : null, staffReadAt: at + 1000 });
       } else if (lg.exact) {
         const goods = pays(r).goods?.paid ? 0 : payAmount(r, 'goods');
-        await push(r, { from: 'sys', kind: 'exact', cost: logi.cost, weight: null, volume: null, total: goods + logi.cost, text: 'Точная стоимость доставки до Алматы: ' + money(logi.cost) + (goods ? '. Итого: ' + money(goods + logi.cost) : '') + '.', at }, { ...kpPatch, logiExact: logi.cost, staffReadAt: at + 1000 });
+        await commit({ from: 'sys', kind: 'exact', cost: logi.cost, weight: null, volume: null, total: goods + logi.cost, text: 'Точная стоимость доставки до Алматы: ' + money(logi.cost) + (goods ? '. Итого: ' + money(goods + logi.cost) : '') + '.', at }, { ...kpPatch, logiExact: logi.cost, staffReadAt: at + 1000 });
       } else {
-        await push(r, { from: 'manager', text: 'Доставка до Алматы (' + SHIP[lg.method].toLowerCase() + '): примерно ' + money(logi.cost) + (logi.term ? ', срок ' + logi.term : '') + '. Точную сумму назовём после взвешивания и замера на нашем складе.', at }, { ...kpPatch, staffReadAt: at + 1000 });
+        await commit({ from: 'manager', text: 'Доставка до Алматы (' + SHIP[lg.method].toLowerCase() + '): примерно ' + money(logi.cost) + (logi.term ? ', срок ' + logi.term : '') + '. Точную сумму назовём после взвешивания и замера на нашем складе.', at }, { ...kpPatch, staffReadAt: at + 1000 });
       }
       toast('Доставка отправлена клиенту');
       return;
@@ -901,61 +972,64 @@ function sheetKp(r) {
     const patch = keep ? { kp } : { kp, status: 'kp', decision: null, rejectReason: null, chosenVariant: null, mode: r.mode === 'manager' ? 'manager' : 'ai' };
     if (logi && lg.exact && what !== 'goods') patch.logiExact = logi.cost; else if (!keep) patch.logiExact = null;
     close();
-    await push(r, { from: 'manager', kind: 'kp', text: r.kp ? 'Новое КП' : (kind === 'cargo' ? 'Расчёт доставки' : 'КП'), at: Date.now() }, { ...patch, staffReadAt: Date.now() + 1000 });
+    await commit({ from: 'manager', kind: 'kp', text: r.kp ? 'Новое КП' : (kind === 'cargo' ? 'Расчёт доставки' : 'КП'), at: Date.now() }, { ...patch, staffReadAt: Date.now() + 1000 });
     toast('КП отправлено');
   } }, 'Отправить клиенту')]);
 }
-function sheetPay(r) {
-  const p = pays(r);
-  const keys = ['goods', 'china', 'city'].filter((k) => (k !== 'goods' || KIND(r) !== 'cargo') && (k !== 'city' || r.delivery?.method === 'door') && (k === 'goods' || KIND(r) !== 'translate'));
-  const label = (k) => (k === 'goods' ? (KIND(r) === 'translate' ? 'Услуга' : 'Товар') : k === 'china' ? 'Доставка Китай → Алматы' : 'Доставка Алматы → ' + (r.delivery?.city || 'город'));
-  const checks = keys.map((k) => h('label', { class: 'chk', style: p[k]?.paid ? 'opacity:.5' : '' }, h('input', { type: 'checkbox', value: k, checked: !p[k]?.paid && (k === 'goods' || !keys.includes('goods') || goodsPaid(r)) && !p[k]?.paid ? (k === keys.find((x) => !p[x]?.paid)) : false, disabled: !!p[k]?.paid }), h('span', { text: label(k) + (payAmount(r, k) ? ' — ' + money(payAmount(r, k)) : '') + (p[k]?.paid ? ' (уже оплачено)' : '') })));
+function sheetPay(r, oid) {
+  const v = viewOf(r, oid);
+  const p = pays(v);
+  const keys = ['goods', 'china', 'city'].filter((k) => (k !== 'goods' || KIND(v) !== 'cargo') && (k !== 'city' || r.delivery?.method === 'door') && (k === 'goods' || KIND(v) !== 'translate'));
+  const label = (k) => (k === 'goods' ? (KIND(v) === 'translate' ? 'Услуга' : 'Товар') : k === 'china' ? 'Доставка Китай → Алматы' : 'Доставка Алматы → ' + (r.delivery?.city || 'город'));
+  const checks = keys.map((k) => h('label', { class: 'chk', style: p[k]?.paid ? 'opacity:.5' : '' }, h('input', { type: 'checkbox', value: k, checked: !p[k]?.paid && (k === 'goods' || !keys.includes('goods') || goodsPaid(v)) && !p[k]?.paid ? (k === keys.find((x) => !p[x]?.paid)) : false, disabled: !!p[k]?.paid }), h('span', { text: label(k) + (payAmount(v, k) ? ' — ' + money(payAmount(v, k)) : '') + (p[k]?.paid ? ' (уже оплачено)' : '') })));
   const method = h('div', { class: 'opts' }); let mval = 'Kaspi';
   const drawM = () => put(method, ...['Kaspi', 'Перевод на карту', 'Наличные', 'Счёт'].map((t) => h('button', { type: 'button', 'aria-pressed': String(mval === t), onclick: () => { mval = t; drawM(); } }, t))); drawM();
   const amt = h('input', { class: 'inp', inputmode: 'decimal', placeholder: 'Сумма, если отличается' });
   const file = h('input', { class: 'inp', type: 'file', accept: 'image/*,.pdf', style: 'padding:9px' });
-  sheet('Клиент оплатил', [h('b', { text: 'Что оплачено' }), checks, h('b', { text: 'Как' }), method, h('label', { class: 'lab' }, 'Сумма (необязательно)', amt), h('label', { class: 'lab' }, 'Фото чека (необязательно)', file)],
+  sheet('Клиент оплатил' + (v._order ? ' — дозаказ №' + v.num : ''), [orderSwitch(r, oid, (id) => sheetPay(r, id)), h('b', { text: 'Что оплачено' }), checks, h('b', { text: 'Как' }), method, h('label', { class: 'lab' }, 'Сумма (необязательно)', amt), h('label', { class: 'lab' }, 'Фото чека (необязательно)', file)],
     (close) => [h('button', { class: 'bigb g', type: 'button', onclick: async () => {
       const selK = checks.map((c) => c.querySelector('input')).filter((i) => i.checked).map((i) => i.value);
       if (!selK.length) { toast('Отметьте, что оплачено'); return; }
       let receipt = null; if (file.files[0]) { try { receipt = (await upload(file.files[0], r.id)).url; } catch { toast('Чек не загрузился'); } }
-      const at = Date.now(); const payments = { ...(r.payments || {}) };
-      selK.forEach((k) => { payments[k] = { paid: true, at, method: mval, amount: selK.length === 1 && num(amt.value) ? num(amt.value) : payAmount(r, k), receipt }; });
+      const at = Date.now(); const payments = { ...(v.payments || {}) };
+      selK.forEach((k) => { payments[k] = { paid: true, at, method: mval, amount: selK.length === 1 && num(amt.value) ? num(amt.value) : payAmount(v, k), receipt }; });
       const patch = { payments };
       if (selK.includes('china')) patch.deliveryPrepaid = true;
-      if (selK.includes('city')) patch.cityDelivery = { ...(r.cityDelivery || {}), prepaid: true };
-      if (selK.includes('goods') && KIND(r) !== 'cargo' && (!r.stage || r.stage === 'paid')) { patch.stage = 'paid'; patch.stageAt = at; patch.status = 'work'; }
-      if (selK.includes('china') && r.stage === 'almaty') { patch.stage = 'delivery_paid'; patch.stageAt = at; }
+      if (selK.includes('city')) patch.cityDelivery = { ...(v.cityDelivery || {}), prepaid: true };
+      if (selK.includes('goods') && KIND(v) !== 'cargo' && (!v.stage || v.stage === 'paid')) { patch.stage = 'paid'; patch.stageAt = at; patch.status = 'work'; }
+      if (selK.includes('china') && v.stage === 'almaty') { patch.stage = 'delivery_paid'; patch.stageAt = at; }
       const total = selK.reduce((s, k) => s + (payments[k].amount || 0), 0);
       close();
-      await push(r, { from: 'sys', kind: 'payment', keys: selK, amount: total, at, text: 'Оплата получена: ' + selK.map((k) => (k === 'goods' ? (KIND(r) === 'translate' ? 'услуга' : 'товар') : k === 'china' ? 'доставка до Алматы' : 'доставка до ' + (r.delivery?.city || 'города'))).join(', ') + (total ? ' — ' + money(total) : '') }, patch);
+      await pushTo(r, oid, { from: 'sys', kind: 'payment', keys: selK, amount: total, at, text: 'Оплата получена: ' + selK.map((k) => (k === 'goods' ? (KIND(v) === 'translate' ? 'услуга' : 'товар') : k === 'china' ? 'доставка до Алматы' : 'доставка до ' + (r.delivery?.city || 'города'))).join(', ') + (total ? ' — ' + money(total) : '') }, patch);
       toast('Оплата отмечена, клиенту ушло уведомление');
     } }, 'Сохранить оплату')]);
 }
-function sheetStage(r) {
-  const list = stagesFor(r).filter((k) => k !== 'paid');
-  const curI = list.indexOf(r.stage);
+function sheetStage(r, oid) {
+  const vw = viewOf(r, oid);
+  const list = stagesFor(vw).filter((k) => k !== 'paid');
+  const curI = list.indexOf(vw.stage);
   const nextK = list.find((k, i) => i > curI);
   const body = h('div', { style: 'display:flex;flex-direction:column;gap:12px' });
-  const exact = { cost: r.logiExact || '', w: '', v: '' };
+  const exact = { cost: vw.logiExact || '', w: '', v: '' };
   const disp = { method: 'Такси', driver: '', phone: '', car: '', color: '', plate: '', eta: '', media: [] };
   let mode = null;
   const draw = () => put(body, 
-    !['work', 'done'].includes(r.status) ? h('div', { style: 'color:var(--org);font-size:13px', text: 'Заказ ещё не оформлен клиентом — этапы появятся после оформления.' }) : null,
-    h('div', { class: 'stg' }, list.map((k, i) => h('button', { type: 'button', class: k === nextK ? 'nx' : '', disabled: i <= curI || !['work', 'done'].includes(r.status), onclick: () => {
+    orderSwitch(r, oid, (id) => sheetStage(r, id)),
+    !['work', 'done'].includes(vw.status) ? h('div', { style: 'color:var(--org);font-size:13px', text: 'Заказ ещё не оформлен клиентом — этапы появятся после оформления.' }) : null,
+    h('div', { class: 'stg' }, list.map((k, i) => h('button', { type: 'button', class: k === nextK ? 'nx' : '', disabled: i <= curI || !['work', 'done'].includes(vw.status), onclick: () => {
       if (k === 'sent_city') { mode = 'dispatch'; draw(); return; }
-      if (k === 'delivery_paid') { document.querySelector('.shade')?.remove(); sheetPay(r); return; }
-      setStage(r, k); document.querySelector('.shade')?.remove();
+      if (k === 'delivery_paid') { document.querySelector('.shade')?.remove(); sheetPay(r, oid); return; }
+      setStage(r, k, oid); document.querySelector('.shade')?.remove();
     } }, h('span', { text: STAGE_LABEL[k] }), h('small', { style: 'color:var(--mut)', text: i <= curI ? '✓ готово' : k === nextK ? 'следующий' : '' })))),
-    ['work', 'done'].includes(r.status) && KIND(r) !== 'translate' ? h('div', { class: 'box' }, h('b', { text: 'Точная стоимость доставки (после склада)' }),
+    ['work', 'done'].includes(vw.status) && KIND(vw) !== 'translate' ? h('div', { class: 'box' }, h('b', { text: 'Точная стоимость доставки (после склада)' }),
       h('div', { class: 'g3' }, h('label', { class: 'lab' }, 'Стоимость, ₸', h('input', { class: 'inp', inputmode: 'decimal', value: exact.cost, oninput: (e) => { exact.cost = e.target.value; } })),
         h('label', { class: 'lab' }, 'Вес, кг', h('input', { class: 'inp', inputmode: 'decimal', oninput: (e) => { exact.w = e.target.value; } })),
         h('label', { class: 'lab' }, 'Объём, м³', h('input', { class: 'inp', inputmode: 'decimal', oninput: (e) => { exact.v = e.target.value; } }))),
       h('button', { class: 'pillb a', type: 'button', style: 'align-self:flex-start', onclick: async () => {
         const v = num(exact.cost); if (!v) { toast('Укажите стоимость'); return; }
-        const goods = pays(r).goods?.paid ? 0 : payAmount(r, 'goods');
+        const goods = pays(vw).goods?.paid ? 0 : payAmount(vw, 'goods');
         document.querySelector('.shade')?.remove();
-        await push(r, { from: 'sys', kind: 'exact', cost: v, weight: num(exact.w) || null, volume: num(exact.v) || null, total: goods + v, text: 'Товар на складе. Точная стоимость доставки: ' + money(v) + (goods ? '. Итого: ' + money(goods + v) : '') + '.', at: Date.now() }, { logiExact: v });
+        await pushTo(r, oid, { from: 'sys', kind: 'exact', cost: v, weight: num(exact.w) || null, volume: num(exact.v) || null, total: goods + v, text: 'Товар на складе. Точная стоимость доставки: ' + money(v) + (goods ? '. Итого: ' + money(goods + v) : '') + '.', at: Date.now() }, { logiExact: v });
         toast('Клиенту отправлена точная стоимость');
       } }, 'Отправить клиенту')) : null,
     mode === 'dispatch' ? h('div', { class: 'box' }, h('b', { text: 'Отправили в ' + (r.delivery?.city || 'город') + ' — данные (все необязательные)' }),
@@ -964,15 +1038,15 @@ function sheetStage(r) {
       filesBox(r, disp, draw),
       h('button', { class: 'pillb a', type: 'button', style: 'align-self:flex-start', onclick: async () => {
         const d = { ...disp, at: Date.now() }; document.querySelector('.shade')?.remove();
-        await push(r, { from: 'sys', kind: 'dispatch', dispatch: d, text: 'Товар отправлен в ' + (r.delivery?.city || 'ваш город') + '.', at: Date.now() }, { dispatch: d, stage: 'sent_city', stageAt: Date.now(), status: 'work' });
+        await pushTo(r, oid, { from: 'sys', kind: 'dispatch', dispatch: d, text: 'Товар отправлен в ' + (r.delivery?.city || 'ваш город') + '.', at: Date.now() }, { dispatch: d, stage: 'sent_city', stageAt: Date.now(), status: 'work' });
         toast('Клиенту отправлены данные машины');
       } }, 'Отправить клиенту')) : null);
   draw();
-  sheet('Этап заказа', body, (close) => [h('button', { class: 'ghb', type: 'button', onclick: close }, 'Закрыть')]);
+  sheet('Этап заказа' + (vw._order ? ' — дозаказ №' + vw.num : ''), body, (close) => [h('button', { class: 'ghb', type: 'button', onclick: close }, 'Закрыть')]);
 }
-async function setStage(r, k) {
+async function setStage(r, k, oid) {
   const at = Date.now(); const extra = k === 'delivered' ? { status: 'done', doneAt: at } : { status: 'work' };
-  await push(r, { from: 'sys', kind: 'stage', stage: k, text: stageText(k, r), at }, { stage: k, stageAt: at, ...extra });
+  await pushTo(r, oid, { from: 'sys', kind: 'stage', stage: k, text: stageText(k, viewOf(r, oid)), at }, { stage: k, stageAt: at, ...extra });
   toast('Этап: ' + STAGE_LABEL[k]);
 }
 function sheetAi(r) {
@@ -997,11 +1071,11 @@ function renderBoard() {
   put(chat, h('div', { class: 'board', id: 'board' },
     h('div', { style: 'display:flex;align-items:center;gap:12px' }, h('h1', { style: 'flex:1', text: 'Доска · заказы по этапам' }), h('span', { style: 'color:var(--mut);font-size:13px', text: 'Нажмите на карточку — откроется чат' })),
     h('div', { class: 'cols' }, COLS.map(([k, l, fn]) => {
-      const list = all.filter((r) => r.service !== 'support' && fn(r)).sort((a, b) => sortKey(b) - sortKey(a));
+      const list = entries().filter((e) => e.r.service !== 'support' && fn(e.v)).sort((a, b) => sortKey(b.r) - sortKey(a.r));
       return h('section', { class: 'col' + (k === 'pay' ? ' pay' : '') }, h('div', { class: 'chd' }, h('span', { text: l }), h('span', { style: 'color:var(--mut)', text: String(list.length) })),
-        list.map((r) => { const lt = lastTalk(r); return h('button', { type: 'button', class: 'bc' + (goodsPaid(r) && r.status === 'work' && !delivDue(r) ? ' paid' : awaitingPay(r) || delivDue(r) ? ' wait' : ''), onclick: () => openChat(r.id) },
-          h('b', { text: r.title || '—' }), h('small', { text: (r.clientName || 'Клиент') + ' · №' + r.num }),
-          needsReply(r) && lt ? h('span', { class: 'chip c-red', style: 'align-self:flex-start', text: 'ждёт ' + waitTxt(lt.at) }) : h('small', { text: statusChip(r)[0] + (r.assignee?.name ? ' · ' + r.assignee.name.split(' ')[0] : '') })); }));
+        list.map(({ r, v, oid }) => { const lt = lastTalk(r); return h('button', { type: 'button', class: 'bc' + (goodsPaid(v) && v.status === 'work' && !delivDue(v) ? ' paid' : awaitingPay(v) || delivDue(v) ? ' wait' : ''), onclick: () => openChat(r.id, oid) },
+          h('b', { text: (oid ? 'Дозаказ: ' : '') + (v.title || '—') }), h('small', { text: (r.clientName || 'Клиент') + ' · №' + v.num }),
+          needsReply(r) && lt ? h('span', { class: 'chip c-red', style: 'align-self:flex-start', text: 'ждёт ' + waitTxt(lt.at) }) : h('small', { text: statusChip(v)[0] + (r.assignee?.name ? ' · ' + r.assignee.name.split(' ')[0] : '') })); }));
     }))));
 }
 
