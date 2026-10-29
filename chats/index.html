@@ -390,7 +390,7 @@ async function checkSession(session) {
   if (!session) return false;
   const { data } = await SB.from('profiles').select('id,role,first_name,last_name').eq('id', session.user.id).maybeSingle();
   if (!data || !['manager', 'admin'].includes(data.role)) { await SB.auth.signOut(); return false; }
-  me = { id: data.id, name: [data.first_name, data.last_name].filter(Boolean).join(' ') || String(session.user.email || 'Менеджер').split('@')[0] };
+  me = { id: data.id, role: data.role, name: [data.first_name, data.last_name].filter(Boolean).join(' ') || String(session.user.email || 'Менеджер').split('@')[0] };
   return true;
 }
 function showGate(err) {
@@ -506,6 +506,7 @@ function updateRail() {
   const cb = railEls.chats; cb.querySelector('.badge')?.remove(); if (n) cb.append(h('span', { class: 'badge', text: String(n) }));
   document.title = (n ? '(' + n + ') ' : '') + 'Закупщик · Чаты';
 }
+const isAdmin = () => me?.role === 'admin';
 const isMine = (r) => r.assignee?.id === me.id;
 const isFree = (r) => !r.assignee?.id;
 const snoozed = (r) => r.snoozeUntil && Date.now() < r.snoozeUntil && !(lastTalk(r)?.from === 'client' && lastTalk(r).at > (r.snoozeAt || 0));
@@ -559,7 +560,7 @@ function renderList() {
         selMode ? h('span', { style: 'display:flex;gap:6px' },
           h('button', { class: 'pillb', type: 'button', style: 'height:30px;background:var(--red);color:#fff', disabled: !picked.size, onclick: () => deleteReqs([...picked]) }, 'Удалить' + (picked.size ? ' (' + picked.size + ')' : '')),
           h('button', { class: 'pillb', type: 'button', style: 'height:30px', onclick: () => { selMode = false; picked.clear(); renderList(); } }, 'Отмена'))
-        : h('button', { class: 'pillb', type: 'button', style: 'height:30px', title: 'Отметить несколько чатов и удалить', onclick: () => { selMode = true; renderList(); } }, 'Выбрать')),
+        : isAdmin() ? h('button', { class: 'pillb', type: 'button', style: 'height:30px', title: 'Отметить несколько чатов и удалить', onclick: () => { selMode = true; renderList(); } }, 'Выбрать') : null),
       q ? h('small', { style: 'color:var(--mut)', text: 'Поиск по всем статусам' }) : null),
     h('div', { class: 'rows' }, list.length ? list.map(rowEl) : h('div', { class: 'empty', text: q ? 'Ничего не нашлось' : 'Здесь пусто' })));
   box.querySelector('.rows').scrollTop = prevScroll;
@@ -638,7 +639,7 @@ function snoozeBtn(r) {
     if (v === 'tom') { const t = new Date(now); t.setDate(t.getDate() + 1); t.setHours(10, 0, 0, 0); until = t.getTime(); }
     if (v === 'week') until = Date.now() + 7 * 86400000;
     push(r, null, { snoozeUntil: until, snoozeAt: Date.now() }); toast('Отложено. Вернётся раньше, если клиент напишет');
-  } }, h('option', { value: '', text: 'Ещё ▾' }), h('option', { value: '1h', text: 'на 1 час' }), h('option', { value: '3h', text: 'на 3 часа' }), h('option', { value: 'tom', text: 'до завтра 10:00' }), h('option', { value: 'week', text: 'на неделю' }), h('option', { value: 'del', text: '🗑 Удалить чат' }));
+  } }, h('option', { value: '', text: 'Ещё ▾' }), h('option', { value: '1h', text: 'на 1 час' }), h('option', { value: '3h', text: 'на 3 часа' }), h('option', { value: 'tom', text: 'до завтра 10:00' }), h('option', { value: 'week', text: 'на неделю' }), isAdmin() ? h('option', { value: 'del', text: '🗑 Удалить чат' }) : null);
   return sel2;
 }
 function tick(r, m) {
@@ -1133,6 +1134,44 @@ async function saveSetting(key, value) {
   if (error) { toast('Не сохранилось. Попробуйте ещё раз'); return false; }
   return true;
 }
+const STAFF_ERR = { bad_email: 'Проверьте почту', short_password: 'Пароль — минимум 6 символов', no_name: 'Впишите имя', forbidden: 'Нет прав', self: 'Себя убрать нельзя', create_failed: 'Не получилось создать аккаунт' };
+async function staffCall(body) {
+  const { data, error } = await SB.functions.invoke('ai', { body: { task: 'staff', ...body } });
+  let err = data?.error;
+  if (error && !err) { try { err = (await error.context?.json())?.error; } catch { /* ignore */ } err = err || 'failed'; }
+  if (err) { toast(STAFF_ERR[err] || 'Не получилось. Попробуйте ещё раз'); return null; }
+  return data;
+}
+function staffCard() {
+  const box = h('section', { class: 'box', style: 'background:var(--s1)' });
+  const name = h('input', { class: 'inp', placeholder: 'Имя Фамилия', autocomplete: 'off' });
+  const email = h('input', { class: 'inp', type: 'email', placeholder: 'почта@mail.ru', autocomplete: 'off' });
+  const pass = h('input', { class: 'inp', placeholder: 'Пароль (от 6 символов)', autocomplete: 'new-password' });
+  const genPass = () => { const c = 'abcdefghjkmnpqrstuvwxyz23456789'; let x = ''; for (let i = 0; i < 8; i++) x += c[Math.floor(Math.random() * c.length)]; pass.value = x; };
+  const list = h('div', { style: 'display:flex;flex-direction:column;gap:6px' }, h('small', { style: 'color:var(--mut)', text: 'Загружаем…' }));
+  const load = async () => {
+    const d = await staffCall({ action: 'list' }); if (!d) return;
+    put(list, d.staff.map((p) => h('div', { class: 'box', style: 'padding:10px;flex-direction:row;align-items:center;gap:10px;flex-wrap:wrap' },
+      h('span', { class: 'av', style: 'width:36px;height:36px;font-size:13px;background:' + avColor(p.id), text: initials([p.first_name, p.last_name].join(' ')) }),
+      h('span', { style: 'flex:1;min-width:160px;display:flex;flex-direction:column' }, h('b', { text: [p.first_name, p.last_name].filter(Boolean).join(' ') || '—' }), h('small', { style: 'color:var(--mut)', text: p.email + ' · ' + (p.role === 'admin' ? 'главный' : 'менеджер') + (p.me ? ' (вы)' : '') })),
+      p.me ? null : h('button', { class: 'pillb', type: 'button', onclick: async () => { const np = prompt('Новый пароль для ' + (p.first_name || p.email) + ' (от 6 символов):'); if (!np) return; if (await staffCall({ action: 'password', id: p.id, password: np.trim() })) toast('Пароль изменён. Передайте его сотруднику'); } }, 'Сменить пароль'),
+      p.me || p.role === 'admin' ? null : h('button', { class: 'pillb', type: 'button', style: 'color:var(--redT)', onclick: async () => { if (!confirm('Убрать доступ у ' + (p.first_name || p.email) + '? Он больше не сможет войти в панель. Переписки останутся.')) return; if (await staffCall({ action: 'remove', id: p.id })) { toast('Доступ убран'); load(); } } }, 'Убрать доступ'))));
+  };
+  put(box, h('b', { style: 'font-size:16px', text: 'Сотрудники' }), h('small', { style: 'color:var(--mut)', text: 'Сотрудник входит по ссылке на панель с этой почтой и паролем. Может всё, кроме настроек, сотрудников и удаления чатов.' }), list,
+    h('div', { class: 'box', style: 'gap:8px' }, h('b', { text: 'Добавить сотрудника' }), h('div', { class: 'g2' }, h('label', { class: 'lab' }, 'Имя', name), h('label', { class: 'lab' }, 'Почта для входа', email)),
+      h('label', { class: 'lab' }, 'Пароль', h('div', { style: 'display:flex;gap:6px' }, pass, h('button', { class: 'pillb', type: 'button', onclick: genPass }, 'Придумать'))),
+      h('button', { class: 'pillb a', type: 'button', style: 'align-self:flex-start', onclick: async (e) => {
+        const btn = e.currentTarget; btn.disabled = true;
+        const d = await staffCall({ action: 'add', name: name.value, email: email.value, password: pass.value.trim() });
+        btn.disabled = false; if (!d) return;
+        const msg = 'Панель: ' + location.href.split('#')[0] + '\nПочта: ' + email.value.trim() + '\nПароль: ' + pass.value.trim();
+        try { await navigator.clipboard.writeText(msg); toast('Сотрудник добавлен. Данные для входа скопированы — отправьте ему'); } catch { toast('Сотрудник добавлен'); }
+        alert('Отправьте сотруднику:\n\n' + msg);
+        name.value = ''; email.value = ''; pass.value = ''; load();
+      } }, 'Добавить')));
+  load();
+  return box;
+}
 function renderSettings() {
   $('#list').hidden = true; $('#info').hidden = true;
   const inp = (val, ph, mode) => h('input', { class: 'inp', value: val ?? '', placeholder: ph || '', inputmode: mode || null });
@@ -1146,17 +1185,19 @@ function renderSettings() {
   const drawTpl = () => put(tplBox, templates.map((t, i) => h('div', { style: 'display:flex;gap:6px' }, h('input', { class: 'inp', value: t, style: 'font-weight:500;font-size:13.5px', onchange: (e) => { templates[i] = e.target.value.trim(); } }), h('button', { class: 'ib', type: 'button', 'aria-label': 'Удалить шаблон', onclick: () => { templates.splice(i, 1); drawTpl(); } }, ic('trash', 16)))),
     h('button', { class: 'pillb', type: 'button', style: 'align-self:flex-start', onclick: () => { templates.push(''); drawTpl(); } }, '+ Шаблон')); drawTpl();
   const card = (title, sub, kids, onSave) => h('section', { class: 'box', style: 'background:var(--s1)' }, h('b', { style: 'font-size:16px', text: title }), sub ? h('small', { style: 'color:var(--mut)', text: sub }) : null, kids, h('button', { class: 'pillb a', type: 'button', style: 'align-self:flex-start', onclick: onSave }, 'Сохранить'));
+  const adm = isAdmin();
   put($('#chat'), h('div', { class: 'setw', id: 'settings' }, h('h1', { text: 'Настройки' }),
-    card('Курс и контакты', 'Курс подставляется в новые КП. Номера клиент видит в кнопке «Связаться с менеджером».', [h('label', { class: 'lab' }, 'Курс юаня, ₸ за 1 ¥', cny), rates?.updatedAt ? h('small', { style: 'color:var(--mut)', text: 'Обновлён: ' + new Date(rates.updatedAt).toLocaleString('ru-RU') }) : null, h('div', { class: 'g2' }, h('label', { class: 'lab' }, 'Телефон для звонков', ph), h('label', { class: 'lab' }, 'WhatsApp', wa))], async () => {
+    adm ? staffCard() : h('small', { style: 'color:var(--mut)', text: 'Курс, тарифы, напоминания и сотрудники меняет только главный.' }),
+    !adm ? null : card('Курс и контакты', 'Курс подставляется в новые КП. Номера клиент видит в кнопке «Связаться с менеджером».', [h('label', { class: 'lab' }, 'Курс юаня, ₸ за 1 ¥', cny), rates?.updatedAt ? h('small', { style: 'color:var(--mut)', text: 'Обновлён: ' + new Date(rates.updatedAt).toLocaleString('ru-RU') }) : null, h('div', { class: 'g2' }, h('label', { class: 'lab' }, 'Телефон для звонков', ph), h('label', { class: 'lab' }, 'WhatsApp', wa))], async () => {
       const c = num(cny.value); if (!c) { toast('Укажите курс'); return; }
       const nr = { cny: c, updatedAt: Date.now() }, nc = { phone: ph.value.trim(), whatsapp: wa.value.trim() };
       if (await saveSetting('rates', nr) && await saveSetting('contacts', nc)) { rates = nr; contacts = nc; toast('Сохранено. Курс ' + c + ' ₸ будет в новых КП'); renderSettings(); }
     }),
-    card('Тарифы доставки', 'По ним приложение показывает клиенту примерную цену доставки груза. Авто: большее из «вес × за кг» и «объём × за м³».', h('div', { class: 'g3' }, h('label', { class: 'lab' }, 'Авиа, ₸/кг', tAir), h('label', { class: 'lab' }, 'Авто, ₸/кг', tKg), h('label', { class: 'lab' }, 'Авто, ₸/м³', tM3)), async () => {
+    !adm ? null : card('Тарифы доставки', 'По ним приложение показывает клиенту примерную цену доставки груза. Авто: большее из «вес × за кг» и «объём × за м³».', h('div', { class: 'g3' }, h('label', { class: 'lab' }, 'Авиа, ₸/кг', tAir), h('label', { class: 'lab' }, 'Авто, ₸/кг', tKg), h('label', { class: 'lab' }, 'Авто, ₸/м³', tM3)), async () => {
       const t = { air_kg: num(tAir.value), auto_kg: num(tKg.value), auto_m3: num(tM3.value), updatedAt: Date.now() };
       if (await saveSetting('tariffs', t)) { tariffs = t; toast('Тарифы сохранены'); }
     }),
-    card('Напоминания клиентам', 'Приходят на телефон раз в день в 10:05 по Алматы, не чаще раза в неделю одному клиенту.', rems.map((x) => x.el), async () => {
+    !adm ? null : card('Напоминания клиентам', 'Приходят на телефон раз в день в 10:05 по Алматы, не чаще раза в неделю одному клиенту.', rems.map((x) => x.el), async () => {
       const val = {}; for (const x of rems) val[x.key] = { on: x.on.checked, text: x.tx.value.trim() }; val.seasonal.date = seaDate.value;
       if (val.seasonal.on && (!val.seasonal.text || !val.seasonal.date)) { toast('Для сезонного укажите день и текст'); return; }
       if (await saveSetting('reminders', val)) { reminders = val; toast('Напоминания сохранены'); }
