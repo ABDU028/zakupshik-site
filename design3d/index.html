@@ -1,73 +1,110 @@
-<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover"><meta name="theme-color" content="#B5532C"><link rel="icon" href="/zakupshik-site/design3d/favicon.png"><script>/* Дизайн 3D Квартир — мост к ИИ вне Claude: тот же интерфейс sample(), но через функцию Supabase design-ai */
+<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover"><meta name="theme-color" content="#B5532C"><link rel="icon" href="/zakupshik-site/design3d/favicon.png"><script>/* Дизайн 3D Квартир — мост к ИИ вне Claude: тот же интерфейс sample(), но через функцию Supabase design-ai.
+   Ответ идёт потоком (SSE): текст появляется по мере написания. */
 (function(){
-  if(window.claude&&window.claude.use)return;
   var FN="https://tqhigjvyoqtwukqqnlmb.supabase.co/functions/v1/design-ai";
   var KEY="sb_publishable_LBGMjPTdbjINAwQa-uchpA_okvE5SQY";
   window.D3K_LINKS={howto:"howto/",example:"primer/",project:"proekt/"};
+  window.D3K_API={
+    request:function(data){return fetch(FN+"?action=request",{method:"POST",headers:{"content-type":"application/json","apikey":KEY},body:JSON.stringify(data)}).then(function(r){return r.json();});}
+  };
+  // мост к приложению на телефоне (голос, файлы)
+  window.D3K_NATIVE=!!window.ReactNativeWebView;
+  window.D3K_post=function(m){try{window.ReactNativeWebView.postMessage(JSON.stringify(m));return true;}catch(e){return false;}};
+  window.__d3kNative=function(m){try{window.dispatchEvent(new CustomEvent("d3k-native",{detail:m}));}catch(e){}};
+  if(window.claude&&window.claude.use)return;
   function err(code,message,text){var e=new Error(message||code);e.code=code;if(text)e.text=text;return e;}
-  async function call(payload,signal){
-    var r;
-    try{r=await fetch(FN,{method:"POST",headers:{"content-type":"application/json","apikey":KEY},body:JSON.stringify(Object.assign({app:"d3k"},payload)),signal:signal});}
-    catch(e){if(e&&e.name==="AbortError")throw err("cancelled");throw err("upstream_error","network");}
-    var j=null;try{j=await r.json();}catch(e){}
-    if(!r.ok||!j||j.error){var c=(j&&j.error)||"upstream_error";throw err(c==="rate_limited"||c==="prompt_too_large"||c==="invalid_request"||c==="timeout"?c:"upstream_error",j&&j.detail);}
-    return j;
-  }
   async function b64(blob){var u=new Uint8Array(await blob.arrayBuffer()),s="",i,n=0x8000;for(i=0;i<u.length;i+=n)s+=String.fromCharCode.apply(null,u.subarray(i,i+n));return btoa(s);}
+  // один раунд: потоковый запрос, сборка блоков ответа
+  async function round(body,tier,signal,onDelta){
+    var r;
+    try{r=await fetch(FN,{method:"POST",headers:{"content-type":"application/json","apikey":KEY,"x-tier":tier},body:JSON.stringify(body),signal:signal});}
+    catch(e){if(e&&e.name==="AbortError")throw err("cancelled");throw err("upstream_error","network");}
+    var ct=r.headers.get("content-type")||"";
+    if(!r.ok||ct.indexOf("event-stream")<0){
+      var j=null;try{j=await r.json();}catch(e){}
+      if(r.ok&&j&&j.content)return{content:j.content,stop_reason:j.stop_reason};
+      var c=(j&&j.error)||(r.status===546?"timeout":"upstream_error");
+      throw err(["rate_limited","prompt_too_large","invalid_request","timeout"].indexOf(c)>=0?c:"upstream_error",j&&j.detail);
+    }
+    var reader=r.body.getReader(),dec=new TextDecoder(),buf="",blocks=[],stop=null,ev=null;
+    function handle(type,d){
+      if(type==="content_block_start"){var b=JSON.parse(JSON.stringify(d.content_block));if(b.type==="tool_use"){b._json="";}if(b.type==="text")b.text=b.text||"";if(b.type==="thinking")b.thinking=b.thinking||"";blocks[d.index]=b;}
+      else if(type==="content_block_delta"){var bl=blocks[d.index],dl=d.delta;if(!bl)return;
+        if(dl.type==="text_delta"){bl.text+=dl.text;onDelta&&onDelta(dl.text);}
+        else if(dl.type==="input_json_delta"){bl._json+=dl.partial_json;}
+        else if(dl.type==="thinking_delta"){bl.thinking+=dl.thinking;}
+        else if(dl.type==="signature_delta"){bl.signature=(bl.signature||"")+dl.signature;}}
+      else if(type==="content_block_stop"){var b2=blocks[d.index];if(b2&&b2.type==="tool_use"){try{b2.input=b2._json?JSON.parse(b2._json):{};}catch(e){b2.input={};b2._bad=true;}delete b2._json;}}
+      else if(type==="message_delta"){if(d.delta&&d.delta.stop_reason)stop=d.delta.stop_reason;}
+      else if(type==="error"){throw err((d.error&&d.error.type)==="overloaded_error"?"rate_limited":"upstream_error",d.error&&d.error.message);}
+    }
+    try{
+      while(true){
+        var x=await reader.read();if(x.done)break;
+        buf+=dec.decode(x.value,{stream:true});
+        var k;
+        while((k=buf.indexOf("\n\n"))>=0){
+          var chunk=buf.slice(0,k);buf=buf.slice(k+2);
+          var type=null,data="";chunk.split("\n").forEach(function(l){if(l.indexOf("event:")===0)type=l.slice(6).trim();else if(l.indexOf("data:")===0)data+=l.slice(5).trim();});
+          if(data){var d=JSON.parse(data);handle(type||d.type,d);}
+        }
+      }
+    }catch(e){if(e&&e.name==="AbortError")throw err("cancelled");if(e&&e.code)throw e;throw err("upstream_error","stream");}
+    if(!stop)throw err("timeout","stream cut");
+    return{content:blocks.filter(Boolean),stop_reason:stop};
+  }
   async function sample(input,opts){
     opts=opts||{};
     var msgs=(typeof input==="string"?[{role:"user",content:input}]:input).map(function(m){return{role:m.role,content:[{type:"text",text:String(m.content||"…")}]};});
     if(opts.images){
       var arr=opts.images instanceof Blob?[opts.images]:Array.prototype.slice.call(opts.images),imgs=[];
-      for(var k=0;k<arr.length&&k<5;k++){var t=arr[k].type;if(!/^image\/(jpeg|png|gif|webp)$/.test(t))t="image/jpeg";imgs.push({type:"image",source:{type:"base64",media_type:t,data:await b64(arr[k])}});}
+      for(var k=0;k<arr.length&&k<8;k++){var t=arr[k].type;if(!/^image\/(jpeg|png|gif|webp)$/.test(t))t="image/jpeg";imgs.push({type:"image",source:{type:"base64",media_type:t,data:await b64(arr[k])}});}
       var last=msgs[msgs.length-1];last.content=imgs.concat(last.content);
     }
     var tools=opts.tools||[],defs=tools.map(function(t){return{name:t.name,description:t.description,input_schema:t.inputSchema||{type:"object",properties:{}}};});
     var text="",tier=opts.modelTier||"default",retries=0;
     function hint(t){var last=msgs[msgs.length-1];last.content=last.content.concat([{type:"text",text:t}]);}
-    for(var round=0;round<8;round++){
+    for(var round_i=0;round_i<9;round_i++){
       if(opts.signal&&opts.signal.aborted)throw err("cancelled",null,text);
-      var r;
-      try{r=await call({messages:msgs,tools:round<7?defs:[],tier:tier},opts.signal);}
+      var body={max_tokens:16000,stream:true,messages:msgs};if(defs.length&&round_i<8)body.tools=defs;
+      var base=text,r;
+      try{r=await round(body,tier,opts.signal,function(dt){text+=dt;if(opts.onText)try{opts.onText({text:text,delta:dt});}catch(e){}});}
       catch(e){
-        if((e.code==="timeout"||e.code==="upstream_error")&&retries<2&&!(opts.signal&&opts.signal.aborted)){retries++;if(tier==="complex")tier="default";round--;continue;}
+        text=base;
+        if((e.code==="timeout"||e.code==="upstream_error")&&retries<2&&!(opts.signal&&opts.signal.aborted)){retries++;if(tier==="complex")tier="default";round_i--;continue;}
         e.text=text;throw e;
       }
       var content=r.content||[];
-      if(r.stop_reason==="max_tokens"&&retries<2){
-        retries++;round--;
-        hint("[Служебно: прошлая попытка ответа оборвалась по длине. Отвечай короче: сразу вызывай нужный инструмент, без длинных рассуждений и пояснений.]");
-        continue;
-      }
-      var tt=content.filter(function(c){return c.type==="text";}).map(function(c){return c.text;}).join("");
-      if(tt.trim()){text=text?text+"\n\n"+tt:tt;if(opts.onText)try{opts.onText({text:text,delta:tt});}catch(e){}}
+      if(r.stop_reason==="max_tokens"&&retries<2){retries++;round_i--;text=base;hint("[Служебно: прошлая попытка оборвалась по длине. Отвечай короче, сразу вызывай нужный инструмент.]");continue;}
+      if(text&&text!==base&&round_i>0&&base&&text.indexOf(base+"\n\n")!==0){/* separator */}
       var uses=content.filter(function(c){return c.type==="tool_use";});
       if(!uses.length)break;
-      msgs.push({role:"assistant",content:content});
+      if(text&&!/\n\n$/.test(text))text+="\n\n";
+      msgs.push({role:"assistant",content:content.map(function(c){var o=Object.assign({},c);delete o._bad;return o;})});
       var results=[];
       for(var u=0;u<uses.length;u++){
         var use=uses[u],tool=tools.find(function(x){return x.name===use.name;}),out,bad=false;
-        try{out=tool?await tool.execute(use.input||{},{signal:opts.signal||new AbortController().signal}):"unknown tool";}catch(e){out="Error: "+((e&&e.message)||e);bad=true;}
+        try{if(use._bad)throw new Error("аргументы инструмента оборвались, пришли короче");out=tool?await tool.execute(use.input||{},{signal:opts.signal||new AbortController().signal}):"unknown tool";}catch(e){out="Error: "+((e&&e.message)||e);bad=true;}
         var res={type:"tool_result",tool_use_id:use.id,content:typeof out==="string"?out:JSON.stringify(out)};if(bad)res.is_error=true;results.push(res);
       }
       msgs.push({role:"user",content:results});
     }
-    if(!text.trim())throw err("empty_completion");
-    return{text:text,truncated:false,modelTierApplied:opts.modelTier||"default"};
+    text=text.replace(/\n{3,}/g,"\n\n").trim();
+    if(!text)throw err("empty_completion");
+    return{text:text,truncated:false,modelTierApplied:tier};
   }
-  sample.limits=async function(){return{maxPromptBytes:1048576,images:{maxCount:5,maxInputBytes:25e6,mediaTypes:["image/jpeg","image/png","image/webp","image/heic","image/heif"]},tools:{maxCount:10}};};
+  sample.limits=async function(){return{maxPromptBytes:2097152,images:{maxCount:8,maxInputBytes:30e6,mediaTypes:["image/jpeg","image/png","image/webp","image/heic","image/heif"]},tools:{maxCount:10}};};
   sample.json=async function(input,opts){
     var r=await sample(typeof input==="string"?input+"\n\nОтветь только JSON, без пояснений.":input,opts);
     var t=r.text.trim().replace(/^```(?:json)?/i,"").replace(/```$/,"").trim();
     try{return JSON.parse(t);}catch(e){var a=t.indexOf("{"),b=t.lastIndexOf("}");if(a>=0&&b>a){try{return JSON.parse(t.slice(a,b+1));}catch(e2){}}throw err("invalid_json",null,r.text);}
   };
   window.claude={use:async function(n){return n==="sample"?sample:null;}};
-  // ссылки «в новом окне» открываем здесь же
   document.addEventListener("click",function(e){var a=e.target.closest&&e.target.closest('a[target="_blank"]');if(!a)return;var h=a.getAttribute("href")||"";if(/^https?:/.test(h)&&h.indexOf(location.origin)!==0)return;e.preventDefault();location.href=a.href;},true);
 })();
 </script></head><body><title>Дизайн 3D Квартир</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Caveat:wght@500;700&display=swap" rel="stylesheet">
 <style>
 :root{
   --bg:#efe9e1;--phone:#fbf8f4;--card:#ffffff;--ink:#1d1b19;--mute:#6f6860;--line:#e4ddd3;
@@ -213,10 +250,60 @@ table.rt td:last-child{text-align:right;font-variant-numeric:tabular-nums}
 .files span.d{display:block;font-size:12px;color:var(--mute)}
 .zv{position:absolute;inset:0;background:#111;z-index:40;overflow:auto;-webkit-overflow-scrolling:touch}.zv img{display:block;width:var(--zw,100%);max-width:none}.zv .zc{position:sticky;top:0;left:0;display:flex;gap:8px;justify-content:flex-end;padding:10px;z-index:2}.zv .zc button{width:42px;height:42px;border-radius:50%;background:rgba(255,255,255,.92);color:#111;font-size:20px;font-weight:700}
 .toast{position:absolute;left:50%;bottom:86px;transform:translateX(-50%);background:var(--ink);color:var(--phone);padding:9px 14px;border-radius:12px;font-size:13px;z-index:30;max-width:90%;text-align:center}
+
+#intro{position:fixed;inset:0;z-index:100;background:#121110;display:grid;place-items:center;transition:opacity .45s}
+#intro.out{opacity:0;pointer-events:none}
+#intro .ibox{text-align:center;color:#f1ece6;font-family:Inter,system-ui,sans-serif}
+#intro .icube{width:110px;height:110px;fill:none;stroke:#e0784b;stroke-width:3.2;stroke-linejoin:round;stroke-linecap:round;stroke-dasharray:420;stroke-dashoffset:420;animation:idraw 1.4s .1s ease forwards}
+#intro .iname{font-size:24px;font-weight:800;margin-top:16px;opacity:0;animation:iup .6s .9s ease forwards}
+#intro .isub{font-size:13px;color:#a59d93;margin-top:4px;opacity:0;animation:iup .6s 1.15s ease forwards}
+#intro .ifounder{font-size:12px;color:#7d756c;margin-top:26px;letter-spacing:.06em;text-transform:uppercase;opacity:0;animation:iup .6s 1.4s ease forwards}
+#intro .ibar{width:140px;height:3px;background:#2a2725;border-radius:3px;margin:18px auto 0;overflow:hidden}
+#intro .ibar i{display:block;height:100%;width:0;background:#e0784b;animation:ibar 2.4s ease forwards}
+@keyframes idraw{to{stroke-dashoffset:0}}@keyframes iup{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}@keyframes ibar{to{width:100%}}
+@media (prefers-reduced-motion:reduce){#intro *{animation-duration:.01s!important;animation-delay:0s!important}}
+.fab{position:absolute;right:14px;bottom:84px;width:52px;height:52px;border-radius:50%;background:var(--ink);color:var(--phone);display:grid;place-items:center;box-shadow:0 6px 20px rgba(0,0,0,.25);z-index:15}
+.fab svg{width:24px;height:24px}
+.ib.hdsup{background:var(--ink);color:var(--phone);width:40px;height:40px}.ib.hdsup svg{width:21px;height:21px;fill:none;stroke:currentColor}
+.fab.inchat{bottom:148px;width:44px;height:44px;opacity:.92}.fab.onhome{bottom:20px}
+.qrs{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.qr{font-size:13px;padding:7px 12px;border-radius:99px;border:1.5px solid var(--acc);color:var(--acc);background:var(--card);white-space:normal;text-align:left}
+details.info{margin:8px 0;border:1px solid var(--line);border-radius:12px;background:var(--phone)}
+details.info>summary{cursor:pointer;padding:9px 12px;font-size:13px;font-weight:600;color:var(--acc);list-style:none}
+details.info>summary::before{content:"ⓘ ";}
+details.info p{padding:0 12px 10px;font-size:13px;color:var(--mute)}
+ol.tl{list-style:none;margin:0;padding:0}
+ol.tl li{display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px dashed var(--line);font-size:13px}
+ol.tl li b{display:block;font-size:14px}ol.tl li span{color:var(--mute)}ol.tl li em{font-style:normal;color:var(--mute);white-space:nowrap;font-size:12px}
+ol.tl li.payrow{background:var(--acc-soft);border:0;border-radius:10px;padding:8px 10px;margin:6px 0;color:var(--acc)}
+ol.tl li.payrow span{color:var(--acc);font-weight:700}
+.opts{padding:4px 12px 8px;display:grid;gap:8px}
+.opt{display:flex;gap:12px;align-items:center;text-align:left;padding:12px;border:1.5px solid var(--line);border-radius:14px;background:var(--card)}
+.opt .oi{font-size:24px;flex:none}.opt b{display:block;font-size:14px}.opt em{font-style:normal;font-size:12px;color:var(--mute)}
+.sh.tall{max-height:86vh;overflow-y:auto}
+.sopt{display:flex;gap:12px;align-items:center;width:100%;text-align:left;padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--card);margin-bottom:8px;color:var(--ink);text-decoration:none;font-size:20px}
+.sopt b{display:block;font-size:15px}.sopt em{font-style:normal;font-size:12px;color:var(--mute)}
+.pencilbox{border:1px solid var(--line);border-radius:12px;overflow:hidden;margin-top:8px}
+.pencil{display:block;width:100%;height:auto}
+.livestat{display:flex;justify-content:space-between;gap:8px;margin-top:6px;font-size:12px;color:var(--mute);border-top:1px dashed var(--line);padding-top:6px}
+.livestat span{font-variant-numeric:tabular-nums}
+.ib.mic{color:var(--mute);border:1px solid var(--line)}.ib.mic.on{background:#d9534f;color:#fff;border-color:#d9534f;animation:pulse 1.2s infinite}
+@keyframes pulse{50%{box-shadow:0 0 0 6px rgba(217,83,79,.25)}}
+.linkb{color:var(--acc);font-weight:600;font-size:13px;padding:4px 0;display:inline-block;margin-top:6px;text-decoration:none}
+.ck{display:flex;gap:10px;width:100%;text-align:left;padding:9px 2px;border-bottom:1px solid var(--line);font-size:14px}
+.ck span{color:var(--mute);width:18px;flex:none}.ck.on span{color:var(--ok);font-weight:700}.ck.on{color:var(--mute)}
+details.grp>summary{display:flex;justify-content:space-between;align-items:center;list-style:none;cursor:pointer}
+details.grp>summary::-webkit-details-marker{display:none}
+.vsec{border:1px solid var(--line);border-radius:12px;padding:10px;margin:6px 0;font-size:13px}
+.vsec div{display:flex;flex-direction:column;padding:5px 0;border-bottom:1px dashed var(--line)}.vsec div:last-child{border:0}
+.vsec em{font-style:normal;color:var(--mute);font-size:12px}
+.prev{flex-wrap:wrap}
+nav.tabs button{font-size:10.5px}
 </style>
 
+<div id="intro"><div class="ibox"><svg viewBox="0 0 120 120" class="icube"><path d="M60 14 20 37v46l40 23 40-23V37z"/><path d="M20 37l40 23 40-23M60 60v46"/></svg><div class="iname">Дизайн 3D Квартир</div><div class="isub">дизайн-проект квартиры в телефоне</div><div class="ifounder">основатель · <span id="introName"></span></div><div class="ibar"><i></i></div></div></div>
 <div id="app"></div>
-<input type="file" id="photo" accept="image/*" hidden>
+<input type="file" id="photo" accept="image/*" multiple hidden>
 
 <script>
 (function(){
@@ -232,6 +319,9 @@ ru:{tag:"Дизайн-проект в чате",hero:"Дизайн-проект 
 kk:{tag:"Чаттағы дизайн-жоба",hero:"Пәтердің дизайн-жобасы телефоныңызда",heroP:"Пәтерді қолмен сызып, суретке түсіріңіз — ЖИ-дизайнер өлшеу жоспарын, жоспарлау нұсқаларын, визуализацияны, жұмыс сызбаларын және материалдар тізімін жасайды.",calc:"Бағасы қанша",area:"Пәтер ауданы, м²",total:"Жоба құны",perm:"₸ / м²",b1:"Өлшеу + сауалнама + жоспарлау",b2:"Визуализация",b3:"Сызбалар + тізім + PDF",free:"Өлшеу жоспары тегін — нақты ауданды соған қарап есептейміз.",how:"Қалай жұмыс істейді",s1:"Нұсқаулық бойынша пәтерді сызып, суретін жібересіз",s2:"ЖИ өлшеу жоспарын жасайды — сіз бекітесіз",s3:"Әр бөлме бойынша толық сауалнама",s4:"5 жоспарлау нұсқасы, таңдауға 2 күн",s5:"Әр бөлменің визуализациясы",s6:"Жұмыс сызбалары — әр парақ келісуге",s7:"Материалдар тізімі және бүкіл жоба PDF",offer:"Оферта шарттарын қабылдаймын: өлшемдерді өзім көрсетемін және дәлдігіне өзім жауаптымын, әр кезеңді тексеріп бекітемін. Әр кезеңге 2 түзету тегін, одан әрі әр түзету 5 000 ₸. Төлем кезең бойынша, алдын ала.",start:"Жобаны бастау",cont:"Жобаны жалғастыру",howto:"Қалай сызу керек",howtoS:"Мысалы бар нұсқаулық",example:"Жоба мысалы",exampleS:"56 м² кезең бойынша",chat:"Чат",stages:"Кезеңдер",files:"Файлдар",more:"Тағы",designer:"ЖИ-дизайнер",online:"желіде",mgrOn:"менеджер байланыста",ph:"Хабарлама…",typing:"Жазып жатыр…",you:"Сіз",ai:"ЖИ-дизайнер",mgr:"Менеджер",approve:"Бекіту",revise:"Түзету",revLeft:"тегін түзету",revPaid:"Түзету 5 000 ₸",approved:"Бекітілді",pay:"Төлеу",payDemo:"Төлем (демо). Жұмыс нұсқасында — Kaspi Pay.",paid:"Төленді",locked:"Алдыңғы кезеңнен кейін ашылады",needPay:"Блокты төлеу керек",st_obmer:"Өлшеу жоспары",st_brief:"Бөлмелер сауалнамасы",st_plan:"Жоспарлау шешімдері",st_vis:"Визуализация",st_draw:"Жұмыс сызбалары",st_ved:"Материалдар тізімі",st_pdf:"Жоба PDF",d_obmer:"Сызбаңыздың суреті → өлшемді сызба",d_brief:"Кім тұрады, жиһаз, техника, әрлеу",d_plan:"5 нұсқа, 2 күнде таңдау",d_vis:"Әр бөлменің ақ моделі мен түсі",d_draw:"Парақ бойынша, әрқайсысы келісуге",d_ved:"Материалдар, шығын заттары, құрал",d_pdf:"Бәрі бір файлда",sendPhoto:"Сызба суретін жіберу",openChat:"Чатты ашу",fillBrief:"Сауалнаманы чатта толтыру",demoNote:"Прототип: мұнда 56 м² мысалының нәтижесі көрсетілген. Жұмыс нұсқасында сіздің файлдарыңыз болады.",choose:"Нұсқаны таңдаңыз",chosen:"Таңдалды",deadline:"Таңдауға қалды",days:"к",hours:"сағ",stall:"2 күннен артық жауап бермедіңіз — менеджер хабарлама алды және сізге қоңырау шалады.",noSample:"ЖИ-чат қосымша Claude-та ашылғанда жұмыс істейді. Кезеңдер, төлем және мысалдар онсыз да жұмыс істейді.",dl:"Жүктеу",xlsx:"Материалдар тізімі, Excel",pdfOpen:"PDF басып шығару үшін толық жобаны ашу",json:"Жоба деректері (JSON)",svg:"Өлшеу жоспары (SVG)",noFiles:"Файлдар кезеңдер өткен сайын пайда болады.",name:"Аты",phone:"Байланыс телефоны",language:"Тіл",theme:"Тақырып",mgrMode:"Менеджер режимі (әкімші демо)",mgrModeS:"Менеджер клиентке жазады, ЖИ кідірісте. Өшіргеннен кейін ЖИ хат алмасуды ескеріп жалғастырады.",shift:"Демо: 2 күн алға",reset:"Жобаны қайта бастау",extraTotal:"Ақылы түзетулер",areaFact:"Өлшеу бойынша аудан",rooms:"Бөлмелер",askMgr:"Менеджерді шақыру",mgrCalled:"Менеджер хабарлама алды және сізбен байланысады.",aiPaused:"ЖИ-агент кідірісте — чатта менеджер.",aiBack:"ЖИ-агент чатқа оралды және менеджермен хат алмасуды көреді.",revPrompt:"«{x}» бойынша түзету: ",payRev:"Тегін түзетулер бітті. Түзету 5 000 ₸ тұрады.",cancel:"Бас тарту",sheets:"Парақтар",allSheets:"Барлық парақ бекітілді",briefSaved:"Бөлмелер бойынша сақталды",greet:"Сәлеметсіз бе! Мен «Дизайн 3D Квартир» ЖИ-дизайнерімін. Өлшеу жоспарынан бастайық: нұсқаулық бойынша пәтерді қолмен сызып, барлық өлшемдерді миллиметрмен жазыңыз да, суретін осында жіберіңіз 📷",q1:"Қалай сызу керек?",q2:"Бағасы қанша?",q3:"Мерзімі қандай?",err_rate:"Сұраулар тым көп, бір минут күтіңіз.",err_gen:"Жауап бере алмадым. Қайталап көріңіз.",err_img:"Бұл сурет жарамайды. JPG немесе PNG жіберіңіз.",err_deny:"Бұл терезеде ЖИ-ге рұқсат жоқ.",cut:"Жауап үзілді — қысқарақ сұраңыз.",back:"Артқа",checking:"Жоспарды сызбаңызбен салыстырып жатырмын…",paidOk:"Төлем өтті",block:"Блок",ofTotal:"сомадан"},
 en:{tag:"Design project in a chat",hero:"Your apartment design project, on your phone",heroP:"Sketch your apartment by hand and take a photo — the AI designer makes the measured plan, layouts, renders, working drawings and a materials list.",calc:"What it costs",area:"Apartment area, m²",total:"Project price",perm:"₸ per m²",b1:"Survey + brief + layouts",b2:"Visualisation",b3:"Drawings + materials + PDF",free:"The measured plan is free — it gives us the exact area.",how:"How it works",s1:"Draw your apartment following the guide and send a photo",s2:"The AI builds the measured plan — you approve it",s3:"A detailed brief for every room",s4:"5 layout options, 2 days to choose",s5:"Renders of every room",s6:"Working drawings — each sheet approved",s7:"Materials list and the whole project as PDF",offer:"I accept the offer terms: I provide the dimensions and am responsible for them, and I check and approve each stage. 2 free revisions per stage, then 5,000 ₸ per revision. Prepaid, stage by stage.",start:"Start a project",cont:"Continue project",howto:"How to draw",howtoS:"Guide with an example",example:"Example project",exampleS:"56 m², stage by stage",chat:"Chat",stages:"Stages",files:"Files",more:"More",designer:"AI designer",online:"online",mgrOn:"manager on the line",ph:"Message…",typing:"Typing…",you:"You",ai:"AI designer",mgr:"Manager",approve:"Approve",revise:"Revise",revLeft:"free revisions",revPaid:"Revision 5,000 ₸",approved:"Approved",pay:"Pay",payDemo:"Payment (demo). The real app uses Kaspi Pay.",paid:"Paid",locked:"Opens after the previous stage",needPay:"Block payment needed",st_obmer:"Measured plan",st_brief:"Room brief",st_plan:"Layout options",st_vis:"Visualisation",st_draw:"Working drawings",st_ved:"Materials list",st_pdf:"Project PDF",d_obmer:"Photo of your sketch → dimensioned plan",d_brief:"Who lives here, furniture, appliances, finishes",d_plan:"5 options, 2 days to choose",d_vis:"White model and colour for each room",d_draw:"Sheet by sheet, each approved",d_ved:"Materials, consumables and tools",d_pdf:"Everything in one file",sendPhoto:"Send a photo of the sketch",openChat:"Open chat",fillBrief:"Fill the brief in chat",demoNote:"Prototype: this shows the 56 m² example. The real app shows your own files here.",choose:"Choose an option",chosen:"Chosen",deadline:"Time left to choose",days:"d",hours:"h",stall:"No reply for over 2 days — a manager has been notified and will call you.",noSample:"The AI chat works when the app is opened in Claude. Stages, payment and examples work anyway.",dl:"Download",xlsx:"Materials list, Excel",pdfOpen:"Open the full project to print as PDF",json:"Project data (JSON)",svg:"Measured plan (SVG)",noFiles:"Files appear as you go through the stages.",name:"Name",phone:"Contact phone",language:"Language",theme:"Theme",mgrMode:"Manager mode (admin demo)",mgrModeS:"The manager writes to the client and the AI pauses. When switched off, the AI continues with the conversation in mind.",shift:"Demo: skip 2 days",reset:"Start the project over",extraTotal:"Paid revisions",areaFact:"Area from the plan",rooms:"Rooms",askMgr:"Call a manager",mgrCalled:"A manager has been notified and will contact you.",aiPaused:"AI agent paused — a manager is in the chat.",aiBack:"The AI agent is back and sees the conversation with the manager.",revPrompt:"Revision for “{x}”: ",payRev:"Free revisions are used up. A revision costs 5,000 ₸.",cancel:"Cancel",sheets:"Sheets",allSheets:"All sheets approved",briefSaved:"Saved by room",greet:"Hello! I'm the AI designer at Дизайн 3D Квартир. Let's start with the measured plan: sketch your apartment by hand following the guide, write every dimension in millimetres and send me a photo 📷",q1:"How do I draw it?",q2:"How much is it?",q3:"How long does it take?",err_rate:"Too many requests, wait a minute.",err_gen:"Couldn't answer. Please try again.",err_img:"That photo didn't work. Send a JPG or PNG.",err_deny:"AI access isn't allowed in this window.",cut:"The answer was cut off — ask for less.",back:"Back",checking:"Checking the plan against your sketch…",paidOk:"Payment done",block:"Block",ofTotal:"of total"}
 };
+Object.assign(T.ru,{brief:"Анкета",what:"Что это и зачем",payBefore:"Оплата перед блоком",freeW:"бесплатно",totalTime:"Весь проект — около 10–14 рабочих дней, если вы быстро отвечаете и утверждаете. Каждый блок оплачивается перед стартом, результат вы проверяете сами.",calcHint:"Введите площадь — покажем цену, этапы и когда платить. Это пример: точную площадь посчитаем по обмеру.",howPay:"Этапы, сроки и оплата",incl:"Что входит и что нет",inclT:"Входит: обмерный план, анкета, 5 вариантов планировки, белые модели и цветные эскизы, 17 листов рабочих чертежей, ведомость материалов, PDF и Excel. Не входит: выезд замерщика (заказывается отдельно), авторский надзор на стройке, закупка материалов, 3D-тур.",tol:"Про точность и допуски",tolT:"Чертежи строятся по вашим размерам с точностью ±10–20 мм. В реальных домах стены не идеально ровные, углы не всегда прямые, диагонали могут не сходиться — это нормально и учитывается в проекте. Перед заказом кухни, шкафов, дверей и стеклянных перегородок мастер делает контрольный замер.",startT:"Начнём",phoneWhy:"Телефон нужен, чтобы менеджер мог связаться, если что-то пойдёт не так. Не передаём третьим лицам.",o_title:"Как начнём обмер? Выберите удобный способ:",o_draw:"Нарисую от руки",o_drawS:"Пример и правила — за 1 минуту",o_ready:"У меня есть готовый обмер",o_readyS:"Фото или скриншот чертежа замерщика, БТИ",o_zamer:"Заказать замер",o_zamerS:"Специалист приедет и всё измерит (платно)",o_video:"Видео-обход квартиры",o_videoS:"Дополнительно к рисунку — проверим углы и стояки",updBelow:"обновлён ниже",retry:"Повторить",ver:"версия",tapZoom:"нажмите на чертёж, чтобы увеличить",tolShort:"точность ±10–20 мм",seeBrief:"Открыть анкету",listening:"Говорите…",briefCov:"Анкета заполнена",openBrief:"Открыть анкету",ex3of5:"В примере 3 варианта, в работе клиент получает 5.",variant:"Вариант",whiteM:"Белая модель",colorM:"В цвете",vedSec:"Из чего состоит ведомость",vedNote:"Количества примерные: посчитаны по чертежам с запасом 5–15%. Мастер на объекте может уточнить. Вёдра и инструмент — если у бригады своих нет.",payHist:"История оплат",briefHint:"Нажмите на пункт — ИИ-дизайнер спросит о нём в чате. Зелёные — уже обсудили.",briefLocked:"Анкета откроется после утверждения обмера и оплаты блока 1.",edit:"Изменить",newProj:"Новый проект",faq:"Частые вопросы",support:"Поддержка",supportS:"Мы на связи на любом этапе.",callUs:"Позвонить",callback:"Заказать звонок",callbackS:"Менеджер перезвонит в удобное время",toMgr:"Написать менеджеру",toMgrS:"Живой человек подключится к чату",faqS:"Ответы на главные вопросы",zamerT:"В Алматы приедет наш специалист, в других городах — партнёр. Менеджер уточнит стоимость и время.",callbackT:"Оставьте номер — перезвоним.",city:"Город",address:"Адрес",whenCall:"Когда удобно",whenPh:"например, сегодня после 18:00",comment:"Комментарий",sendReq:"Отправить",revWhat:"Что поправить",revPh:"Например: сдвинуть дверь в спальню на 300 мм к окну",andSend:"и отправить",sendRev:"Отправить правку",newProjT:"Текущий проект будет удалён с этого телефона: чат, обмер, анкета и оплаты. Отменить это нельзя.",newProjOk:"Да, начать новый",shootDraw:"Сфотографировать рисунок",videoSteps:"Сначала нарисуйте план и сфотографируйте его — видео дополняет рисунок.|Включите свет, держите телефон горизонтально.|Идите медленно по кругу, снимайте каждую стену от пола до потолка.|В каждом углу задержитесь на 2–3 секунды.|Покажите стояки, щиток, радиаторы, вентрешётки, окна и двери.|Видео до 2–3 минут.",videoNote:"Мы возьмём из видео 6 кадров и сверим с рисунком: не сходятся ли углы, где стояки и короба.",pickVideo:"Выбрать видео",guideSteps:"Лист в клетку, вид сверху — как будто смотрите с потолка. Масштаб не важен.|Нарисуйте все стены, подпишите каждую комнату.|Окна и двери — разрывом в стене. Подпишите ширину и расстояние от угла.|Рулеткой измерьте каждую стену у пола, от угла до угла. Пишите в миллиметрах: 3450, а не 3,45.|Обязательно общая длина и ширина квартиры — по ним проверим, что всё сходится.|Высота потолка в каждой комнате, высота подоконников.|Отметьте: стояки — кружком, щиток — квадратом, радиаторы, вентрешётки, короба.|Фото — сверху, при дневном свете, весь лист в кадре.",guideNote:"Если какой-то размер не сходится на 1–3 см — ничего страшного, стены не идеальны. Мы переспросим, если будет непонятно.",howtoAnim:"Анимированная инструкция",phoneNeed:"Укажите телефон — 10 цифр или больше",revNeed:"Опишите правку хотя бы парой слов",zamerOk:"Заявка на замер отправлена. Менеджер свяжется с вами.",callbackOk:"Заявка отправлена. Менеджер перезвонит.",newProjDone:"Новый проект создан",letsTalk:"Давайте обсудим",changeIn:"Хочу изменить в «{x}»: ",voiceErr:"Голосовой ввод не сработал. Попробуйте ещё раз или напишите текстом.",framesWait:"Готовлю кадры из видео…",videoErr:"Не получилось прочитать видео. Попробуйте другое или пришлите фото.",videoMsg:"Видео-обход квартиры",readyMsg:"Вот готовый обмер моей квартиры",drawMsg:"Вот мой рисунок квартиры",st_build:"Строю план…",st_read:"Читаю рисунок…",st_think_plan:"Сверяюсь с вашим планом…",st_fix:"Исправляю план…",greet:"Здравствуйте! Я ИИ-дизайнер «Дизайн 3D Квартир». Всё начинается с обмерного плана — чертежа вашей квартиры с размерами. Выберите ниже, как удобнее: нарисовать от руки, прислать готовый обмер или заказать замерщика. Можно писать и наговаривать голосом 🎙"});
+T.kk.brief="Сауалнама";T.en.brief="Brief";
+
 const STAGES=[
  {id:"obmer",block:0},{id:"brief",block:1},{id:"plan",block:1},{id:"vis",block:2},{id:"draw",block:3},{id:"ved",block:3},{id:"pdf",block:3}
 ];
@@ -244,15 +334,15 @@ const VARS=[{id:"A",img:"varA"},{id:"B",img:"varB"},{id:"V",img:"varV"}];
 /* ---------- state ---------- */
 const KEY="d3k_app_v1";
 let S;
-function fresh(){return{lang:"ru",theme:"",started:false,offer:false,area:56,name:"",phone:"",obmer:null,brief:{},paid:{},ok:{},rev:{},extra:0,variant:null,since:{},shift:0,mgrMode:false,mgrCalled:false,photo:null,chat:[]};}
-function load(){try{const v=JSON.parse(localStorage.getItem(KEY)||"null");S=Object.assign(fresh(),v||{});}catch(e){S=fresh();}}
+function fresh(){return{lang:"ru",theme:"",started:false,offer:false,area:56,name:"",phone:"",obmer:null,brief:{},paid:{},ok:{},rev:{},extra:0,variant:null,since:{},shift:0,mgrMode:false,mgrCalled:false,photo:null,photos:[],covered:{},planVer:0,payLog:[],reqs:[],chat:[]};}
+function load(){try{const v=JSON.parse(localStorage.getItem(KEY)||"null");S=Object.assign(fresh(),v||{});}catch(e){S=fresh();}if(S.photo&&!(S.photos||[]).length){S.photos=[S.photo];}delete S.photo;}
 function save(){try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}}
 load();
 const t=k=>(T[S.lang]&&T[S.lang][k])||T.ru[k]||k;
 const now=()=>Date.now()+S.shift;
 const fmt=n=>Math.round(n).toLocaleString("ru-RU").replace(/,/g," ");
 const esc=s=>String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
-const md=s=>esc(s).replace(/\*\*(.+?)\*\*/g,"<b>$1</b>");
+const md=(s,btn)=>esc(s).replace(/\*\*(.+?)\*\*/g,"<b>$1</b>").replace(/\[\[([^\]]+)\]\]/g,(m,inner)=>{const o=inner.split("|").map(x=>x.trim()).filter(Boolean).slice(0,6);return btn?`<span class="qrs">${o.map(x=>`<button class="qr" data-a="qr" data-k="${x}">${x}</button>`).join("")}</span>`:`<span class="mute">${o.join(" · ")}</span>`;});
 function applyTheme(){if(S.theme)document.documentElement.setAttribute("data-theme",S.theme);else document.documentElement.removeAttribute("data-theme");}
 applyTheme();
 
@@ -281,21 +371,34 @@ if(caps){
 }
 let capsSettled=false;setTimeout(()=>{capsSettled=true;render();},10500);
 
-/* ---------- plan SVG from data ---------- */
+/* ---------- plan SVG from data (v2: размеры только по наружному контуру, высоты, радиаторы) ---------- */
 function zonesOf(o){return (o&&(o.zones||o.rooms))||[];}
 function bbox(Z){const x=Math.min(...Z.map(r=>r.x)),y=Math.min(...Z.map(r=>r.y)),X=Math.max(...Z.map(r=>r.x+r.w)),Y=Math.max(...Z.map(r=>r.y+r.d));return{x,y,w:X-x,d:Y-y};}
 function inZ(Z,x,y){return Z.some(r=>x>r.x&&x<r.x+r.w&&y>r.y&&y<r.y+r.d);}
 function cutIv(ivs,qa,qb){const r=[];ivs.forEach(([a,b])=>{if(qb<=a||qa>=b){r.push([a,b]);return;}if(qa>a)r.push([a,qa]);if(qb<b)r.push([qb,b]);});return r;}
-/* outer boundary of the union of zones, as merged straight segments */
-function outline(o){
-  const Z=zonesOf(o),segs=[];
+const PROBE=520; // зона ближе этого расстояния за стеной = стена внутренняя
+/* грани зон, не прилегающие к соседней зоне; ext=true — наружная стена (за ней нет квартиры) */
+function faces(o){
+  const Z=zonesOf(o),out=[];
   Z.forEach(r=>{
     [["N",r.y,r.x,r.x+r.w,-1],["S",r.y+r.d,r.x,r.x+r.w,1],["W",r.x,r.y,r.y+r.d,-1],["E",r.x+r.w,r.y,r.y+r.d,1]].forEach(([side,c,a,b,dir])=>{
       const hz=side==="N"||side==="S";let ivs=[[a,b]];
       Z.forEach(q=>{if(q===r)return;const p=c+dir*5;const cov=hz?(p>q.y&&p<q.y+q.d):(p>q.x&&p<q.x+q.w);if(cov)ivs=hz?cutIv(ivs,q.x,q.x+q.w):cutIv(ivs,q.y,q.y+q.d);});
-      ivs.forEach(([u,v])=>{if(v-u>30)segs.push({side,c,a:u,b:v,dir});});
+      ivs.forEach(([u,v])=>{
+        if(v-u<=30)return;
+        // наружная часть: дальше PROBE за гранью нет другой зоны
+        let ext=[[u,v]];
+        Z.forEach(q=>{if(q===r)return;const p0=c+dir*5,p1=c+dir*PROBE;const lo=Math.min(p0,p1),hi=Math.max(p0,p1);const cov=hz?(q.y<hi&&q.y+q.d>lo):(q.x<hi&&q.x+q.w>lo);if(cov)ext=hz?cutIv(ext,q.x,q.x+q.w):cutIv(ext,q.y,q.y+q.d);});
+        let intr=[[u,v]];ext.forEach(([a1,b1])=>{intr=cutIv(intr,a1,b1);});
+        ext.forEach(([a1,b1])=>{if(b1-a1>30)out.push({side,c,a:a1,b:b1,dir,ext:true});});
+        intr.forEach(([a1,b1])=>{if(b1-a1>30)out.push({side,c,a:a1,b:b1,dir,ext:false});});
+      });
     });
   });
+  return out;
+}
+function outline(o){
+  const segs=faces(o).filter(s=>s.ext);
   segs.sort((p,q)=>p.side<q.side?-1:p.side>q.side?1:(p.c-q.c)||(p.a-q.a));
   const m=[];segs.forEach(s=>{const l=m[m.length-1];if(l&&l.side===s.side&&Math.abs(l.c-s.c)<3&&s.a<=l.b+3)l.b=Math.max(l.b,s.b);else m.push(Object.assign({},s));});
   return m;
@@ -305,9 +408,9 @@ function opAbs(o,op){
   const w=+op.width_mm||900,off=+op.offset_mm||0,side=String(op.wall||"N").toUpperCase();
   let c,a,dir;
   if(side==="N"){c=r.y;a=r.x+off;dir=-1;}else if(side==="S"){c=r.y+r.d;a=r.x+off;dir=1;}else if(side==="W"){c=r.x;a=r.y+off;dir=-1;}else{c=r.x+r.w;a=r.y+off;dir=1;}
-  const hz=side==="N"||side==="S",mid=a+w/2,p=c+dir*5;
-  const outer=hz?!inZ(Z,mid,p):!inZ(Z,p,mid);
-  return{side,c,a,b:a+w,dir,hz,outer,kind:op.kind||"door",w};
+  const hz=side==="N"||side==="S",mid=a+w/2,p=c+dir*5,p2=c+dir*PROBE;
+  const outer=hz?!inZ(Z,mid,p)&&!inZ(Z,mid,p2):!inZ(Z,p,mid)&&!inZ(Z,p2,mid);
+  return{side,c,a,b:a+w,dir,hz,outer,kind:op.kind||"door",w,sill:+op.sill_mm||0,hgt:+op.height_mm||0};
 }
 function chains(o){
   const ops=(o.openings||[]).map(op=>opAbs(o,op)).filter(q=>q.outer);
@@ -321,27 +424,24 @@ function chains(o){
 }
 function planSVG(o,opt){
   opt=opt||{};const Z=zonesOf(o);if(!Z.length)return"";
-  const bb=bbox(Z),E=+o.outer_wall_mm||300,P=1500,vw=bb.w+2*P,vh=bb.d+2*P,ox=P-bb.x,oy=P-bb.y;
-  const X=x=>ox+x,Y=y=>oy+y,ink="#1d1b19",wc="#cfc6ba",blue="#2b6cb0",dc="#b5532c",paper="#fffdf9";
+  const bb=bbox(Z),E=+o.outer_wall_mm||300,P=1700,vw=bb.w+2*P,vh=bb.d+2*P,ox=P-bb.x,oy=P-bb.y;
+  const X=x=>ox+x,Y=y=>oy+y,ink="#1d1b19",wc="#cfc6ba",blue="#2b6cb0",dc="#b5532c",paper="#fffdf9",red="#d9534f";
   const L=(x1,y1,x2,y2,w,c,extra)=>`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${c||ink}" stroke-width="${w||14}"${extra||""}/>`;
   const tx=(x,y,s,sz,a,rot,col,wt)=>`<text x="${x}" y="${y}" font-size="${sz||170}" text-anchor="${a||"middle"}" fill="${col||ink}" font-family="Inter,Arial,sans-serif"${wt?` font-weight="${wt}"`:""}${rot?` transform="rotate(${rot} ${x} ${y})"`:""}>${esc(s)}</text>`;
   let g=`<defs><pattern id="hh" width="110" height="110" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="110" height="110" fill="${wc}"/><line x1="0" y1="0" x2="0" y2="110" stroke="#8d847a" stroke-width="16"/></pattern></defs>`;
-  // walls band = union of expanded zones, then the floor
   Z.forEach(r=>{g+=`<rect x="${X(r.x)-E}" y="${Y(r.y)-E}" width="${r.w+2*E}" height="${r.d+2*E}" fill="url(#hh)"/>`;});
   Z.forEach(r=>{g+=`<rect x="${X(r.x)-4}" y="${Y(r.y)-4}" width="${r.w+8}" height="${r.d+8}" fill="${paper}"/>`;});
-  const segs=chains(o);
-  segs.forEach(s=>{const hz=s.side==="N"||s.side==="S";g+=hz?L(X(s.a),Y(s.c),X(s.b),Y(s.c),18):L(X(s.c),Y(s.a),X(s.c),Y(s.b),18);});
-  // dashed boundary only between zones with different names
+  faces(o).forEach(s=>{const hz=s.side==="N"||s.side==="S";g+=hz?L(X(s.a),Y(s.c),X(s.b),Y(s.c),18):L(X(s.c),Y(s.a),X(s.c),Y(s.b),18);});
   for(let i=0;i<Z.length;i++)for(let j=i+1;j<Z.length;j++){const r=Z[i],q=Z[j];if(r.name===q.name)continue;
     const vs=(x,y1,y2)=>{if(y2-y1>30)g+=L(X(x),Y(y1),X(x),Y(y2),10,"#a59d93",' stroke-dasharray="70 50"');};
     const hs=(y,x1,x2)=>{if(x2-x1>30)g+=L(X(x1),Y(y),X(x2),Y(y),10,"#a59d93",' stroke-dasharray="70 50"');};
     if(Math.abs(r.x+r.w-q.x)<3||Math.abs(q.x+q.w-r.x)<3){const x=Math.abs(r.x+r.w-q.x)<3?q.x:r.x;vs(x,Math.max(r.y,q.y),Math.min(r.y+r.d,q.y+q.d));}
     if(Math.abs(r.y+r.d-q.y)<3||Math.abs(q.y+q.d-r.y)<3){const y=Math.abs(r.y+r.d-q.y)<3?q.y:r.y;hs(y,Math.max(r.x,q.x),Math.min(r.x+r.w,q.x+q.w));}}
-  // internal walls (axis line + thickness)
-  (o.walls||[]).forEach(w=>{const t=+w.t_mm||(w.kind==="bearing"?250:100);const x1=X(+w.x1),y1=Y(+w.y1),x2=X(+w.x2),y2=Y(+w.y2);g+=L(x1,y1,x2,y2,t+36,ink,' stroke-linecap="square"')+L(x1,y1,x2,y2,t,w.kind==="bearing"?"url(#hh)":"#ebe5dc",' stroke-linecap="square"');});
-  // shafts, columns, boxes
+  (o.walls||[]).forEach(w=>{const t0=+w.t_mm||(w.kind==="bearing"?200:100);const x1=X(+w.x1),y1=Y(+w.y1),x2=X(+w.x2),y2=Y(+w.y2);g+=L(x1,y1,x2,y2,t0+36,ink,' stroke-linecap="square"')+L(x1,y1,x2,y2,t0,w.kind==="bearing"?"url(#hh)":"#ebe5dc",' stroke-linecap="square"');});
   (o.blocks||[]).forEach(b=>{g+=`<rect x="${X(+b.x)}" y="${Y(+b.y)}" width="${+b.w}" height="${+b.d}" fill="url(#hh)" stroke="${ink}" stroke-width="18"/>`;if(b.label)g+=tx(X(+b.x)+b.w/2,Y(+b.y)+b.d+190,b.label,140,"middle",0,"#6f6860");});
-  // openings
+  // радиаторы и вентиляция
+  (o.radiators||[]).forEach(rd=>{const w=+rd.w||+rd.len||1000,d=+rd.d||120;g+=`<rect x="${X(+rd.x)}" y="${Y(+rd.y)}" width="${w}" height="${d}" fill="${red}" opacity=".55"/>`;});
+  (o.vents||[]).forEach(v=>{const s=220,x=X(+v.x)-s/2,y=Y(+v.y)-s/2;g+=`<rect x="${x}" y="${y}" width="${s}" height="${s}" fill="#fff" stroke="#8e44ad" stroke-width="16"/>`+L(x,y,x+s,y+s,12,"#8e44ad")+L(x+s,y,x,y+s,12,"#8e44ad");});
   (o.openings||[]).forEach(op=>{
     const q=opAbs(o,op);const th=q.outer?E:260;const c0=q.outer?q.c:q.c-th/2*q.dir;const c1=c0+q.dir*th;const lo=Math.min(c0,c1),hi=Math.max(c0,c1);
     if(q.hz)g+=`<rect x="${X(q.a)}" y="${Y(lo)-10}" width="${q.w}" height="${hi-lo+20}" fill="${paper}"/>`;else g+=`<rect x="${X(lo)-10}" y="${Y(q.a)}" width="${hi-lo+20}" height="${q.w}" fill="${paper}"/>`;
@@ -349,136 +449,177 @@ function planSVG(o,opt){
       const m=(lo+hi)/2;
       if(q.hz)g+=L(X(q.a),Y(lo),X(q.a),Y(hi),14,blue)+L(X(q.b),Y(lo),X(q.b),Y(hi),14,blue)+L(X(q.a),Y(lo),X(q.b),Y(lo),10,blue)+L(X(q.a),Y(m),X(q.b),Y(m),14,blue)+L(X(q.a),Y(hi),X(q.b),Y(hi),10,blue);
       else g+=L(X(lo),Y(q.a),X(hi),Y(q.a),14,blue)+L(X(lo),Y(q.b),X(hi),Y(q.b),14,blue)+L(X(lo),Y(q.a),X(lo),Y(q.b),10,blue)+L(X(m),Y(q.a),X(m),Y(q.b),14,blue)+L(X(hi),Y(q.a),X(hi),Y(q.b),10,blue);
+      if(q.sill||q.hgt){const lab=(q.sill?"пд "+q.sill:"")+(q.hgt?(q.sill?" · ":"")+"h "+q.hgt:"");const inn=-q.dir;if(q.hz)g+=tx(X((q.a+q.b)/2),Y(q.c)+inn*260+(inn>0?110:0),lab,120,"middle",0,blue);else g+=tx(X(q.c)+inn*230,Y((q.a+q.b)/2),lab,120,"middle",-90,blue);}
     }else if(q.kind!=="arch"){
       const col=q.kind==="entry"?dc:ink,inn=-q.dir;const w=Math.min(q.w,1000);
       if(q.hz){const yy=Y(q.c);g+=L(X(q.a),yy,X(q.a),yy+inn*w,14,col)+`<path d="M${X(q.a)} ${yy+inn*w} A${w} ${w} 0 0 ${inn>0?0:1} ${X(q.a)+w} ${yy}" fill="none" stroke="${col}" stroke-width="9" stroke-dasharray="40 30"/>`;}
       else{const xx=X(q.c);g+=L(xx,Y(q.a),xx+inn*w,Y(q.a),14,col)+`<path d="M${xx+inn*w} ${Y(q.a)} A${w} ${w} 0 0 ${inn>0?1:0} ${xx} ${Y(q.a)+w}" fill="none" stroke="${col}" stroke-width="9" stroke-dasharray="40 30"/>`;}
+      if(!q.outer){const lab=String(q.w)+(q.hgt?"×"+q.hgt:"");if(q.hz)g+=tx(X((q.a+q.b)/2),Y(q.c)-q.dir*-0+(-inn*190)+60,lab,110,"middle",0,"#6f6860");else g+=tx(X(q.c)-inn*170,Y((q.a+q.b)/2),lab,110,"middle",-90,"#6f6860");}
     }
   });
-  // dimension chains along the outer walls
+  // размерные цепочки — только наружный контур
   const tick=(x,y)=>L(x-60,y+60,x+60,y-60,14,dc);
-  segs.forEach(s=>{
-    const hz=s.side==="N"||s.side==="S";const off=s.c+s.dir*(E+380),off2=s.c+s.dir*(E+820);
-    const line=(o1,pts,withText,isTot)=>{
+  chains(o).forEach(s=>{
+    const hz=s.side==="N"||s.side==="S";const off=s.c+s.dir*(E+420),off2=s.c+s.dir*(E+900);
+    const line=(o1,pts,isTot,pieces)=>{
       const a=pts[0],b=pts[pts.length-1];
       if(hz){g+=L(X(a),Y(o1),X(b),Y(o1),9,dc);pts.forEach(p=>g+=tick(X(p),Y(o1)));}
       else{g+=L(X(o1),Y(a),X(o1),Y(b),9,dc);pts.forEach(p=>g+=tick(X(o1),Y(p)));}
-      for(let i=0;i<pts.length-1;i++){const len=pts[i+1]-pts[i];if(len<150)continue;const mid=(pts[i]+pts[i+1])/2;const pc=isTot?null:s.pieces[i];const col=pc&&pc.op?blue:dc;
-        if(hz)g+=tx(X(mid),Y(o1)-55,String(len),len<600?120:170,"middle",0,col,isTot?700:400);else g+=tx(X(o1)-55,Y(mid),String(len),len<600?120:170,"middle",-90,col,isTot?700:400);}
+      for(let i=0;i<pts.length-1;i++){const len=pts[i+1]-pts[i];if(len<160)continue;const mid=(pts[i]+pts[i+1])/2;const pc=pieces&&pieces[i];const col=pc&&pc.op?blue:dc;const sz=isTot?210:len<700?130:180;
+        if(hz)g+=tx(X(mid),Y(o1)-60,String(len),sz,"middle",0,col,isTot?700:500);else g+=tx(X(o1)-60,Y(mid),String(len),sz,"middle",-90,col,isTot?700:500);}
     };
-    line(off,s.pts,true,false);
-    if(s.pts.length>2)line(off2,[s.a,s.b],true,true);
+    line(off,s.pts,false,s.pieces);
+    if(s.pts.length>2)line(off2,[s.a,s.b],true);
   });
-  // labels per zone name (largest rect carries the label)
-  const by={};Z.forEach(r=>{const k=r.name;(by[k]=by[k]||[]).push(r);});
+  // подписи комнат: название, площадь, высота, внутренние размеры
+  const by={};Z.forEach(r=>{(by[r.name]=by[r.name]||[]).push(r);});
   const blockArea=b=>(+b.w)*(+b.d);
   Object.entries(by).forEach(([n,rs])=>{const big=rs.slice().sort((a,b)=>b.w*b.d-a.w*a.d)[0];let ar=rs.reduce((s,r)=>s+r.w*r.d,0);(o.blocks||[]).forEach(b=>{const cx=+b.x+b.w/2,cy=+b.y+b.d/2;if(rs.some(r=>cx>r.x&&cx<r.x+r.w&&cy>r.y&&cy<r.y+r.d))ar-=blockArea(b);});
-    const sz=Math.max(120,Math.min(260,Math.min(big.w,big.d)/7));let lx=big.x+big.w/2,ly=big.y+big.d/2;
+    const sz=Math.max(150,Math.min(280,Math.min(big.w,big.d)/6.5));let lx=big.x+big.w/2,ly=big.y+big.d/2;
     const busyAt=(x,y)=>(o.blocks||[]).some(b=>x>+b.x-1300&&x<+b.x+ +b.w+1300&&y>+b.y-700&&y<+b.y+ +b.d+700)||(o.walls||[]).some(w=>x>Math.min(w.x1,w.x2)-1300&&x<Math.max(w.x1,w.x2)+1300&&y>Math.min(w.y1,w.y2)-700&&y<Math.max(w.y1,w.y2)+700)||(o.risers||[]).some(r=>Math.abs(r.x-x)<1300&&Math.abs(r.y-y)<700);
-    for(const [fx,fy] of [[.5,.5],[.5,.25],[.5,.75],[.25,.5],[.75,.5],[.25,.25],[.75,.25],[.25,.75],[.75,.75]]){const tx0=big.x+big.w*fx,ty0=big.y+big.d*fy;if(!busyAt(tx0,ty0)){lx=tx0;ly=ty0;break;}}
-    const cx=X(lx),cy=Y(ly);
-    g+=tx(cx,cy-sz*.2,n,sz,"middle",0,ink,600)+tx(cx,cy+sz*1.05,(ar/1e6).toFixed(1).replace(".",",")+" м²",sz*.85,"middle",0,"#6f6860");});
-  (o.risers||[]).forEach(s=>{g+=`<circle cx="${X(+s.x)}" cy="${Y(+s.y)}" r="90" fill="${blue}"/>`+tx(X(+s.x)+130,Y(+s.y)+50,s.kind||"Ст",130,"start",0,blue,600);});
-  if(o.panel&&o.panel.x!=null){g+=`<rect x="${X(+o.panel.x)-110}" y="${Y(+o.panel.y)-70}" width="220" height="140" fill="#e0a100" stroke="${ink}" stroke-width="12"/>`+tx(X(+o.panel.x),Y(+o.panel.y)+250,"ЩК",130,"middle",0,ink,600);}
-  g+=tx(vw-200,vh-200,`h потолка = ${o.ceiling_mm||"—"} мм`,160,"end",0,"#6f6860");
+    for(const [fx,fy] of [[.5,.5],[.5,.3],[.5,.7],[.3,.5],[.7,.5],[.3,.3],[.7,.3],[.3,.7],[.7,.7]]){const tx0=big.x+big.w*fx,ty0=big.y+big.d*fy;if(!busyAt(tx0,ty0)){lx=tx0;ly=ty0;break;}}
+    const cx=X(lx),cy=Y(ly);const h=big.h_mm||o.ceiling_mm;
+    g+=tx(cx,cy-sz*.35,n,sz,"middle",0,ink,600)+tx(cx,cy+sz*.8,(ar/1e6).toFixed(1).replace(".",",")+" м²"+(h?" · h "+h:""),sz*.75,"middle",0,"#6f6860");
+    if(big.w>1400&&big.d>1400){g+=tx(X(big.x+big.w/2),Y(big.y)+170,String(Math.round(big.w)),120,"middle",0,"#9a8f84");g+=tx(X(big.x)+150,Y(big.y+big.d/2),String(Math.round(big.d)),120,"middle",-90,"#9a8f84");}
+    if(big.floor_mm)g+=tx(cx,cy+sz*1.7,(big.floor_mm>0?"+":"")+big.floor_mm,sz*.6,"middle",0,blue);
+  });
+  (o.risers||[]).forEach(s=>{g+=`<circle cx="${X(+s.x)}" cy="${Y(+s.y)}" r="95" fill="${blue}"/>`+tx(X(+s.x)+140,Y(+s.y)+50,s.kind||"Ст",130,"start",0,blue,600);});
+  if(o.panel&&o.panel.x!=null){g+=`<rect x="${X(+o.panel.x)-120}" y="${Y(+o.panel.y)-75}" width="240" height="150" fill="#e0a100" stroke="${ink}" stroke-width="12"/>`+tx(X(+o.panel.x),Y(+o.panel.y)+260,"ЩК"+(o.panel.h_mm?" h"+o.panel.h_mm:""),130,"middle",0,ink,600);}
+  g+=tx(vw-200,vh-200,`размеры в мм · точность ±10–20 мм`,150,"end",0,"#6f6860");
   const size=opt.px?` width="${opt.px}" height="${Math.round(opt.px*vh/vw)}"`:opt.full?` width="${vw/10}mm" height="${vh/10}mm"`:"";
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${vw} ${vh}"${size} style="background:${paper}"><rect width="${vw}" height="${vh}" fill="${paper}"/>${g}</svg>`;
 }
 function svgToPng(svg){return new Promise((res,rej)=>{const im=new Image();im.onload=()=>{const c=document.createElement("canvas");c.width=im.naturalWidth||1600;c.height=im.naturalHeight||1200;const x=c.getContext("2d");x.fillStyle="#fff";x.fillRect(0,0,c.width,c.height);x.drawImage(im,0,0,c.width,c.height);c.toBlob(b=>b?res(b):rej(new Error("png")),"image/png");};im.onerror=()=>rej(new Error("svg"));im.src="data:image/svg+xml;charset=utf-8,"+encodeURIComponent(svg);});}
 function dataBlob(u){const [h,b]=u.split(",");const m=(h.match(/data:([^;]+)/)||[])[1]||"image/jpeg";const s=atob(b),a=new Uint8Array(s.length);for(let i=0;i<s.length;i++)a[i]=s.charCodeAt(i);return new Blob([a],{type:m});}
 
+/* ---------- чек-лист анкеты (то, о чём вспоминают на стройке) ---------- */
+const CHECK=[
+ {g:"Семья и задачи",items:[["fam","Кто живёт, возраст, распорядок"],["budget","Бюджет ремонта цифрой, что уже куплено"],["when","Сроки и кто делает ремонт"],["guests","Гости, рабочее место, хобби"],["kids","Дети: безопасность, рост вместе с ребёнком"],["pets","Питомцы: лоток, миски, материалы"]]},
+ {g:"Стиль",items:[["style","Стиль интерьера"],["palette","Цвета и материалы"],["refs","Фото интерьеров, которые нравятся"]]},
+ {g:"Электрика и связь",items:[["sockets","Розетки по зонам и высотам"],["master","Мастер-выключатель и линии, которые не отключаются"],["panel","Щиток: отдельные линии, УЗО"],["smart","Умный дом: что автоматизировать"],["net","Интернет, роутер, кабель к ТВ и столу"],["cams","Видеодомофон, камеры, сигнализация"],["leak","Датчики протечки и краны-автоматы"]]},
+ {g:"Освещение",items:[["lightscen","Сценарии света в каждой комнате"],["lighttype","Люстры, точечные, треки, бра, торшеры"],["switches","Выключатели: проходные, у кровати, датчики"],["backlight","Подсветка: потолок, кухня, ночная"]]},
+ {g:"Сантехника",items:[["sanfix","Состав сантехники в каждом санузле"],["shower","Ванна/душ: поддон или трап, экран, ниша"],["laundry","Стиралка, сушилка, где сушить бельё"],["water","Фильтры, водонагреватель, счётчики"],["hatches","Инсталляции, короба, люки к кранам"],["bidet","Гигиенический душ, смесители"]]},
+ {g:"Отопление и климат",items:[["rads","Радиаторы: оставить, заменить, перенести"],["towel","Полотенцесушитель: водяной или электро"],["wfloor","Тёплый пол: где, тип, терморегулятор"],["ac","Кондиционеры: блоки, трасса, дренаж"],["vent","Вытяжка и вентиляция"]]},
+ {g:"Отделка",items:[["floors","Полы по комнатам, пороги, уровни"],["tile","Плитка: где, формат, раскладка, затирка"],["walls","Стены: краска, обои, штукатурка"],["ceil","Потолки: тип, высота, ниши под карниз"],["plinth","Плинтус и галтели"],["noise","Шумоизоляция"]]},
+ {g:"Двери и окна",items:[["doors","Двери: тип, высота, открывание"],["windows","Подоконники, откосы, карнизы, шторы"]]},
+ {g:"Кухня",items:[["kplan","Форма кухни, рабочий треугольник"],["kappl","Техника и её размеры"],["kwork","Мойка у стояка, столешница, фартук, розетки"]]},
+ {g:"Хранение",items:[["store","Гардероб, верхняя одежда, пылесос, коляска, доска"]]}
+];
+const CHECK_IDS=CHECK.flatMap(g=>g.items.map(i=>i[0]));
+const coverage=()=>{const c=S.covered||{};return CHECK_IDS.filter(id=>c[id]).length/CHECK_IDS.length;};
+const STYLES="Современный (чистые линии, нейтральная база, немного декора) · Минимализм (ничего лишнего, скрытое хранение, монохром) · Скандинавский (светлое дерево, белый, текстиль, уют) · Джапанди (японская сдержанность + сканди: дерево, лён, природные оттенки, низкая мебель) · Неоклассика (молдинги, симметрия, благородные цвета, современная мебель) · Классика (лепнина, дорогие материалы, мебель с декором) · Лофт (кирпич, бетон, металл, открытые коммуникации, тёмные тона) · Эко/органик (натуральные материалы, растения, округлые формы) · Mid-century (50–60-е: ножки-шпильки, орех, горчичный, бирюза) · Ар-деко (геометрия, латунь, бархат, контрасты) · Хай-тек (глянец, металл, техника на виду, холодный свет) · Прованс/кантри (состаренное дерево, цветочные принты, пастель) · Средиземноморский (белые стены, синий, терракота, арки) · Бохо (этника, ротанг, текстиль, много растений) · Восточный/казахский акцент (орнаменты, войлок, тёплые ткани — акцентами в современном интерьере)";
 /* ---------- agent ---------- */
 function snapshot(){
-  return {stage:(current()||{}).id||"done",status:Object.fromEntries(STAGES.map(s=>[s.id,stageStatus(s.id)])),area_m2:area(),price_kzt:total(),obmer:S.obmer,brief:S.brief,revisions:S.rev,client:{name:S.name||null,phone:S.phone?"указан":null}};
+  const miss=CHECK.flatMap(g=>g.items.filter(i=>!(S.covered||{})[i[0]]).map(i=>i[0]+": "+i[1]));
+  return {stage:(current()||{}).id||"done",status:Object.fromEntries(STAGES.map(s=>[s.id,stageStatus(s.id)])),area_m2:area(),price_kzt:total(),obmer:S.obmer,brief:S.brief,brief_coverage:Math.round(coverage()*100)+"%",brief_not_discussed:miss,revisions:S.rev,client:{name:S.name||null,phone:S.phone?"указан":null}};
 }
 function rules(){
   const L={ru:"русском",kk:"казахском",en:"английском"}[S.lang];
-  return `Ты — ИИ-дизайнер сервиса «Дизайн 3D Квартир» (Казахстан). Клиент общается с тобой в мобильном приложении. Отвечай на ${L} языке, коротко и по-человечески, как опытный дизайнер интерьера. Без длинных списков, максимум 5 вопросов за раз.
+  return `Ты — ИИ-дизайнер сервиса «Дизайн 3D Квартир» (Казахстан) и одновременно опытный прораб: знаешь стройку, электрику, сантехнику, отопление и отделку. Клиент общается с тобой в мобильном приложении. Отвечай на ${L} языке, коротко, по-человечески и просто: люди строят не каждый день — объясняй термины одной фразой. Максимум 4–5 вопросов за раз. Когда у вопроса есть типовые ответы, в конце сообщения дай кнопки одной строкой: [[вариант 1 | вариант 2 | вариант 3]] (только одна такая строка на сообщение, 2–5 коротких вариантов; клиент нажмёт кнопку вместо набора текста). Если клиент не знает — предложи разумный вариант по умолчанию и объясни почему.
 
-УСЛУГА: дизайн-проект для бюджетных клиентов, ${PRICE} ₸ за м². Этапы: 1) обмерный план по фото рисунка клиента (бесплатно); оплата блока 1 (30%) → 2) анкета по комнатам, 3) 5 вариантов планировки (2 дня на выбор); оплата блока 2 (30%) → 4) визуализация: белая модель и цвет по каждой комнате; оплата блока 3 (40%) → 5) рабочие чертежи лист за листом (обмер, демонтаж/монтаж перегородок, мебель, развёртки, электрика, освещение, выключатели, сантехника, полы, тёплый пол, потолки), 6) ведомость материалов с расходниками и инструментом (без цен), 7) PDF. На каждый этап/лист 2 бесплатные правки, дальше 5 000 ₸ за правку. Оплата — кнопками в разделе «Этапы», ты деньги не принимаешь. Сроки: обмер — в течение дня, планировки — 1–2 дня, визуализация — 2–3 дня, чертежи — 3–5 дней (ориентир).
+УСЛУГА: дизайн-проект для бюджетных клиентов, ${PRICE} ₸ за м². Этапы: 1) обмерный план (бесплатно); оплата блока 1 (30%) → 2) анкета, 3) 5 вариантов планировки (2 дня на выбор); оплата блока 2 (30%) → 4) визуализация: белая модель и цвет; оплата блока 3 (40%) → 5) рабочие чертежи лист за листом, 6) ведомость материалов (без цен), 7) PDF. На этап/лист 2 бесплатные правки, дальше 5 000 ₸. Оплата — кнопками в «Этапах». Сроки: обмер — в течение дня, планировки 1–2 дня, визуализация 2–3 дня, чертежи 3–5 дней. Можно заказать выезд замерщика (Алматы — наш специалист, другие города — партнёр; цену уточнит менеджер) — для этого есть кнопка поддержки.
 
-ЭТАП 1, ОБМЕР. Попроси фото рисунка от руки: вид сверху, все стены с размерами в мм, окна и двери с шириной, стояки, щиток, высота потолка. Инструкция: ${LINKS.howto}. Пока обмер не утверждён, фото рисунка прикладывается к каждому запросу — смотри на него каждый раз.
-Как читать рисунок:
-1) Фото может быть повёрнуто, а надписи — идти боком. Определи, как повёрнут лист, и строй план так, чтобы цифры читались нормально.
-2) Рисунок не в масштабе — опирайся только на подписанные числа, а пропорции линий используй лишь чтобы понять, какая цифра к какой стене относится.
-3) Форма квартиры: обведи внешний контур и найди все углы, выступы и ниши. Г-образную, П-образную и любую сложную квартиру составь из нескольких прямоугольников-зон (zones), которые стыкуются вплотную, без зазоров и наложений.
-4) Стены внутри квартиры: рисуй только те, что есть на рисунке (walls: ось x1,y1→x2,y2, толщина t_mm, kind bearing — заштрихованная/несущая, partition — перегородка). Если между частями квартиры стены нет — это открытое пространство: зоны стыкуются без стены.
-5) Короба, шахты, колонны, выступы стен — blocks (x,y,w,d). Кружок «0» у стены — стояк (risers). Маленький прямоугольник у окна с размером ~1000 и отступом — радиатор, это не проём, просто упомяни его в notes.
-6) Проёмы: разрыв в штриховке наружной стены или отрезок с засечками — окно; разрыв с подписью у входа — входная дверь (entry). Если ширина окна не подписана — спроси, не выдумывай.
-7) Цепочки: размеры вдоль одной стены должны в сумме давать её полную длину. Проверь каждую стену. Если не сходится больше чем на 30 мм или цифра не читается — спроси клиента конкретно.
-8) Названия помещений бери с рисунка. Если не подписаны — «Зона 1», «Зона 2» и т.д. Для открытого пространства одно название на все его прямоугольники.
-Координаты в мм: начало в левом верхнем внутреннем углу, X вправо, Y вниз. Проёмы: zone + стена N/S/W/E этого прямоугольника + offset_mm от левого (N/S) или верхнего (W/E) угла прямоугольника.
-После save_obmer сравни каждую длину в outline (по каждой наружной стене и между проёмами) с числами на рисунке. Если что-то не совпадает — исправь и вызови save_obmer снова. Затем одной-двумя фразами опиши форму и площадь и вызови request_approval со stage "obmer". Сообщения [Автосверка] — это проверка твоего плана другим взглядом по фото: внимательно разберись и исправь.
+ЭТАП 1, ОБМЕР. Источники: рисунок от руки, готовый обмер от замерщика, кадры видео-обхода (подписаны в сообщении). Инструкция: ${LINKS.howto}. Пока обмер не утверждён, фото плана приложены к каждому запросу — смотри на них каждый раз.
+Как читать:
+1) Фото может быть повёрнуто — определи ориентацию по надписям.
+2) Рисунок не в масштабе — опирайся только на числа.
+3) Квартира = несколько прямоугольников-зон (zones), вплотную, без наложений. Межкомнатная стена = зазор между зонами, равный её толщине (обычно 100–200 мм). Открытое пространство — зоны с одним названием, стыкуются без зазора.
+4) Внутренние стены, которых нет как зазоров (пилоны, выступы) — walls; шахты, короба, колонны — blocks.
+5) Для каждой зоны укажи h_mm — высоту потолка, если подписана (H=3015 и т.п.), и floor_mm — отметку пола, если отличается (−015 в санузлах).
+6) Проёмы: window/door/entry/arch, ширина, отступ; для окон sill_mm (высота подоконника) и height_mm, для дверей height_mm, если подписаны.
+7) Радиаторы — radiators (x, y, w, d, comment: размеры и откуда выводы); вентиляционные решётки — vents; стояки — risers (К — канализация, В — вода); щиток — panel с h_mm.
+8) Проверь цепочки: размеры вдоль стены в сумме = полной длине. В реальных домах стены не идеальны: если расхождение до 30 мм — бери как есть; больше — спроси клиента конкретно.
+9) Названия помещений — с рисунка или «Помещение 1…».
+Координаты в мм от левого верхнего внутреннего угла, X вправо, Y вниз. Проёмы привязывай к зоне: стена N/S/W/E + offset_mm от левого (N/S) или верхнего (W/E) угла зоны.
+После save_obmer сверь каждую длину в outline с рисунком; исправь, если надо. Потом одной-двумя фразами: форма, площадь, что принято условно — и request_approval stage "obmer". Обязательно предупреди: точность обмера по рисунку ±10–20 мм; перед заказом кухни, шкафов и дверей мастер делает контрольный замер. Сообщения [Автосверка] — проверка твоего плана по фото: разберись и исправь.
+ЛОГИКА КВАРТИРЫ (скажи клиенту, если видишь): кухня — у вентшахты и не дальше ~3 м мойкой от стояка канализации (уклон 2–3%, иначе подиум); мокрые зоны не над жилыми у соседей; комната с собственной дверью в санузел — спальня родителей; детским — комнаты ближе к санузлу; прихожей нужно место под верхнюю одежду; тёплый пол водяной от центрального отопления в квартире обычно запрещён — только электрический.
 
-ЭТАП 2, АНКЕТА. Только если этап brief не locked и не pay. По каждой комнате узнай: кто живёт (взрослые, дети, животные), стиль, мебель и размеры (кровать, шкаф до потолка или нет), техника (посудомойка, встроенный холодильник, стиралка — где), кухня до потолка, мойка, двери (обычные/скрытые), перегородки (ГКЛ 100/125 или газоблок 100/150), потолок (ГКЛ/натяжной, галтели), плинтус, полы (ламинат/керамогранит, тёплый пол где), карнизы, кондиционеры, освещение, бюджет отделки. Проверяй реализуемость: спальня от 8 м², детская от 7 м², проход у кровати от 600 мм, проход на кухне от 900 мм, совмещённый санузел с душем от 3 м². Если желаемое не помещается — честно скажи и предложи вариант. После каждой комнаты вызови save_brief. Когда все комнаты заполнены — request_approval со stage "brief".
+ЭТАП 2, АНКЕТА. Только если этап brief не locked и не pay. Иди по чек-листу (в состоянии проекта brief_not_discussed — что ещё не обсудили) и по комнатам. После каждой темы — save_brief (комната или «Общее», ответы, covered — id обсуждённых пунктов). Карточку утверждения анкеты можно показать, только когда обсуждено не меньше 85% пунктов.
+Что обязательно выяснить и подсказать (как прораб):
+• Электрика: розетки по зонам (у кровати с USB, у стола, ТВ-зона с запасом, кухня над столешницей 3–4 шт., робот-пылесос, сушилка для обуви); высоты (у пола 300, над столешницей 1050–1100, у ТВ 1000–1200); отдельные линии на варку (32 А), духовку, посудомойку, стиралку, бойлер, тёплые полы, каждый кондиционер; УЗО на мокрые зоны, розетки IP44 в санузлах. МАСТЕР-ВЫКЛЮЧАТЕЛЬ у входа: уходя, одним нажатием выключает свет и розетки, кроме неотключаемых линий — холодильник и морозилка, роутер/интернет, камеры и видеодомофон, сигнализация, датчики протечки с кранами, аквариум, котёл/насосы. Спроси, что ещё должно работать всегда. Умный дом: свет, шторы, тёплые полы, кондиционеры, протечки — что хочет и бюджет (Wi-Fi устройства или проводная система).
+• Связь: где заходит интернет, место роутера (центр квартиры, не в щитке), кабель к ТВ и рабочему месту, видеодомофон, камеры.
+• Свет: три уровня — общий, функциональный (кухня, зеркало, стол), акцентный (подсветка, бра). Тёплый свет 2700–3000К в жилых, 4000К над рабочей зоной кухни. Проходные выключатели у входа и у кровати, ночная подсветка в коридоре, датчики движения в кладовой.
+• Сантехника: состав каждого санузла; ванна или душ; трап требует подъём пола 80–120 мм — проверь по отметкам; инсталляция — короб глубиной 150–250 мм; люки к счётчикам и кранам; гигиенический душ; фильтр под мойку; водонагреватель на случай отключения горячей воды; краны-автоматы с датчиками протечки.
+• Отопление и климат: радиаторы не закрываем мебелью и шторами вплотную; перенос радиатора — только согласовав с УК; полотенцесушитель; тёплый пол — электрический кабель/мат под плитку, плёнка под ламинат, не под мебель и сантехнику, терморегулятор с датчиком пола; кондиционер: где внутренний блок (не над кроватью и столом), куда наружный (корзина на фасаде), трасса закладывается ДО ремонта, дренаж в канализацию или наружу.
+• Отделка: плитка — где (санузлы, фартук, прихожая), формат, раскладка от центра или от входа, затирка; гидроизоляция санузла: пол + стены на 200 мм, в душе на высоту 1800+; полы — ламинат 32–33 кл./кварцвинил/паркет, где стыки и пороги, одинаковый уровень; стены — выравнивание, моющаяся матовая краска, обои; потолки — натяжной (−50 мм) или ГКЛ (−80–100 мм), ниши под скрытый карниз, галтели; шумоизоляция детских и санузлов у спален.
+• Двери: высота 2000/2100/2400, скрытые или обычные, открывание (в комнату, не в коридор), замки в санузлах. Окна: подоконники, откосы, карнизы, жалюзи, детские замки.
+• Кухня: форма (прямая, угловая, П), рабочий треугольник мойка–плита–холодильник, проход ≥ 900 мм, высота столешницы под рост, фартук, вытяжка с воздуховодом в шахту и обратным клапаном, техника и её точные размеры.
+• Хранение: гардероб, верхняя одежда, коляска, велосипеды, пылесос, гладильная доска, чемоданы, сезонные вещи.
+• Дети и питомцы: безопасность окон и розеток, мебель «на вырост», место для лотка с вытяжкой, ткани «антикоготь».
+Реализуемость: спальня от 8 м², детская от 7 м², проход у кровати от 600 мм, на кухне от 900, совмещённый санузел с душем от 3 м². Если не помещается — честно скажи и предложи вариант.
+СТИЛЬ. Ты насмотренный дизайнер: знаешь стили — ${STYLES}. Определи вкус клиента 3–4 вопросами (тёплое или холодное, много вещей или минимум, дерево/камень/металл/текстиль, светлое или тёмное, что раздражает в интерьерах), предложи 2–3 подходящих стиля с объяснением и попроси прислать фото понравившихся интерьеров (из Pinterest, Instagram). По фото опиши, что именно нравится (цвета, материалы, формы), и запиши в save_brief «Общее» → стиль, палитра, материалы, референсы. Подстраивайся под человека: семье с детьми — практичные материалы; любителю порядка — скрытое хранение; и т.д.
 
-ЭТАПЫ 3–7 выполняет конвейер студии. Результаты появляются в разделе «Этапы», там клиент утверждает или пишет правку. Если клиент пишет правку — уточни её до конкретики (что, где, размер) и подтверди, что передал в работу.
+ЭТАПЫ 3–7 выполняет конвейер студии. Результаты появляются в «Этапах», там клиент утверждает или пишет правку. Если клиент пишет правку — уточни до конкретики (что, где, размер) и подтверди, что передал в работу. Объясняй, что на каждом чертеже и зачем он строителю, и что эскизы — общий вид, а при расхождении верны чертежи.
 
-МЕНЕДЖЕР. Сообщения с пометкой [Менеджер] писал живой менеджер студии. Его договорённости считаются согласованными — продолжай с них и не противоречь им. Вызови call_manager, если клиент недоволен, просит возврат, спорит об оплате или оферте, задаёт юридический вопрос, просит выезд на замер, или ты не можешь решить вопрос.
-Не обсуждай цены материалов у поставщиков. Не обещай бесплатных правок сверх двух.
+МЕНЕДЖЕР. Сообщения [Менеджер] писал живой менеджер. Его договорённости — согласованные решения. Вызови call_manager, если клиент недоволен, просит возврат, спорит об оплате или оферте, задаёт юридический вопрос, хочет выезд замерщика, или ты не можешь решить вопрос.
+Не обсуждай цены материалов у поставщиков. Не обещай бесплатных правок сверх двух. Не обещай точность «в миллиметр».
 
 СОСТОЯНИЕ ПРОЕКТА (JSON): ${JSON.stringify(snapshot())}`;
 }
 const NUM={type:"number"};
+let pendingCards=[],obmerTouched=false,liveStage="";
 const TOOLS=()=>[
- {name:"save_obmer",description:"Сохраняет обмерный план из рисунка клиента и рисует его. Квартира = объединение прямоугольников zones. Возвращает площади, outline — длины всех наружных стен и кусков между проёмами (сверь с рисунком) — и warnings.",
+ {name:"save_obmer",description:"Сохраняет обмерный план и рисует его. Квартира = объединение прямоугольников zones. Возвращает площади, outline — длины наружных стен и кусков между проёмами (сверь с рисунком) — и warnings.",
   inputSchema:{type:"object",required:["zones"],properties:{
    ceiling_mm:NUM,
-   zones:{type:"array",description:"прямоугольники пола, вплотную друг к другу",items:{type:"object",required:["name","x","y","w","d"],properties:{name:{type:"string"},x:NUM,y:NUM,w:NUM,d:NUM}}},
-   walls:{type:"array",description:"только стены внутри квартиры, которые есть на рисунке",items:{type:"object",required:["x1","y1","x2","y2"],properties:{x1:NUM,y1:NUM,x2:NUM,y2:NUM,t_mm:NUM,kind:{type:"string",enum:["bearing","partition"]}}}},
-   blocks:{type:"array",description:"шахты, короба, колонны",items:{type:"object",properties:{x:NUM,y:NUM,w:NUM,d:NUM,label:{type:"string"}}}},
-   openings:{type:"array",items:{type:"object",properties:{kind:{type:"string",enum:["window","door","entry","arch"]},zone:{type:"string"},wall:{type:"string",enum:["N","S","W","E"]},offset_mm:NUM,width_mm:NUM,height_mm:NUM,sill_mm:NUM}}},
-   risers:{type:"array",items:{type:"object",properties:{x:NUM,y:NUM,kind:{type:"string",description:"К, ХВС/ГВС, Ст"}}}},
-   panel:{type:"object",properties:{x:NUM,y:NUM}},notes:{type:"string"}}},
-  execute:i=>saveObmer(i)},
- {name:"save_brief",description:"Сохраняет ответы анкеты по одной комнате (сливает с прежними). Возвращает список заполненных комнат.",
-  inputSchema:{type:"object",required:["room","answers"],properties:{room:{type:"string"},answers:{type:"object",description:"короткие пары ключ: значение на русском, например {\"кровать\":\"2000×2000\",\"шкаф\":\"до потолка\"}"}}},
-  execute:i=>{const r=String(i.room||"").slice(0,60);if(!r)throw new Error("нет room");const a=i.answers&&typeof i.answers==="object"?i.answers:{};S.brief[r]=Object.assign(S.brief[r]||{},a);save();render(false);return{saved:Object.keys(S.brief)};}},
- {name:"request_approval",description:"Показывает клиенту в чате карточку «Утвердить / Правка» для этапа. Вызывай, когда результат этапа готов.",
+   zones:{type:"array",items:{type:"object",required:["name","x","y","w","d"],properties:{name:{type:"string"},x:NUM,y:NUM,w:NUM,d:NUM,h_mm:{type:"number",description:"высота потолка"},floor_mm:{type:"number",description:"отметка пола, напр. -15"}}}},
+   walls:{type:"array",items:{type:"object",required:["x1","y1","x2","y2"],properties:{x1:NUM,y1:NUM,x2:NUM,y2:NUM,t_mm:NUM,kind:{type:"string",enum:["bearing","partition"]}}}},
+   blocks:{type:"array",items:{type:"object",properties:{x:NUM,y:NUM,w:NUM,d:NUM,label:{type:"string"}}}},
+   openings:{type:"array",items:{type:"object",properties:{kind:{type:"string",enum:["window","door","entry","arch","balcony"]},zone:{type:"string"},wall:{type:"string",enum:["N","S","W","E"]},offset_mm:NUM,width_mm:NUM,height_mm:NUM,sill_mm:NUM}}},
+   radiators:{type:"array",items:{type:"object",properties:{x:NUM,y:NUM,w:NUM,d:NUM,comment:{type:"string"}}}},
+   vents:{type:"array",items:{type:"object",properties:{x:NUM,y:NUM,comment:{type:"string"}}}},
+   risers:{type:"array",items:{type:"object",properties:{x:NUM,y:NUM,kind:{type:"string"}}}},
+   panel:{type:"object",properties:{x:NUM,y:NUM,h_mm:NUM}},notes:{type:"string"}}},
+  execute:i=>{setLive(t("st_build"));return saveObmer(i);}},
+ {name:"save_brief",description:"Сохраняет ответы анкеты по комнате или разделу «Общее» (сливает с прежними) и отмечает обсуждённые пункты чек-листа. Возвращает охват анкеты и что ещё не обсуждено.",
+  inputSchema:{type:"object",required:["room","answers"],properties:{room:{type:"string"},answers:{type:"object",description:"короткие пары ключ: значение на русском"},covered:{type:"array",items:{type:"string"},description:"id пунктов чек-листа, обсуждённых этим ответом: "+CHECK_IDS.join(", ")}}},
+  execute:i=>{const r=String(i.room||"").slice(0,60);if(!r)throw new Error("нет room");const a=i.answers&&typeof i.answers==="object"?i.answers:{};S.brief[r]=Object.assign(S.brief[r]||{},a);S.covered=S.covered||{};(Array.isArray(i.covered)?i.covered:[]).forEach(id=>{if(CHECK_IDS.includes(String(id)))S.covered[String(id)]=true;});save();render(false);const miss=CHECK.flatMap(g=>g.items.filter(x=>!S.covered[x[0]]).map(x=>x[0]));return{saved:Object.keys(S.brief),coverage:Math.round(coverage()*100)+"%",not_discussed:miss};}},
+ {name:"request_approval",description:"Показывает клиенту в чате карточку «Утвердить / Правка» для этапа. obmer — после save_obmer; brief — только при охвате анкеты от 85%.",
   inputSchema:{type:"object",required:["stage","summary"],properties:{stage:{type:"string",enum:["obmer","brief"]},summary:{type:"string",description:"1–2 предложения: что утверждаем"}}},
-  execute:i=>{const st=String(i.stage);if(!["obmer","brief"].includes(st))throw new Error("stage obmer|brief");if(st==="obmer"&&!S.obmer)throw new Error("сначала save_obmer");if(st==="brief"&&!Object.keys(S.brief).length)throw new Error("сначала save_brief");const s=stageStatus(st);if(s==="locked"||s==="pay")throw new Error("этап ещё не открыт: "+s);markShown(st);pendingCards=pendingCards.filter(c=>!(c.role==="ap"&&c.stage===st));pendingCards.push({role:"ap",stage:st,text:String(i.summary||"").slice(0,400)});return"карточка будет показана клиенту под твоим сообщением";}},
- {name:"call_manager",description:"Уведомляет менеджера в админке, он позвонит клиенту. Укажи причину.",
+  execute:i=>{const st=String(i.stage);if(!["obmer","brief"].includes(st))throw new Error("stage obmer|brief");if(st==="obmer"&&!S.obmer)throw new Error("сначала save_obmer");if(st==="brief"){if(!Object.keys(S.brief).length)throw new Error("сначала save_brief");if(coverage()<.85)throw new Error("анкета заполнена на "+Math.round(coverage()*100)+"%, нужно от 85%. Не обсуждено: "+CHECK.flatMap(g=>g.items.filter(x=>!(S.covered||{})[x[0]]).map(x=>x[1])).join("; "));}const s=stageStatus(st);if(s==="locked"||s==="pay")throw new Error("этап ещё не открыт: "+s);markShown(st);pendingCards=pendingCards.filter(c=>!(c.role==="ap"&&c.stage===st));pendingCards.push({role:"ap",stage:st,text:String(i.summary||"").slice(0,400)});return"карточка будет показана клиенту под твоим сообщением";}},
+ {name:"call_manager",description:"Уведомляет менеджера, он свяжется с клиентом. Укажи причину.",
   inputSchema:{type:"object",required:["reason"],properties:{reason:{type:"string"}}},
-  execute:i=>{S.mgrCalled=true;S.mgrReason=String(i.reason||"").slice(0,300);save();pendingCards.push({role:"sys",text:t("mgrCalled")});return"менеджер уведомлён";}}
+  execute:i=>{S.mgrCalled=true;S.mgrReason=String(i.reason||"").slice(0,300);save();sendRequest("manager",{note:"ИИ позвал менеджера: "+S.mgrReason});pendingCards.push({role:"sys",text:t("mgrCalled")});return"менеджер уведомлён";}}
 ];
-let pendingCards=[],obmerTouched=false;
 function saveObmer(i){
   const src=Array.isArray(i.zones)?i.zones:Array.isArray(i.rooms)?i.rooms:[];
-  let Z=src.map(r=>({name:String(r.name||"Зона").slice(0,40),x:+r.x||0,y:+r.y||0,w:+r.w||0,d:+r.d||0})).filter(r=>r.w>100&&r.d>100);
+  let Z=src.map(r=>({name:String(r.name||"Зона").slice(0,40),x:+r.x||0,y:+r.y||0,w:+r.w||0,d:+r.d||0,h_mm:+r.h_mm||null,floor_mm:+r.floor_mm||null})).filter(r=>r.w>100&&r.d>100);
   if(!Z.length)throw new Error("нет zones");
   const bb=bbox(Z);if(bb.w>60000||bb.d>60000)throw new Error("размеры в мм, не больше 60000");
   const dx=-bb.x,dy=-bb.y;Z.forEach(r=>{r.x+=dx;r.y+=dy;});
   const mv=(p,kx,ky)=>{const q=Object.assign({},p);q[kx]=+q[kx]+dx;q[ky]=+q[ky]+dy;return q;};
   const walls=(Array.isArray(i.walls)?i.walls:[]).slice(0,40).map(w=>{let q=mv(w,"x1","y1");q=mv(q,"x2","y2");return{x1:q.x1,y1:q.y1,x2:q.x2,y2:q.y2,t_mm:+w.t_mm||null,kind:w.kind==="bearing"?"bearing":"partition"};}).filter(w=>[w.x1,w.y1,w.x2,w.y2].every(Number.isFinite));
   const blocks=(Array.isArray(i.blocks)?i.blocks:[]).slice(0,20).map(b=>Object.assign(mv(b,"x","y"),{w:+b.w||0,d:+b.d||0,label:String(b.label||"").slice(0,30)})).filter(b=>b.w>0&&b.d>0);
-  const risers=(Array.isArray(i.risers)?i.risers:[]).slice(0,10).map(s=>mv(s,"x","y"));
-  const panel=i.panel&&i.panel.x!=null?mv(i.panel,"x","y"):null;
+  const pts=(arr,n)=>(Array.isArray(arr)?arr:[]).slice(0,n).map(s=>mv(s,"x","y")).filter(s=>Number.isFinite(s.x)&&Number.isFinite(s.y));
   const warn=[];
   for(let a=0;a<Z.length;a++)for(let b=a+1;b<Z.length;b++){const p=Z[a],q=Z[b];const ix=Math.min(p.x+p.w,q.x+q.w)-Math.max(p.x,q.x),iy=Math.min(p.y+p.d,q.y+q.d)-Math.max(p.y,q.y);if(ix>20&&iy>20)warn.push(`зоны «${p.name}» и «${q.name}» накладываются на ${Math.round(ix)}×${Math.round(iy)} мм`);}
-  // gaps: a zone edge that nearly touches another zone (within 300 mm) but not exactly
-  for(let a=0;a<Z.length;a++)for(let b=0;b<Z.length;b++){if(a===b)continue;const p=Z[a],q=Z[b];const g1=q.x-(p.x+p.w),g2=q.y-(p.y+p.d);const oy=Math.min(p.y+p.d,q.y+q.d)-Math.max(p.y,q.y),ox=Math.min(p.x+p.w,q.x+q.w)-Math.max(p.x,q.x);if(g1>3&&g1<300&&oy>100)warn.push(`зазор ${Math.round(g1)} мм между «${p.name}» и «${q.name}» — если там нет стены, состыкуй зоны`);if(g2>3&&g2<300&&ox>100)warn.push(`зазор ${Math.round(g2)} мм между «${p.name}» и «${q.name}» — если там нет стены, состыкуй зоны`);}
-  const ops=(Array.isArray(i.openings)?i.openings:[]).slice(0,40).map(o=>Object.assign({},o,{zone:o.zone||o.room}));
+  const ops=(Array.isArray(i.openings)?i.openings:[]).slice(0,50).map(o=>Object.assign({},o,{zone:o.zone||o.room,kind:o.kind==="balcony"?"door":o.kind}));
   ops.forEach(o=>{if(!Z.some(z=>z.name===o.zone))warn.push(`проём ${o.kind||""}: зона «${o.zone}» не найдена`);});
-  const ob={zones:Z,walls,blocks,openings:ops,risers,panel,ceiling_mm:+i.ceiling_mm||null,notes:String(i.notes||"").slice(0,500)};
+  const ob={zones:Z,walls,blocks,openings:ops,radiators:pts(i.radiators,30),vents:pts(i.vents,20),risers:pts(i.risers,12),panel:i.panel&&i.panel.x!=null?mv(i.panel,"x","y"):null,ceiling_mm:+i.ceiling_mm||null,notes:String(i.notes||"").slice(0,800)};
   let ar=Z.reduce((s,r)=>s+r.w*r.d,0);blocks.forEach(b=>{if(inZ(Z,b.x+b.w/2,b.y+b.d/2))ar-=b.w*b.d;});
   ob.area=Math.round(ar/1e5)/10;ob.total_w_mm=Math.round(bbox(Z).w);ob.total_d_mm=Math.round(bbox(Z).d);
-  S.obmer=ob;obmerTouched=true;delete S.since.obmer;S.ok.obmer=false;save();render(false);
+  S.obmer=ob;S.planVer=(S.planVer||0)+1;obmerTouched=true;delete S.since.obmer;S.ok.obmer=false;save();render(false);
   const by={};Z.forEach(r=>{by[r.name]=(by[r.name]||0)+r.w*r.d/1e6;});
   const names={N:"верхняя",S:"нижняя",W:"левая",E:"правая"};
   const outlineInfo=chains(ob).map(s=>({wall:names[s.side]+" наружная стена",at:Math.round(s.c),from:Math.round(s.a),length:Math.round(s.b-s.a),pieces:s.pieces.map(p=>(p.op?"проём ":"")+p.len)}));
-  return{ok:true,area_m2:ob.area,shape:`габарит ${ob.total_w_mm}×${ob.total_d_mm}, наружных отрезков стен: ${outlineInfo.length}`,rooms:Object.entries(by).map(([n,a])=>({name:n,area_m2:Math.round(a*10)/10})),outline:outlineInfo,warnings:warn};
+  return{ok:true,area_m2:ob.area,shape:`габарит ${ob.total_w_mm}×${ob.total_d_mm}`,rooms:Object.entries(by).map(([n,a])=>({name:n,area_m2:Math.round(a*10)/10})),outline:outlineInfo,warnings:warn};
 }
 
-let busy=false,ctl=null,pendingImg=null,pendingThumb=null,liveLabel="";
+let busy=false,ctl=null,liveLabel="",liveT0=0,liveTimer=null;
+let pending=[]; // [{blob,thumb,kind:'photo'|'frame'}]
 function addMsg(m){m.ts=now();S.chat.push(m);if(S.chat.length>200)S.chat=S.chat.slice(-200);save();}
-const photoActive=()=>!!(S.photo&&!S.ok.obmer&&limits&&limits.images);
+const photoActive=()=>!!((S.photos&&S.photos.length)&&!S.ok.obmer&&limits&&limits.images);
+function setLive(s){liveLabel=s;const el=document.getElementById("livestat");if(el)el.firstChild.textContent=s;}
+function startLive(s){liveLabel=s;liveT0=Date.now();clearInterval(liveTimer);liveTimer=setInterval(()=>{const el=document.getElementById("livesec");if(el){const sec=Math.round((Date.now()-liveT0)/1000);el.textContent=Math.floor(sec/60)+":"+String(sec%60).padStart(2,"0");}},1000);}
+function stopLive(){clearInterval(liveTimer);liveTimer=null;}
 function turns(){
   const out=[{role:"user",content:rules()},{role:"assistant",content:"Понял, работаю по правилам."}];
   const hist=S.chat.filter(m=>["me","ai","mgr"].includes(m.role)).slice(-40);
   hist.forEach(m=>{
     const role=m.role==="me"?"user":"assistant";
     let c=m.role==="mgr"?`[Менеджер]: ${m.text}`:(m.text||"");
-    if(m.img&&m.role==="me")c=(c?c+"\n":"")+"[клиент прислал фото рисунка]";
+    if(m.imgs&&m.role==="me")c=(c?c+"\n":"")+`[клиент приложил ${m.imgs} фото${m.kind==="frame"?" (кадры видео-обхода)":""}]`;
+    else if(m.img&&m.role==="me")c=(c?c+"\n":"")+"[клиент прислал фото]";
     if(!c.trim())c="…";
     const last=out[out.length-1];
     if(last.role===role)last.content+="\n\n"+c;else out.push({role,content:c});
@@ -486,17 +627,20 @@ function turns(){
   if(out[out.length-1].role!=="user")out.push({role:"user",content:"(клиент ждёт ответа)"});
   return out;
 }
-async function runAgent(note){
-  busy=true;liveLabel=t("typing");render();
+async function runAgent(note,extraImgs,label){
+  busy=true;startLive(label||t("typing"));render();
   const ph=photoActive();
   ctl=new AbortController();let ok=false;
   try{
     const tt=turns();
     if(note)tt[tt.length-1].content+="\n\n"+note;
-    if(ph)tt[tt.length-1].content+="\n\n[К этому запросу приложено фото рисунка клиента.]";
-    const opts={signal:ctl.signal,modelTier:ph?"complex":"default",onText:({text})=>{const el=document.getElementById("live");if(el){el.classList.remove("typing");el.innerHTML=md(text);scrollChat();}}};
+    const imgs=[];
+    if(ph){S.photos.forEach(p=>imgs.push(dataBlob(p)));tt[tt.length-1].content+=`\n\n[К запросу приложены фото плана квартиры: ${S.photos.length} шт.]`;}
+    (extraImgs||[]).forEach(b=>{if(imgs.length<8)imgs.push(b);});
+    if(extraImgs&&extraImgs.length)tt[tt.length-1].content+=`\n\n[К этому сообщению клиент приложил ${extraImgs.length} изображ.]`;
+    const opts={signal:ctl.signal,modelTier:imgs.length?"complex":"default",onText:({text})=>{const el=document.getElementById("live");if(el){el.classList.remove("typing");el.innerHTML=md(text,false);scrollChat();}}};
     if(limits&&limits.tools)opts.tools=TOOLS();else opts.cache=false;
-    if(ph)opts.images=[dataBlob(S.photo)];
+    if(imgs.length)opts.images=imgs;
     const r=await sample(tt,opts);
     addMsg({role:"ai",text:r.text.trim()+(r.truncated?"\n\n("+t("cut")+")":"")});ok=true;
   }catch(e){
@@ -505,43 +649,69 @@ async function runAgent(note){
     if(c==="not_granted"||c==="sampling_disabled"||c==="capability_disabled"||c==="capability_removed"){addMsg({role:"sys",text:t("err_deny")});sample=null;}
     else if(c==="rate_limited")addMsg({role:"sys",text:t("err_rate")});
     else if(c==="image_rejected"||c==="images_unavailable")addMsg({role:"sys",text:t("err_img")});
-    else if(c!=="cancelled")addMsg({role:"sys",text:t("err_gen")+(c?" ("+c+")":"")});
+    else if(c!=="cancelled")addMsg({role:"sys",text:t("err_gen")+(c?" ("+c+")":""),retry:true});
   }
   pendingCards.forEach(addMsg);pendingCards=[];
-  busy=false;ctl=null;render();return ok;
+  busy=false;ctl=null;stopLive();render();return ok;
 }
 async function verifyPlan(){
-  busy=true;liveLabel=t("checking");render();ctl=new AbortController();
+  busy=true;startLive(t("checking"));render();ctl=new AbortController();
   try{
     const png=await svgToPng(planSVG(S.obmer,{px:1600}));
-    const v=await sample.json(`Изображение 1 — рисунок квартиры от руки, который сделал клиент (фото может быть повёрнуто, надписи могут идти боком). Изображение 2 — обмерный план, построенный по этому рисунку (размеры в мм, синие цифры — проёмы).
-Сравни их с учётом возможного поворота: 1) общую форму квартиры — углы, выступы, ниши, Г-образность; 2) где на рисунке есть внутренние стены и где их нет (открытое пространство); 3) положение и ширину окон и входной двери; 4) стояки, короба, шахты; 5) каждый размер, подписанный на рисунке, — есть ли он на плане и совпадает ли.
-Ответь только JSON без пояснений: {"ok": true или false, "issues": ["конкретное расхождение: что на рисунке, что на плане, с цифрами"]}. ok=false только при реальных ошибках: другая форма, лишняя или пропущенная стена, проём не там, размер отличается больше чем на 50 мм. Мелкие различия в рисовке не считаются.`,{images:[dataBlob(S.photo),png],modelTier:"complex",cache:false,signal:ctl.signal});
+    const imgs=S.photos.map(dataBlob);imgs.push(png);
+    const v=await sample.json(`Изображения 1–${S.photos.length} — план квартиры от клиента (рисунок от руки или обмер; фото может быть повёрнуто). Последнее изображение — обмерный план, построенный по нему (размеры в мм, синие цифры — проёмы).
+Сравни с учётом поворота: 1) форму квартиры — углы, выступы, ниши; 2) где есть внутренние стены и где их нет; 3) положение и ширину окон и дверей; 4) стояки, шахты, короба, радиаторы; 5) каждый размер, подписанный на исходнике, — есть ли на плане и совпадает ли.
+Ответь только JSON: {"ok": true или false, "issues": ["конкретное расхождение с цифрами"]}. ok=false только при реальных ошибках: другая форма, лишняя или пропущенная стена, проём не там, размер отличается больше чем на 50 мм.`,{images:imgs,modelTier:"complex",cache:false,signal:ctl.signal});
     if(v&&v.ok===false&&Array.isArray(v.issues))return v.issues.map(String).slice(0,8);
     return [];
   }catch(e){return [];}
-  finally{busy=false;ctl=null;}
+  finally{busy=false;ctl=null;stopLive();}
 }
-async function send(text){
+async function send(text,opt){
+  opt=opt||{};
   text=(text||"").trim();
-  if(!text&&!pendingImg)return;
+  const imgs=pending.slice();pending=[];
+  if(!text&&!imgs.length)return;
   if(S.mgrMode){addMsg({role:"mgr",text});render();return;}
-  const hadImg=!!pendingImg;
-  addMsg({role:"me",text:text||"",img:pendingThumb||null});
-  pendingImg=null;pendingThumb=null;
+  const kind=imgs.length?imgs[0].kind:null;
+  // фото плана до утверждения обмера сохраняем — они нужны ИИ на каждом шаге
+  if(imgs.length&&kind!=="frame"&&!S.ok.obmer&&!opt.reference){S.photos=imgs.map(p=>p.keep).slice(0,4);}
+  addMsg({role:"me",text:text||"",img:imgs.length?imgs[0].thumb:null,imgs:imgs.length||0,kind});
   if(!sample){render();return;}
   obmerTouched=false;
-  const ok=await runAgent();
+  const oneOff=(kind==="frame"||S.ok.obmer||opt.reference)?imgs.map(p=>p.blob):[];
+  const label=imgs.length&&!S.ok.obmer?t("st_read"):photoActive()?t("st_think_plan"):t("typing");
+  const ok=await runAgent(kind==="frame"?"[Это кадры видео-обхода квартиры по порядку. Используй их, чтобы проверить план: стены, проёмы, стояки, радиаторы, высоты.]":"",oneOff,label);
   if(ok&&obmerTouched&&photoActive()&&sample){
     const issues=await verifyPlan();
-    if(issues.length){obmerTouched=false;await runAgent("[Автосверка плана с фото рисунка нашла расхождения: "+issues.join("; ")+". Проверь по фото. Где автосверка права — исправь через save_obmer и снова вызови request_approval. Клиенту коротко скажи, что поправил. Если не уверен — спроси клиента.]");}
+    if(issues.length){obmerTouched=false;await runAgent("[Автосверка плана с фото нашла расхождения: "+issues.join("; ")+". Проверь по фото. Где автосверка права — исправь через save_obmer и снова вызови request_approval. Клиенту коротко скажи, что поправил. Если не уверен — спроси клиента.]",[],t("st_fix"));}
     else render();
   }
 }
+function sendRequest(kind,extra){
+  const d=Object.assign({kind,name:S.name,phone:S.phone,stage:(current()||{}).id||"done",project:{area:area(),obmer:!!S.obmer,brief_coverage:Math.round(coverage()*100),last:S.chat.filter(m=>m.role==="me"||m.role==="ai").slice(-6).map(m=>(m.role==="me"?"К: ":"ИИ: ")+String(m.text||"").slice(0,300))}},extra||{});
+  S.reqs=(S.reqs||[]).concat([{kind,at:now()}]);save();
+  if(window.D3K_API)return window.D3K_API.request(d).catch(()=>null);
+  return Promise.resolve(null);
+}
 
+/* ---------- настройки поддержки ---------- */
+const SUPPORT={phone:"",wa:"",city:"Алматы"}; // номер поддержки появится здесь — тогда покажутся «Позвонить» и WhatsApp
+const FOUNDER="Абдурашид Зияидинов";
+const EXPL={
+ obmer:"Обмерный план — точный чертёж квартиры «как есть»: стены, окна, двери, высоты, стояки, радиаторы. На нём строится всё остальное. Точность по рисунку — ±10–20 мм: в реальных домах стены не идеально ровные, углы не всегда 90°, диагонали могут не сходиться. Перед заказом кухни, шкафов и дверей мастер обязательно делает контрольный замер.",
+ brief:"Анкета — всё, что важно учесть до стройки: кто живёт, стиль, мебель и техника, электрика и свет, сантехника, отопление, отделка, хранение. Чем подробнее анкета, тем меньше переделок и лишних трат на стройке. Прогресс видно во вкладке «Анкета».",
+ plan:"5 вариантов расстановки мебели и перегородок. В каждом проверены проходы (у кровати от 600 мм, на кухне от 900 мм), подходы к окнам и радиаторам, расстояние от мойки до стояка. На выбор — 2 дня; можно собрать свой вариант из двух.",
+ vis:"Белая модель — объём комнаты строго по размерам. Цветной эскиз показывает настроение: цвета, материалы, свет. Мелочи (ручки, декор, складки ткани) могут отличаться — при расхождении верны чертежи.",
+ draw:"Рабочие чертежи — инструкция для бригады: перегородки, мебель, развёртки стен, розетки и выводы, свет, выключатели, сантехника, полы, тёплый пол, потолки, пироги стен, мебель на заказ. Каждый лист с размерами и привязками. Электрик смотрит свои листы, сантехник — свои, мебельщик — свои.",
+ ved:"Ведомость — что и сколько купить: черновые материалы, отделка, электрика, сантехника, расходники и инструмент. Количества посчитаны по чертежам с запасом 5–15% на подрезку и бой. Цен нет — их дадут магазины, а файл Excel можно разослать поставщикам и сравнить. Мастера на месте могут уточнить количество.",
+ pdf:"Весь проект одним файлом формата A3 со штампом и номерами листов — распечатать и отдать бригаде. Плюс Excel с ведомостью."
+};
+const DUR={obmer:"в течение дня",brief:"1–2 дня",plan:"1–2 дня",vis:"2–3 дня",draw:"3–5 дней",ved:"1 день",pdf:"сразу"};
+const VED_SECTIONS=[["Перегородки","ГКЛ, профиль или газоблок, крепёж, клей"],["Черновые работы","штукатурка, стяжка, грунт, сетка"],["Гидроизоляция","пол санузлов и стены на 200 мм, в душе выше"],["Электрика","кабель по сечениям, подрозетники, гофра, щиток, автоматы, УЗО"],["Сантехника","трубы, фитинги, выводы, инсталляции, трапы"],["Отопление и тёплый пол","мат/кабель, терморегуляторы, датчики"],["Плитка","керамогранит с запасом, клей, затирка, СВП, крестики"],["Полы","ламинат, подложка, пороги"],["Стены и потолки","шпаклёвка, краска, малярная сетка, натяжной/ГКЛ"],["Двери и плинтус","полотна, коробки, фурнитура, плинтус"],["Расходники и инструмент","диски, биты, вёдра для смесей, плёнка, скотч"]];
 /* ---------- actions ---------- */
-let tab=S.started?"chat":"home",openStage=null,toastT=null,sheetUI=null,draft="";
-function toast(s){const el=document.createElement("div");el.className="toast";el.textContent=s;document.getElementById("app").appendChild(el);clearTimeout(toastT);toastT=setTimeout(()=>el.remove(),2200);}
+let tab=S.started?"chat":"home",openStage=null,toastT=null,sheetUI=null,modal=null,draft="",listening=false;
+function toast(s){const el=document.createElement("div");el.className="toast";el.textContent=s;document.getElementById("app").appendChild(el);clearTimeout(toastT);toastT=setTimeout(()=>el.remove(),2600);}
 function approve(key){
   S.ok[key]=true;
   if(key.startsWith("vis:")){if(ROOMS.every(r=>S.ok["vis:"+r]))S.ok.vis=true;}
@@ -554,39 +724,62 @@ function approve(key){
 function label(key){if(key.startsWith("draw:")){const s=DSHEETS.find(x=>"draw:"+x.id===key);return s?s[S.lang]:key;}if(key.startsWith("vis:"))return t("st_vis")+": "+key.slice(4);return t("st_"+key);}
 function revise(key){
   const n=S.rev[key]||0;
-  const go=()=>{S.rev[key]=n+1;if(n>=FREE_REV)S.extra+=EXTRA;delete S.since[key];S.since[key]=now();save();sheetUI=null;draft=t("revPrompt").replace("{x}",label(key));tab="chat";render();const ta=document.getElementById("ta");if(ta){ta.focus();ta.setSelectionRange(ta.value.length,ta.value.length);}};
-  if(n>=FREE_REV){sheetUI={title:t("revPaid"),text:t("payRev")+"\n\n"+t("payDemo"),ok:t("pay")+" 5 000 ₸",fn:go};render();}else go();
+  // сначала описать правку, потом (если платная) оплатить
+  modal={kind:"revise",key,paid:n>=FREE_REV};render();
 }
-function pay(b){sheetUI={title:t("block")+" "+b+" · "+BLOCKS[b].pct+"%",text:fmt(blockSum(b))+" ₸\n\n"+t("payDemo"),ok:t("pay")+" "+fmt(blockSum(b))+" ₸",fn:()=>{S.paid[b]=true;sheetUI=null;const c=current();if(c){markShown(c.id);openStage=c.id;}addMsg({role:"sys",text:"✓ "+t("paidOk")+": "+t("block")+" "+b+" — "+fmt(blockSum(b))+" ₸"});save();render();toast(t("paidOk"));}};render();}
+function doRevise(key,text){
+  const n=S.rev[key]||0;S.rev[key]=n+1;if(n>=FREE_REV)S.extra+=EXTRA;delete S.since[key];S.since[key]=now();save();modal=null;
+  tab="chat";render();send(t("revPrompt").replace("{x}",label(key))+text);
+}
+function pay(b){sheetUI={title:t("block")+" "+b+" · "+BLOCKS[b].pct+"%",text:fmt(blockSum(b))+" ₸ — "+t("b"+b)+"\n\n"+t("payDemo"),ok:t("pay")+" "+fmt(blockSum(b))+" ₸",fn:()=>{S.paid[b]=true;S.payLog=(S.payLog||[]).concat([{b,sum:blockSum(b),at:now()}]);sheetUI=null;const c=current();if(c){markShown(c.id);openStage=c.id;}addMsg({role:"sys",text:"✓ "+t("paidOk")+": "+t("block")+" "+b+" — "+fmt(blockSum(b))+" ₸"});save();render();toast(t("paidOk"));}};render();}
 function revBtns(key){
   const n=S.rev[key]||0,left=Math.max(0,FREE_REV-n);
   return `<div class="row" style="margin-top:10px"><button class="btn okb" data-a="approve" data-k="${key}">${t("approve")}</button><button class="btn ghost" data-a="revise" data-k="${key}">${left>0?t("revise"):t("revPaid")}</button></div><div class="xs mute" style="margin-top:6px">${t("revLeft")}: ${left}/${FREE_REV}</div>`;
 }
-async function dl(name,data){
-  if(!downloads){toast("—");return;}
-  try{await downloads.save({filename:name,data});}catch(e){if(e&&e.code&&e.code!=="declined"&&e.code!=="cancelled")toast(t("err_gen"));}
+async function dl(name,data,kind){
+  if(window.D3K_NATIVE){
+    if(kind==="xlsx"){window.D3K_post({t:"open",url:new URL("files/vedomost-56.xlsx",location.href).href});return;}
+    if(kind==="svg"){try{const png=await svgToPng(planSVG(S.obmer,{px:2400}));const fr=new FileReader();fr.onload=()=>window.D3K_post({t:"share",name:"obmernyj-plan.png",dataUrl:fr.result});fr.readAsDataURL(png);}catch(e){toast(t("err_gen"));}return;}
+    window.D3K_post({t:"share",name,text:typeof data==="string"?data:""});return;
+  }
+  if(downloads){try{await downloads.save({filename:name,data});}catch(e){if(e&&e.code&&e.code!=="declined"&&e.code!=="cancelled")toast(t("err_gen"));}return;}
+  try{const blob=data instanceof Blob?data:new Blob([data]);const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},1000);}catch(e){toast(t("err_gen"));}
 }
 function b64blob(b,type){const s=atob(b),a=new Uint8Array(s.length);for(let i=0;i<s.length;i++)a[i]=s.charCodeAt(i);return new Blob([a],{type});}
+const phoneOk=p=>String(p||"").replace(/\D/g,"").length>=10;
 
 /* ---------- views ---------- */
-const ICON={chat:'<path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/>',stages:'<path d="M4 6h16M4 12h16M4 18h10"/><circle cx="19" cy="18" r="2"/>',files:'<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/>',more:'<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>'};
+const ICON={chat:'<path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/>',stages:'<path d="M4 6h16M4 12h16M4 18h10"/><circle cx="19" cy="18" r="2"/>',brief:'<path d="M9 4h6a1 1 0 0 1 1 1v1H8V5a1 1 0 0 1 1-1z"/><path d="M8 5H6a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1h-2"/><path d="M9 12l2 2 4-4"/>',files:'<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/>',more:'<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>'};
 const LOGO='<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linejoin="round"><path d="M12 2 3 7v10l9 5 9-5V7z"/><path d="M3 7l9 5 9-5M12 12v10"/></svg>';
-
+const I_HELP='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14v-2a8 8 0 0 1 16 0v2"/><rect x="2.5" y="13" width="4" height="6" rx="1.5"/><rect x="17.5" y="13" width="4" height="6" rx="1.5"/><path d="M20 19a4 4 0 0 1-4 3h-3"/></svg>';
+function info(id){return `<details class="info"><summary>${t("what")}</summary><p>${esc(EXPL[id])}</p></details>`;}
+function timeline(areaM2){
+  const tot=Math.round(areaM2*PRICE/100)*100,bs=b=>Math.round(tot*BLOCKS[b].pct/100/100)*100;
+  const rows=[["obmer",0,"Чертёж вашей квартиры с размерами"],["brief",1,"Подробная анкета: жизнь, стиль, инженерия"],["plan",1,"5 вариантов планировки с мебелью"],["vis",2,"Белая модель и цветные эскизы комнат"],["draw",3,"17 листов чертежей для бригады"],["ved",3,"Что и сколько купить"],["pdf",3,"Весь проект в PDF + Excel"]];
+  let prev=-1;return `<ol class="tl">${rows.map(([id,b,what])=>{const payRow=b!==prev&&b>0?`<li class="payrow"><b>${t("payBefore")} ${b} · ${BLOCKS[b].pct}%</b><span>${fmt(bs(b))} ₸</span></li>`:"";prev=b;return payRow+`<li><div><b>${t("st_"+id)}</b><span>${what}</span></div><em>${DUR[id]}${id==="obmer"?" · "+t("freeW"):""}</em></li>`;}).join("")}</ol><p class="xs mute">${t("totalTime")}</p>`;
+}
 function vHome(){
   const a=+S.area||0,tot=Math.round(a*PRICE/100)*100;
   return `<div class="hero"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px"><span class="pill">${PRICE.toLocaleString("ru-RU")} ${t("perm")}</span>${langSw()}</div><h2>${t("hero")}</h2><p>${t("heroP")}</p></div>
   <div class="pad" style="padding-top:8px">
-   <div class="card calc"><h3 style="margin-bottom:8px">${t("calc")}</h3><label class="field"><span>${t("area")}</span><input id="areaIn" inputmode="decimal" value="${esc(S.area)}"></label>
+   <div class="card calc"><h3 style="margin-bottom:4px">${t("calc")}</h3><p class="xs mute" style="margin-bottom:8px">${t("calcHint")}</p><label class="field"><span>${t("area")}</span><input id="areaIn" inputmode="decimal" value="${esc(S.area)}"></label>
     <div class="mute sm">${t("total")}</div><div class="big" id="totOut">${fmt(tot)} ₸</div>
     <div class="split" id="splitOut">${[1,2,3].map(b=>`<div>${t("b"+b)}<b>${fmt(Math.round(tot*BLOCKS[b].pct/100/100)*100)} ₸</b></div>`).join("")}</div>
-    <p class="xs mute" style="margin-top:8px">${t("free")}</p></div>
-   <div class="card"><h3 style="margin-bottom:4px">${t("how")}</h3><ol class="steps">${[1,2,3,4,5,6,7].map(i=>`<li>${t("s"+i)}</li>`).join("")}</ol></div>
+    <h3 style="margin:16px 0 6px">${t("howPay")}</h3><div id="tlOut">${timeline(a)}</div>
+    <details class="info"><summary>${t("incl")}</summary><p>${t("inclT")}</p></details>
+    <details class="info"><summary>${t("tol")}</summary><p>${t("tolT")}</p></details></div>
    <div class="links" style="margin-top:12px"><a href="${LINKS.howto}" target="_blank" rel="noopener">${t("howto")}<span>${t("howtoS")}</span></a><a href="${LINKS.example}" target="_blank" rel="noopener">${t("example")}<span>${t("exampleS")}</span></a></div>
-   ${S.started?`<button class="btn full" style="margin-top:16px" data-a="enter">${t("cont")}</button>`:`<label class="chk"><input type="checkbox" id="offer" ${S.offer?"checked":""}><span>${t("offer")}</span></label><button class="btn full" data-a="start" ${S.offer?"":"disabled"}>${t("start")}</button>`}
-   <div style="height:20px"></div></div>`;
+   ${S.started?`<button class="btn full" style="margin-top:16px" data-a="enter">${t("cont")}</button>`:`<div class="card" style="margin-top:12px"><h3 style="margin-bottom:8px">${t("startT")}</h3><label class="field"><span>${t("name")}</span><input id="nm" autocomplete="name" value="${esc(S.name)}"></label><label class="field"><span>${t("phone")} *</span><input id="pn" inputmode="tel" autocomplete="tel" placeholder="+7 7__ ___ __ __" value="${esc(S.phone)}"></label><p class="xs mute">${t("phoneWhy")}</p><label class="chk"><input type="checkbox" id="offer" ${S.offer?"checked":""}><span>${t("offer")}</span></label><button class="btn full" data-a="start" ${S.offer&&phoneOk(S.phone)?"":"disabled"} id="startBtn">${t("start")}</button></div>`}
+   <div style="height:90px"></div></div>`;
 }
 function langSw(){return `<div class="lang">${["ru","kk","en"].map(l=>`<button class="${S.lang===l?"on":""}" data-a="lang" data-k="${l}">${{ru:"РУС",kk:"ҚАЗ",en:"ENG"}[l]}</button>`).join("")}</div>`;}
-
+function obmerStart(){
+  return `<div class="opts"><p class="sm"><b>${t("o_title")}</b></p>
+   <button class="opt" data-a="guide"><span class="oi">✏️</span><span><b>${t("o_draw")}</b><em>${t("o_drawS")}</em></span></button>
+   <button class="opt" data-a="att" data-k="ready"><span class="oi">📐</span><span><b>${t("o_ready")}</b><em>${t("o_readyS")}</em></span></button>
+   <button class="opt" data-a="zamer"><span class="oi">📏</span><span><b>${t("o_zamer")}</b><em>${t("o_zamerS")}</em></span></button>
+   <button class="opt" data-a="video"><span class="oi">🎥</span><span><b>${t("o_video")}</b><em>${t("o_videoS")}</em></span></button></div>`;
+}
 function vChat(){
   const noAI=!sample&&(capsSettled||!caps);
   let h=`<div class="chat">`;
@@ -596,173 +789,302 @@ function vChat(){
   h+=`<div class="msgs" id="msgs">`;
   if(!S.chat.length)h+=`<div class="m ai"><span class="who">${t("ai")}</span>${md(t("greet"))}</div>`;
   const lastAp={};S.chat.forEach((m,i)=>{if(m.role==="ap")lastAp[m.stage]=i;});
+  let lastAi=-1;S.chat.forEach((m,i)=>{if(m.role==="ai")lastAi=i;});
   S.chat.forEach((m,i)=>{
-    if(m.role==="ap"&&lastAp[m.stage]!==i){h+=`<div class="sys">${t("st_"+m.stage)}: ${{ru:"обновлён ниже",kk:"төменде жаңартылды",en:"updated below"}[S.lang]}</div>`;return;}
-    if(m.role==="sys")h+=`<div class="sys">${md(m.text)}</div>`;
-    else if(m.role==="ap"){const done=S.ok[m.stage];const n=S.rev[m.stage]||0,left=Math.max(0,FREE_REV-n);h+=`<div class="ap"><h4>${t("st_"+m.stage)}</h4><div class="sm">${md(m.text)}</div>${m.stage==="obmer"&&S.obmer?`<div class="plan" style="margin-top:8px">${planSVG(S.obmer)}</div>`:""}${done?`<div class="pill ok" style="display:inline-block;margin-top:10px">✓ ${t("approved")}</div>`:`<div class="row"><button class="btn okb" data-a="approve" data-k="${m.stage}">${t("approve")}</button><button class="btn ghost" data-a="revise" data-k="${m.stage}">${left>0?t("revise"):t("revPaid")}</button></div><div class="xs mute" style="margin-top:6px">${t("revLeft")}: ${left}/${FREE_REV}</div>`}</div>`;}
-    else{const cls=m.role==="me"?"me":m.role==="mgr"?"mgr":"ai";const who=m.role==="me"?t("you"):m.role==="mgr"?t("mgr"):t("ai");h+=`<div class="m ${cls}"><span class="who">${who}</span>${m.img?`<img src="${m.img}" alt="">`:""}${md(m.text)}</div>`;}
+    if(m.role==="ap"&&lastAp[m.stage]!==i){h+=`<div class="sys">${t("st_"+m.stage)}: ${t("updBelow")}</div>`;return;}
+    if(m.role==="sys")h+=`<div class="sys">${md(m.text)}${m.retry&&i===S.chat.length-1?` <button class="linkb" data-a="retry">${t("retry")}</button>`:""}</div>`;
+    else if(m.role==="ap"){const done=S.ok[m.stage];const n=S.rev[m.stage]||0,left=Math.max(0,FREE_REV-n);h+=`<div class="ap"><h4>${t("st_"+m.stage)}${m.stage==="obmer"&&S.planVer>1?` · ${t("ver")} ${S.planVer}`:""}</h4><div class="sm">${md(m.text)}</div>${m.stage==="obmer"&&S.obmer?`<div class="plan" style="margin-top:8px">${planSVG(S.obmer)}</div><p class="xs mute" style="margin-top:6px">${t("tapZoom")} · ${t("tolShort")}</p>`:""}${m.stage==="brief"?`<button class="linkb" data-a="tab" data-k="brief">${t("seeBrief")} (${Math.round(coverage()*100)}%)</button>`:""}${done?`<div class="pill ok" style="display:inline-block;margin-top:10px">✓ ${t("approved")}</div>`:`<div class="row"><button class="btn okb" data-a="approve" data-k="${m.stage}">${t("approve")}</button><button class="btn ghost" data-a="revise" data-k="${m.stage}">${left>0?t("revise"):t("revPaid")}</button></div><div class="xs mute" style="margin-top:6px">${t("revLeft")}: ${left}/${FREE_REV}</div>`}</div>`;}
+    else{const cls=m.role==="me"?"me":m.role==="mgr"?"mgr":"ai";const who=m.role==="me"?t("you"):m.role==="mgr"?t("mgr"):t("ai");h+=`<div class="m ${cls}"><span class="who">${who}</span>${m.img?`<img src="${m.img}" alt="">${m.imgs>1?`<span class="xs">+${m.imgs-1}</span>`:""}`:""}${md(m.text,m.role==="ai"&&i===lastAi&&!busy)}</div>`;}
   });
-  if(busy)h+=`<div class="m ai"><span class="who">${t("ai")}</span><span id="live" class="typing">${esc(liveLabel||t("typing"))}</span></div>`;
+  if(busy)h+=`<div class="m ai"><span class="who">${t("ai")}</span><span id="live" class="typing"></span><div class="livestat" id="livestat">${esc(liveLabel||t("typing"))}<span id="livesec">0:00</span></div></div>`;
   h+=`</div>`;
-  if(!S.chat.filter(m=>m.role==="me").length&&!S.mgrMode)h+=`<div class="chips"><button data-a="q" data-k="q1">${t("q1")}</button><button data-a="q" data-k="q2">${t("q2")}</button><button data-a="q" data-k="q3">${t("q3")}</button></div>`;
-  if(pendingThumb)h+=`<div class="prev"><img src="${pendingThumb}" alt=""><button class="btn ghost" style="min-height:32px;padding:4px 10px" data-a="unimg">✕</button></div>`;
+  const started=S.chat.some(m=>m.role==="me");
+  if(!S.obmer&&!started&&!S.mgrMode)h+=obmerStart();
+  if(pending.length)h+=`<div class="prev">${pending.map(p=>`<img src="${p.thumb}" alt="">`).join("")}<button class="btn ghost" style="min-height:32px;padding:4px 10px" data-a="unimg">✕</button></div>`;
   const canImg=!!(limits&&limits.images)&&!S.mgrMode;
-  h+=`<div class="composer">${canImg?`<button class="ib att" data-a="att" aria-label="photo"><svg viewBox="0 0 24 24"><path d="M3 8a2 2 0 0 1 2-2h2l2-2h6l2 2h2a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><circle cx="12" cy="13" r="4"/></svg></button>`:""}<textarea id="ta" rows="1" placeholder="${S.mgrMode?t("mgr")+": ":""}${t("ph")}">${esc(draft)}</textarea><button class="ib send" data-a="${busy?"stop":"send"}" aria-label="send">${busy?'<svg viewBox="0 0 24 24"><rect x="7" y="7" width="10" height="10" rx="1"/></svg>':'<svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg>'}</button></div></div>`;
+  const canVoice=!S.mgrMode&&(window.D3K_NATIVE||("webkitSpeechRecognition" in window)||("SpeechRecognition" in window));
+  h+=`<div class="composer">${canImg?`<button class="ib att" data-a="att" aria-label="photo"><svg viewBox="0 0 24 24"><path d="M3 8a2 2 0 0 1 2-2h2l2-2h6l2 2h2a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><circle cx="12" cy="13" r="4"/></svg></button>`:""}<textarea id="ta" rows="1" placeholder="${S.mgrMode?t("mgr")+": ":""}${listening?t("listening"):t("ph")}">${esc(draft)}</textarea>${canVoice?`<button class="ib mic ${listening?"on":""}" data-a="mic" aria-label="voice"><svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></button>`:""}<button class="ib send" data-a="${busy?"stop":"send"}" aria-label="send">${busy?'<svg viewBox="0 0 24 24"><rect x="7" y="7" width="10" height="10" rx="1"/></svg>':'<svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg>'}</button></div></div>`;
   return h;
 }
-
 function stageBody(id){
   const st=stageStatus(id);
-  if(st==="locked")return `<p class="sm mute">${t("locked")}</p>`;
-  if(st==="pay"){const b=STAGES.find(s=>s.id===id).block;return `<div class="paybox"><b>${t("needPay")} ${b} · ${BLOCKS[b].pct}%</b><div class="big" style="font-size:24px;margin:4px 0">${fmt(blockSum(b))} ₸</div><div class="xs mute">${t("b"+b)} · ${BLOCKS[b].pct}% ${t("ofTotal")} ${fmt(total())} ₸</div><button class="btn full" style="margin-top:10px" data-a="pay" data-k="${b}">${t("pay")}</button></div>`;}
+  if(st==="locked")return info(id)+`<p class="sm mute">${t("locked")}</p>`;
+  if(st==="pay"){const b=STAGES.find(s=>s.id===id).block;return info(id)+`<div class="paybox"><b>${t("needPay")} ${b} · ${BLOCKS[b].pct}%</b><div class="big" style="font-size:24px;margin:4px 0">${fmt(blockSum(b))} ₸</div><div class="xs mute">${t("b"+b)} · ${BLOCKS[b].pct}% ${t("ofTotal")} ${fmt(total())} ₸</div><button class="btn full" style="margin-top:10px" data-a="pay" data-k="${b}">${t("pay")}</button></div>`;}
   const done=st==="done";const demo=`<div class="demo">${t("demoNote")}</div>`;
   const okRow=k=>S.ok[k]?`<div class="pill ok" style="display:inline-block;margin-top:10px">✓ ${t("approved")}</div>`:revBtns(k);
+  let h=info(id);
   switch(id){
    case"obmer":
-    if(!S.obmer)return `<p class="sm mute" style="margin-bottom:10px">${t("d_obmer")}</p><div class="row"><button class="btn" data-a="photo">${t("sendPhoto")}</button><a class="btn ghost" href="${LINKS.howto}" target="_blank" rel="noopener">${t("howto")}</a></div>`;
-    return `<div class="plan">${planSVG(S.obmer)}</div><table class="rt">${Object.entries(zonesOf(S.obmer).reduce((m,r)=>{m[r.name]=(m[r.name]||0)+r.w*r.d/1e6;return m;},{})).map(([n,a])=>`<tr><td>${esc(n)}</td><td>${a.toFixed(1).replace(".",",")} м²</td></tr>`).join("")}<tr><td><b>${t("areaFact")}</b></td><td><b>${String(S.obmer.area).replace(".",",")} м²</b></td></tr></table>${done?okRow("obmer"):revBtns("obmer")}`;
+    if(!S.obmer)return h+`<p class="sm mute" style="margin-bottom:10px">${t("d_obmer")}</p><button class="btn full" data-a="chat">${t("openChat")}</button>`;
+    return h+`<div class="plan">${planSVG(S.obmer)}</div><p class="xs mute" style="margin-top:6px">${t("tapZoom")}</p><table class="rt">${Object.entries(zonesOf(S.obmer).reduce((m,r)=>{m[r.name]=(m[r.name]||0)+r.w*r.d/1e6;return m;},{})).map(([n,a])=>`<tr><td>${esc(n)}</td><td>${a.toFixed(1).replace(".",",")} м²</td></tr>`).join("")}<tr><td><b>${t("areaFact")}</b></td><td><b>${String(S.obmer.area).replace(".",",")} м²</b></td></tr></table>${done?okRow("obmer"):revBtns("obmer")}`;
    case"brief":{
-    const ks=Object.keys(S.brief);
-    let h=ks.length?`<div class="sm mute">${t("briefSaved")}:</div>`+ks.map(k=>`<div class="kv"><b>${esc(k)}</b> — ${Object.entries(S.brief[k]).slice(0,8).map(([a,b])=>esc(a)+": "+esc(typeof b==="object"?JSON.stringify(b):b)).join("; ")}</div>`).join(""):"";
-    h+=`<button class="btn soft full" style="margin-top:10px" data-a="chat">${t("fillBrief")}</button>`;
-    if(ks.length)h+=okRow("brief");
+    const pc=Math.round(coverage()*100);
+    h+=`<div class="sm" style="margin-bottom:4px">${t("briefCov")}: <b>${pc}%</b></div><div class="prog"><i style="width:${pc}%"></i></div><button class="btn soft full" data-a="tab" data-k="brief">${t("openBrief")}</button>`;
+    if(Object.keys(S.brief).length)h+=okRow("brief");
     return h;}
    case"plan":{
     markShown("plan");const left=Math.max(0,S.since.plan+2*864e5-now());const dd=Math.floor(left/864e5),hh=Math.floor(left%864e5/36e5);
-    let h=demo+`<p class="xs mute" style="margin:-4px 0 8px">${{ru:"В примере 3 варианта, в работе клиент получает 5.",kk:"Мысалда 3 нұсқа, жұмыста клиент 5 нұсқа алады.",en:"The example has 3 options; a real client gets 5."}[S.lang]}</p>`+(done?"":`<div class="sm" style="margin-bottom:8px">${t("deadline")}: <b>${dd} ${t("days")} ${hh} ${t("hours")}</b></div>`);
-    h+=`<div class="imgs">${VARS.map(v=>`<button class="var ${S.variant===v.id?"sel":""}" data-a="var" data-k="${v.id}" ${done?"disabled":""}><img loading="lazy" src="${IMG[v.img]}" alt=""><div class="xs" style="margin-top:4px"><b>${{ru:"Вариант",kk:"Нұсқа",en:"Option"}[S.lang]} ${{A:"А",B:"Б",V:"В"}[v.id]}</b>${S.variant===v.id?" · "+t("chosen"):""}</div></button>`).join("")}</div>`;
+    h+=demo+`<p class="xs mute" style="margin:-4px 0 8px">${t("ex3of5")}</p>`+(done?"":`<div class="sm" style="margin-bottom:8px">${t("deadline")}: <b>${dd} ${t("days")} ${hh} ${t("hours")}</b></div>`);
+    h+=`<div class="imgs">${VARS.map(v=>`<button class="var ${S.variant===v.id?"sel":""}" data-a="var" data-k="${v.id}" ${done?"disabled":""}><img loading="lazy" src="${IMG[v.img]}" alt=""><div class="xs" style="margin-top:4px"><b>${t("variant")} ${{A:"А",B:"Б",V:"В"}[v.id]}</b>${S.variant===v.id?" · "+t("chosen"):""}</div></button>`).join("")}</div>`;
     h+=S.variant?okRow("plan"):`<p class="sm mute" style="margin-top:8px">${t("choose")}</p>`;
     return h;}
    case"vis":
-    return demo+ROOMS.map(r=>{const ks=SK.filter(k=>k.room===r);const key="vis:"+r;return `<div class="sheet"><div class="hd"><b>${esc(r)}</b>${S.ok[key]?`<span class="pill ok">✓</span>`:""}</div>${ks.map(k=>`<div class="imgs" style="margin-bottom:6px"><figure><img loading="lazy" data-zoom src="${k.src}" alt=""><figcaption>${{ru:"Белая модель",kk:"Ақ модель",en:"White model"}[S.lang]} · ${{ru:"вид",kk:"көрініс",en:"view"}[S.lang]} ${k.v}</figcaption></figure><figure><img loading="lazy" data-zoom src="${k.color}" alt=""><figcaption>${{ru:"В цвете",kk:"Түсті",en:"Colour"}[S.lang]}</figcaption></figure></div>`).join("")}${S.ok[key]?"":revBtns(key)}</div>`;}).join("")+(S.ok.vis?`<div class="pill ok" style="display:inline-block;margin-top:10px">✓ ${t("approved")}</div>`:"");
+    return h+demo+ROOMS.map(r=>{const ks=SK.filter(k=>k.room===r);const key="vis:"+r;return `<div class="sheet"><div class="hd"><b>${esc(r)}</b>${S.ok[key]?`<span class="pill ok">✓</span>`:""}</div>${ks.map(k=>`<div class="imgs" style="margin-bottom:6px"><figure><img loading="lazy" data-zoom src="${k.src}" alt=""><figcaption>${t("whiteM")} · ${k.v}</figcaption></figure><figure><img loading="lazy" data-zoom src="${k.color}" alt=""><figcaption>${t("colorM")}</figcaption></figure></div>`).join("")}${S.ok[key]?"":revBtns(key)}</div>`;}).join("")+(S.ok.vis?`<div class="pill ok" style="display:inline-block;margin-top:10px">✓ ${t("approved")}</div>`:"");
    case"draw":
-    return demo+`<div class="xs mute">${t("sheets")}: ${DSHEETS.filter(s=>S.ok["draw:"+s.id]).length}/${DSHEETS.length} · ${{ru:"нажмите на лист, чтобы увеличить",kk:"үлкейту үшін парақты басыңыз",en:"tap a sheet to zoom"}[S.lang]}</div>`+DSHEETS.map((s,i)=>`<div class="sheet"><div class="hd"><span class="xs mute">${String(i+1).padStart(2,"0")}</span><b>${s[S.lang]}</b>${S.ok["draw:"+s.id]?`<span class="pill ok">✓</span>`:""}</div><img loading="lazy" data-zoom src="${IMG["S_"+s.id]}" alt="" style="width:100%;border-radius:8px;border:1px solid var(--line)">${S.ok["draw:"+s.id]?"":revBtns("draw:"+s.id)}</div>`).join("")+(S.ok.draw?`<div class="pill ok" style="display:inline-block;margin-top:10px">✓ ${t("allSheets")}</div>`:"");
+    return h+demo+`<div class="xs mute">${t("sheets")}: ${DSHEETS.filter(s=>S.ok["draw:"+s.id]).length}/${DSHEETS.length} · ${t("tapZoom")}</div>`+DSHEETS.map((s,i)=>`<div class="sheet"><div class="hd"><span class="xs mute">${String(i+1).padStart(2,"0")}</span><b>${s[S.lang]}</b>${S.ok["draw:"+s.id]?`<span class="pill ok">✓</span>`:""}</div><img loading="lazy" data-zoom src="${IMG["S_"+s.id]}" alt="" style="width:100%;border-radius:8px;border:1px solid var(--line)">${S.ok["draw:"+s.id]?"":revBtns("draw:"+s.id)}</div>`).join("")+(S.ok.draw?`<div class="pill ok" style="display:inline-block;margin-top:10px">✓ ${t("allSheets")}</div>`:"");
    case"ved":
-    return demo+`<div class="one">${[1,2,3,4,5].map(i=>`<img loading="lazy" data-zoom src="${IMG["S_ved_"+i]}" alt="" style="margin-bottom:8px">`).join("")}</div><button class="btn soft full" style="margin-top:10px" data-a="xlsx">${t("dl")}: ${t("xlsx")}</button>`+okRow("ved");
+    return h+demo+`<div class="vsec"><b>${t("vedSec")}</b>${VED_SECTIONS.map(([a,b])=>`<div><span>${a}</span><em>${b}</em></div>`).join("")}</div><p class="xs mute" style="margin:8px 0">${t("vedNote")}</p><div class="one">${[1,2,3,4,5].map(i=>`<img loading="lazy" data-zoom src="${IMG["S_ved_"+i]}" alt="" style="margin-bottom:8px">`).join("")}</div><button class="btn soft full" style="margin-top:10px" data-a="xlsx">${t("dl")}: ${t("xlsx")}</button>`+okRow("ved");
    case"pdf":
-    return demo+`<a class="btn full" href="${LINKS.project}" target="_blank" rel="noopener">${t("pdfOpen")}</a>`+(done?"":`<button class="btn ghost full" style="margin-top:8px" data-a="approve" data-k="pdf">✓ ${t("approve")}</button>`);
+    return h+demo+`<a class="btn full" href="${LINKS.project}" target="_blank" rel="noopener">${t("pdfOpen")}</a>`+(done?"":`<button class="btn ghost full" style="margin-top:8px" data-a="approve" data-k="pdf">✓ ${t("approve")}</button>`);
   }
 }
 function vStages(){
   const doneN=STAGES.filter(s=>S.ok[s.id]).length;
   const c=current();if(!openStage&&c)openStage=c.id;
-  let h=`<div class="pad"><div class="card" style="margin-bottom:12px"><div style="display:flex;justify-content:space-between;align-items:baseline"><b>${doneN}/${STAGES.length}</b><span class="sm mute">${fmt(total())} ₸ · ${String(area()).replace(".",",")} м²</span></div><div class="prog"><i style="width:${doneN/STAGES.length*100}%"></i></div><div class="row xs mute" style="gap:12px">${[1,2,3].map(b=>`<span>${t("block")} ${b}: ${S.paid[b]?"✓ "+t("paid"):fmt(blockSum(b))+" ₸"}</span>`).join("")}${S.extra?`<span>${t("extraTotal")}: ${fmt(S.extra)} ₸</span>`:""}</div></div>`;
+  let h=`<div class="pad"><div class="card" style="margin-bottom:12px"><div style="display:flex;justify-content:space-between;align-items:baseline"><b>${doneN}/${STAGES.length}</b><span class="sm mute">${fmt(total())} ₸ · ${String(area()).replace(".",",")} м²</span></div><div class="prog"><i style="width:${doneN/STAGES.length*100}%"></i></div><div class="row xs mute" style="gap:12px">${[1,2,3].map(b=>`<span>${t("block")} ${b}: ${S.paid[b]?"✓ "+t("paid"):fmt(blockSum(b))+" ₸"}</span>`).join("")}${S.extra?`<span>${t("extraTotal")}: ${fmt(S.extra)} ₸</span>`:""}</div>${(S.payLog||[]).length?`<details class="info"><summary>${t("payHist")}</summary>${S.payLog.map(p=>`<p>${new Date(p.at).toLocaleDateString("ru-RU")} · ${t("block")} ${p.b} · ${fmt(p.sum)} ₸</p>`).join("")}</details>`:""}</div>`;
   if(stalled())h+=`<div class="banner" style="margin:0 0 12px">${t("stall")}</div>`;
   STAGES.forEach((s,i)=>{
     const st=stageStatus(s.id);const cls={done:"done",active:"active",review:"review",pay:"active",locked:""}[st];
     const pill={done:`<span class="pill ok">✓</span>`,pay:`<span class="pill warn">${t("pay")}</span>`,review:`<span class="pill">●</span>`,active:`<span class="pill">●</span>`,locked:`<span class="pill mute">🔒</span>`}[st];
-    h+=`<details class="stage ${cls}" data-st="${s.id}" ${openStage===s.id?"open":""}><summary><span class="num">${st==="done"?"✓":i+1}</span><span class="t"><b>${t("st_"+s.id)}</b><span>${t("d_"+s.id)}</span></span>${pill}</summary><div class="body">${openStage===s.id?stageBody(s.id):""}</div></details>`;
+    h+=`<details class="stage ${cls}" data-st="${s.id}" ${openStage===s.id?"open":""}><summary><span class="num">${st==="done"?"✓":i+1}</span><span class="t"><b>${t("st_"+s.id)}</b><span>${t("d_"+s.id)} · ${DUR[s.id]}</span></span>${pill}</summary><div class="body">${openStage===s.id?stageBody(s.id):""}</div></details>`;
   });
   return h+`</div>`;
 }
+function vBrief(){
+  const c=S.covered||{},pc=Math.round(coverage()*100);
+  let h=`<div class="pad"><div class="card"><div style="display:flex;justify-content:space-between;align-items:baseline"><b>${t("briefCov")}</b><b>${pc}%</b></div><div class="prog"><i style="width:${pc}%"></i></div><p class="xs mute">${t("briefHint")}</p></div>`;
+  if(stageStatus("brief")==="locked"||stageStatus("brief")==="pay")h+=`<div class="banner" style="margin:12px 0 0">${t("briefLocked")}</div>`;
+  CHECK.forEach(g=>{const n=g.items.filter(i=>c[i[0]]).length;h+=`<details class="card grp" ${n<g.items.length?"open":""}><summary><b>${g.g}</b><span class="pill ${n===g.items.length?"ok":"mute"}">${n}/${g.items.length}</span></summary>${g.items.map(([id,lab])=>`<button class="ck ${c[id]?"on":""}" data-a="ask" data-k="${esc(lab)}"><span>${c[id]?"✓":"○"}</span>${esc(lab)}</button>`).join("")}</details>`;});
+  const ks=Object.keys(S.brief);
+  if(ks.length)h+=`<h3 style="margin:16px 0 8px">${t("briefSaved")}</h3>`+ks.map(k=>`<div class="card"><div style="display:flex;justify-content:space-between;gap:8px;align-items:center"><b>${esc(k)}</b><button class="linkb" data-a="editroom" data-k="${esc(k)}">${t("edit")}</button></div>${Object.entries(S.brief[k]).map(([a,b])=>`<div class="kv"><span class="mute">${esc(a)}:</span> ${esc(typeof b==="object"?JSON.stringify(b):b)}</div>`).join("")}</div>`).join("");
+  return h+`<div style="height:90px"></div></div>`;
+}
 function vFiles(){
   const f=[];
-  if(S.obmer)f.push(`<button data-a="svg"><span class="ic">SVG</span><span>${t("svg")}<span class="d">${String(S.obmer.area).replace(".",",")} м²</span></span></button>`);
+  if(S.obmer)f.push(`<button data-a="svg"><span class="ic">PNG</span><span>${t("svg")}<span class="d">${String(S.obmer.area).replace(".",",")} м²</span></span></button>`);
   if(S.ok.draw||stageStatus("ved")!=="locked"&&S.paid[3])f.push(`<button data-a="xlsx"><span class="ic">XLS</span><span>${t("xlsx")}<span class="d">${t("demoNote").split(":")[0]}</span></span></button>`);
   if(S.paid[3])f.push(`<a href="${LINKS.project}" target="_blank" rel="noopener"><span class="ic">PDF</span><span>${t("pdfOpen")}</span></a>`);
-  f.push(`<button data-a="json"><span class="ic">{ }</span><span>${t("json")}<span class="d">obmer, brief, ${t("stages").toLowerCase()}</span></span></button>`);
-  return `<div class="pad files">${S.obmer?"":`<p class="sm mute" style="margin-bottom:12px">${t("noFiles")}</p>`}${f.join("")}${downloads?"":`<p class="xs mute">${t("noSample").split(".")[0]}.</p>`}</div>`;
+  f.push(`<button data-a="json"><span class="ic">{ }</span><span>${t("json")}<span class="d">obmer, brief</span></span></button>`);
+  return `<div class="pad files">${S.obmer?"":`<p class="sm mute" style="margin-bottom:12px">${t("noFiles")}</p>`}${f.join("")}<div style="height:90px"></div></div>`;
 }
 function vMore(){
-  return `<div class="pad"><div class="card"><label class="field"><span>${t("name")}</span><input id="nm" value="${esc(S.name)}"></label><label class="field"><span>${t("phone")}</span><input id="pn" inputmode="tel" placeholder="+7 7__ ___ __ __" value="${esc(S.phone)}"></label>
+  return `<div class="pad"><button class="btn soft full" style="margin-bottom:12px" data-a="newproj">＋ ${t("newProj")}</button>
+  <div class="card"><label class="field"><span>${t("name")}</span><input id="nm" value="${esc(S.name)}"></label><label class="field"><span>${t("phone")}</span><input id="pn" inputmode="tel" placeholder="+7 7__ ___ __ __" value="${esc(S.phone)}"></label>
    <div class="tg"><span>${t("language")}</span>${langSw()}</div>
-   <div class="tg"><span>${t("theme")}</span><div class="lang">${[["","Auto"],["light","☀"],["dark","☾"]].map(([v,l])=>`<button class="${S.theme===v?"on":""}" data-a="theme" data-k="${v}">${l}</button>`).join("")}</div></div>
-   <button class="btn ghost full" style="margin-top:12px" data-a="mgrcall">${t("askMgr")}</button></div>
-  <div class="card"><div class="tg" style="border:0;padding-top:0"><b>${t("mgrMode")}</b><input type="checkbox" id="mm" ${S.mgrMode?"checked":""}></div><p class="xs mute">${t("mgrModeS")}</p>
-   <button class="btn ghost full" style="margin-top:10px" data-a="shift">${t("shift")}</button></div>
+   <div class="tg"><span>${t("theme")}</span><div class="lang">${[["","Auto"],["light","☀"],["dark","☾"]].map(([v,l])=>`<button class="${S.theme===v?"on":""}" data-a="theme" data-k="${v}">${l}</button>`).join("")}</div></div></div>
+  <div class="card"><h3 style="margin-bottom:6px">${t("faq")}</h3>${FAQ().map(([q,a])=>`<details class="info"><summary>${q}</summary><p>${a}</p></details>`).join("")}</div>
   <div class="links" style="margin-top:12px"><a href="${LINKS.howto}" target="_blank" rel="noopener">${t("howto")}<span>${t("howtoS")}</span></a><a href="${LINKS.example}" target="_blank" rel="noopener">${t("example")}<span>${t("exampleS")}</span></a></div>
-  <button class="btn ghost full" style="margin-top:16px;color:var(--acc)" data-a="reset">${t("reset")}</button><div style="height:16px"></div></div>`;
+  <div class="card" style="margin-top:12px"><div class="tg" style="border:0;padding-top:0"><b>${t("mgrMode")}</b><input type="checkbox" id="mm" ${S.mgrMode?"checked":""}></div><p class="xs mute">${t("mgrModeS")}</p>
+   <button class="btn ghost full" style="margin-top:10px" data-a="shift">${t("shift")}</button></div>
+  <p class="xs mute" style="text-align:center;margin-top:16px">Дизайн 3D Квартир · ${FOUNDER}</p><div style="height:90px"></div></div>`;
 }
-
+function FAQ(){return[
+ ["Насколько точный обмер по рисунку?","±10–20 мм. Стены в домах не идеально ровные, углы не всегда 90°, поэтому диагонали могут не сходиться — это нормально. Для планировки и чертежей этого хватает; кухню, шкафы и двери заказывают после контрольного замера мастером."],
+ ["Можно ли заказать замерщика?","Да: кнопка поддержки → «Заказать замер». В Алматы приедет наш специалист, в других городах — партнёр. Стоимость и время уточнит менеджер."],
+ ["Что если мне не понравится вариант?","На каждый этап и лист — 2 бесплатные правки. Дальше правка стоит 5 000 ₸. Сначала вы описываете правку, потом подтверждаете."],
+ ["Почему оплата заранее?","Каждый блок работы оплачивается перед стартом, а результат вы проверяете и утверждаете. Обмер — бесплатно."],
+ ["Цены на материалы будут?","В ведомости — количества без цен: цены меняются каждый день. Excel можно отправить в магазины и сравнить."],
+ ["Кто отвечает за размеры?","Размеры даёте вы (рисунок или обмер). Мы проверяем, чтобы всё сходилось, и задаём вопросы, если нет."]];}
+function modalHTML(){
+  if(!modal)return"";
+  const close=`<button class="btn ghost" data-a="mclose">${t("cancel")}</button>`;
+  switch(modal.kind){
+   case"support":return `<h3>${t("support")}</h3><p class="xs mute" style="margin:4px 0 12px">${t("supportS")}</p>
+     ${SUPPORT.phone?`<a class="sopt" href="tel:${SUPPORT.phone}">📞 <span><b>${t("callUs")}</b><em>${SUPPORT.phone}</em></span></a>`:""}
+     ${SUPPORT.wa?`<a class="sopt" href="https://wa.me/${SUPPORT.wa.replace(/\D/g,"")}" target="_blank" rel="noopener">💬 <span><b>WhatsApp</b><em>${SUPPORT.wa}</em></span></a>`:""}
+     <button class="sopt" data-a="form" data-k="callback">📲 <span><b>${t("callback")}</b><em>${t("callbackS")}</em></span></button>
+     <button class="sopt" data-a="mgrchat">🧑‍💼 <span><b>${t("toMgr")}</b><em>${t("toMgrS")}</em></span></button>
+     <button class="sopt" data-a="zamer">📏 <span><b>${t("o_zamer")}</b><em>${t("o_zamerS")}</em></span></button>
+     <button class="sopt" data-a="faqgo">❓ <span><b>${t("faq")}</b><em>${t("faqS")}</em></span></button>
+     <div class="row" style="margin-top:8px">${close}</div>`;
+   case"form":{const z=modal.k==="zamer";return `<h3>${z?t("o_zamer"):t("callback")}</h3><p class="xs mute" style="margin:4px 0 12px">${z?t("zamerT"):t("callbackT")}</p>
+     <label class="field"><span>${t("name")}</span><input id="f_name" value="${esc(S.name)}"></label><label class="field"><span>${t("phone")} *</span><input id="f_phone" inputmode="tel" value="${esc(S.phone)}" placeholder="+7 7__ ___ __ __"></label>
+     ${z?`<label class="field"><span>${t("city")}</span><input id="f_city" value="${esc(S.city||SUPPORT.city)}"></label><label class="field"><span>${t("address")}</span><input id="f_addr" value="${esc(S.addr||"")}"></label>`:""}
+     <label class="field"><span>${t("whenCall")}</span><input id="f_when" placeholder="${t("whenPh")}"></label><label class="field"><span>${t("comment")}</span><input id="f_note"></label>
+     <div class="row"><button class="btn" data-a="fsend" data-k="${z?"zamer":"callback"}">${t("sendReq")}</button>${close}</div>`;}
+   case"revise":{const n=S.rev[modal.key]||0;return `<h3>${t("revise")}: ${esc(label(modal.key))}</h3><p class="xs mute" style="margin:4px 0 10px">${modal.paid?t("payRev")+" "+t("payDemo"):t("revLeft")+": "+Math.max(0,FREE_REV-n)+"/"+FREE_REV}</p><label class="field"><span>${t("revWhat")}</span><textarea id="f_rev" rows="4" style="width:100%;padding:10px;border:1px solid var(--line);border-radius:12px;background:var(--card)" placeholder="${t("revPh")}"></textarea></label><div class="row"><button class="btn" data-a="revsend">${modal.paid?t("pay")+" 5 000 ₸ "+t("andSend"):t("sendRev")}</button>${close}</div>`;}
+   case"newproj":return `<h3>${t("newProj")}?</h3><p class="sm mute" style="margin:8px 0 14px">${t("newProjT")}</p><div class="row"><button class="btn" data-a="newok">${t("newProjOk")}</button>${close}</div>`;
+   case"guide":return guideHTML()+`<div class="row" style="margin-top:12px"><button class="btn" data-a="att" data-k="draw">📷 ${t("shootDraw")}</button>${close}</div>`;
+   case"video":return `<h3>${t("o_video")}</h3><ol class="steps" style="margin:8px 0">${t("videoSteps").split("|").map(s=>`<li>${s}</li>`).join("")}</ol><p class="xs mute">${t("videoNote")}</p><div class="row" style="margin-top:12px"><button class="btn" data-a="pickvideo">🎥 ${t("pickVideo")}</button>${close}</div>`;
+  }
+  return"";
+}
+/* пример рисунка «карандашом» */
+function pencil(){
+  let seed=7;const rnd=()=>{seed=(seed*9301+49297)%233280;return seed/233280-.5;};
+  const ln=(x1,y1,x2,y2,w)=>{const n=6;let d=`M${x1+rnd()*2} ${y1+rnd()*2}`;for(let i=1;i<=n;i++){const t0=i/n;d+=` L${x1+(x2-x1)*t0+rnd()*2.2} ${y1+(y2-y1)*t0+rnd()*2.2}`;}return `<path d="${d}" fill="none" stroke="#33415c" stroke-width="${w||2}" stroke-linecap="round" stroke-linejoin="round"/>`;};
+  const tx=(x,y,s,r,sz,c)=>`<text x="${x}" y="${y}" font-size="${sz||13}" fill="${c||"#1f4fbf"}" font-family="Caveat,'Comic Sans MS',cursive"${r?` transform="rotate(${r} ${x} ${y})"`:""} text-anchor="middle">${s}</text>`;
+  let g="";
+  // контур: две комнаты + коридор
+  [[30,30,330,30],[330,30,330,230],[330,230,30,230],[30,230,30,30],[30,32,328,32],[180,30,180,150],[180,190,180,230],[30,150,180,150]].forEach(a=>{g+=ln(...a,a===undefined?2:2.2);});
+  g+=ln(28,28,332,28,1)+ln(332,28,332,232,1)+ln(332,232,28,232,1)+ln(28,232,28,28,1);
+  // окна (разрыв + двойная линия)
+  g+=`<rect x="80" y="24" width="60" height="12" fill="#fff"/>`+ln(80,27,140,27,1.4)+ln(80,33,140,33,1.4);
+  g+=`<rect x="230" y="24" width="60" height="12" fill="#fff"/>`+ln(230,27,290,27,1.4)+ln(230,33,290,33,1.4);
+  // дверь входная
+  g+=`<rect x="70" y="225" width="40" height="12" fill="#fff"/>`+ln(70,230,70,190,1.6)+`<path d="M70 190 Q102 194 110 230" fill="none" stroke="#33415c" stroke-width="1.2" stroke-dasharray="3 3"/>`;
+  // стояк, щиток, радиатор
+  g+=`<circle cx="315" cy="215" r="6" fill="none" stroke="#33415c" stroke-width="1.8"/>`+tx(298,220,"ст",0,12);
+  g+=`<rect x="38" y="200" width="16" height="10" fill="none" stroke="#33415c" stroke-width="1.6"/>`+tx(46,196,"щит",0,12);
+  g+=ln(90,42,130,42,3)+tx(110,56,"радиатор 1000",0,11);
+  // размеры
+  g+=ln(30,12,330,12,1)+tx(180,10,"7000",0,15);
+  g+=ln(14,30,14,230,1)+tx(10,130,"4800",-90,15);
+  g+=tx(110,20,"окно 1500 · от угла 500",0,11)+tx(260,20,"окно 1500",0,11);
+  g+=tx(105,100,"Комната 1",0,15,"#33415c")+tx(105,118,"h = 2700",0,13)+tx(255,120,"Кухня-гостиная",0,15,"#33415c")+tx(255,138,"h = 2700",0,13);
+  g+=tx(105,180,"Коридор",0,14,"#33415c")+tx(90,248,"дверь 900",0,12)+tx(105,165,"3500",0,12)+tx(190,85,"2600",-90,12);
+  return `<svg viewBox="0 0 350 260" class="pencil" role="img" aria-label="пример рисунка"><rect width="350" height="260" fill="#fbfaf4"/>${Array.from({length:13},(_,i)=>`<line x1="0" y1="${i*20+10}" x2="350" y2="${i*20+10}" stroke="#dfe6f0" stroke-width=".6"/>`).join("")}${g}</svg>`;
+}
+function guideHTML(){
+  return `<h3>${t("o_draw")}</h3><div class="pencilbox">${pencil()}</div><ol class="steps" style="margin:10px 0">${t("guideSteps").split("|").map(s=>`<li>${s}</li>`).join("")}</ol><p class="xs mute">${t("guideNote")}</p><a class="linkb" href="${LINKS.howto}" target="_blank" rel="noopener">${t("howtoAnim")} →</a>`;
+}
 function render(full){
   const app=document.getElementById("app");
-  if(full===false&&tab==="chat"){ // keep chat input intact during tool calls
-    return;
-  }
+  if(full===false&&tab==="chat")return;
   const ta=document.getElementById("ta");if(ta)draft=ta.value;
   const ms=document.getElementById("msgs");const atBottom=!ms||ms.scrollHeight-ms.scrollTop-ms.clientHeight<80;
   const mainScroll=app.querySelector("main")?app.querySelector("main").scrollTop:0;
   document.documentElement.lang=S.lang==="kk"?"kk":S.lang;
+  const fab=tab==="chat"?"":`<button class="fab ${tab==="home"?"onhome":""}" data-a="support" aria-label="${t("support")}">${I_HELP}</button>`;
   if(tab==="home"){
-    app.innerHTML=`<div class="top"><span class="logo">${LOGO}</span><div><h1>Дизайн 3D Квартир</h1><small>${t("tag")}</small></div></div><main>${vHome()}</main>`;
+    app.innerHTML=`<div class="top"><span class="logo">${LOGO}</span><div><h1>Дизайн 3D Квартир</h1><small>${t("tag")}</small></div></div><main>${vHome()}</main>${fab}`;
   }else{
     const sub=S.mgrMode?t("mgrOn"):t("online");
-    const body=tab==="chat"?vChat():tab==="stages"?vStages():tab==="files"?vFiles():vMore();
-    app.innerHTML=`<div class="top"><button class="ib backb" data-a="back" aria-label="${t("back")}"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button><div><h1>${tab==="chat"?t("designer"):t(tab)}</h1><small>${tab==="chat"?"● "+sub:"Дизайн 3D Квартир"}</small></div><span class="sp"></span>${current()?`<span class="pill">${t("st_"+current().id)}</span>`:`<span class="pill ok">✓</span>`}</div>
-    <main style="${tab==="chat"?"overflow:hidden":""}">${body}</main>
-    <nav class="tabs">${["chat","stages","files","more"].map(k=>`<button class="${tab===k?"on":""}" data-a="tab" data-k="${k}"><svg viewBox="0 0 24 24">${ICON[k]}</svg>${t(k)}</button>`).join("")}</nav>`;
+    const body=tab==="chat"?vChat():tab==="stages"?vStages():tab==="brief"?vBrief():tab==="files"?vFiles():vMore();
+    app.innerHTML=`<div class="top"><button class="ib backb" data-a="back" aria-label="${t("back")}"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button><div><h1>${tab==="chat"?t("designer"):t(tab)}</h1><small>${tab==="chat"?"● "+sub:"Дизайн 3D Квартир"}</small></div><span class="sp"></span>${tab==="chat"?`<button class="ib hdsup" data-a="support" aria-label="${t("support")}">${I_HELP}</button>`:current()?`<span class="pill">${t("st_"+current().id)}</span>`:`<span class="pill ok">✓</span>`}</div>
+    <main style="${tab==="chat"?"overflow:hidden":""}">${body}</main>${fab}
+    <nav class="tabs">${["chat","stages","brief","files","more"].map(k=>`<button class="${tab===k?"on":""}" data-a="tab" data-k="${k}"><svg viewBox="0 0 24 24">${ICON[k]}</svg>${t(k)}</button>`).join("")}</nav>`;
   }
   if(sheetUI)app.insertAdjacentHTML("beforeend",`<div class="sheetbg" data-a="shclose"><div class="sh"><h3>${esc(sheetUI.title)}</h3><p class="sm mute" style="white-space:pre-wrap;margin:8px 0 14px">${esc(sheetUI.text)}</p><div class="row"><button class="btn" data-a="shok">${esc(sheetUI.ok)}</button><button class="btn ghost" data-a="shclose">${t("cancel")}</button></div></div></div>`);
+  if(modal)app.insertAdjacentHTML("beforeend",`<div class="sheetbg" data-a="mclose"><div class="sh tall">${modalHTML()}</div></div>`);
   const m=app.querySelector("main");if(m&&tab!=="chat")m.scrollTop=mainScroll;
   if(tab==="chat"&&atBottom)scrollChat();
   bindInputs();
 }
 function scrollChat(){const ms=document.getElementById("msgs");if(ms)ms.scrollTop=ms.scrollHeight;}
 function bindInputs(){
-  const a=document.getElementById("areaIn");if(a)a.oninput=()=>{S.area=a.value.replace(",",".");save();const v=+S.area||0,tot=Math.round(v*PRICE/100)*100;document.getElementById("totOut").textContent=fmt(tot)+" ₸";document.getElementById("splitOut").innerHTML=[1,2,3].map(b=>`<div>${t("b"+b)}<b>${fmt(Math.round(tot*BLOCKS[b].pct/100/100)*100)} ₸</b></div>`).join("");};
-  const o=document.getElementById("offer");if(o)o.onchange=()=>{S.offer=o.checked;save();render();};
+  const a=document.getElementById("areaIn");if(a)a.oninput=()=>{S.area=a.value.replace(",",".");save();const v=+S.area||0,tot=Math.round(v*PRICE/100)*100;document.getElementById("totOut").textContent=fmt(tot)+" ₸";document.getElementById("splitOut").innerHTML=[1,2,3].map(b=>`<div>${t("b"+b)}<b>${fmt(Math.round(tot*BLOCKS[b].pct/100/100)*100)} ₸</b></div>`).join("");document.getElementById("tlOut").innerHTML=timeline(v);};
+  const sb=()=>{const b=document.getElementById("startBtn");if(b)b.disabled=!(S.offer&&phoneOk(S.phone));};
+  const o=document.getElementById("offer");if(o)o.onchange=()=>{S.offer=o.checked;save();sb();};
   const ta=document.getElementById("ta");if(ta){const fit=()=>{ta.style.height="auto";ta.style.height=Math.min(120,ta.scrollHeight)+"px";ta.style.overflowY=ta.scrollHeight>120?"auto":"hidden";};fit();ta.oninput=()=>{draft=ta.value;fit();};ta.onkeydown=e=>{if(e.key==="Enter"&&!e.shiftKey&&window.matchMedia("(pointer:fine)").matches){e.preventDefault();doSend();}};}
   const nm=document.getElementById("nm");if(nm)nm.oninput=()=>{S.name=nm.value;save();};
-  const pn=document.getElementById("pn");if(pn)pn.oninput=()=>{S.phone=pn.value;save();};
+  const pn=document.getElementById("pn");if(pn)pn.oninput=()=>{S.phone=pn.value;save();sb();};
   const mm=document.getElementById("mm");if(mm)mm.onchange=()=>{S.mgrMode=mm.checked;addMsg({role:"sys",text:S.mgrMode?t("aiPaused"):t("aiBack")});save();toast(S.mgrMode?t("aiPaused"):t("aiBack"));};
   document.querySelectorAll("details.stage").forEach(d=>d.ontoggle=()=>{if(d.open&&openStage!==d.dataset.st){openStage=d.dataset.st;render();}else if(!d.open&&openStage===d.dataset.st){openStage=null;}});
 }
-function doSend(){if(busy)return;const ta=document.getElementById("ta");const v=ta?ta.value:"";draft="";if(ta)ta.value="";send(v);}
+function doSend(){if(busy)return;const ta=document.getElementById("ta");const v=ta?ta.value:"";draft="";if(ta)ta.value="";if(listening)toggleVoice(false);send(v);}
+/* ---------- голос ---------- */
+let rec=null,voiceBase="";
+function toggleVoice(on){
+  if(on===undefined)on=!listening;
+  const ta=document.getElementById("ta");voiceBase=ta?ta.value.trim():"";
+  const lang={ru:"ru-RU",kk:"kk-KZ",en:"en-US"}[S.lang]||"ru-RU";
+  if(window.D3K_NATIVE){window.D3K_post({t:"voice",on,lang});listening=on;render();return;}
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;if(!SR)return;
+  if(!on){try{rec&&rec.stop();}catch(e){}listening=false;render();return;}
+  rec=new SR();rec.lang=lang;rec.interimResults=true;rec.continuous=false;
+  rec.onresult=e=>{let s="";for(let i=0;i<e.results.length;i++)s+=e.results[i][0].transcript;voiceText(s);};
+  rec.onend=()=>{listening=false;render();};rec.onerror=()=>{listening=false;render();};
+  try{rec.start();listening=true;render();}catch(e){listening=false;}
+}
+function voiceText(s){const ta=document.getElementById("ta");const v=(voiceBase?voiceBase+" ":"")+s;draft=v;if(ta){ta.value=v;ta.dispatchEvent(new Event("input"));}}
+window.addEventListener("d3k-native",e=>{const m=e.detail||{};if(m.t==="voice"&&m.text!=null)voiceText(m.text);if(m.t==="voice-end"){listening=false;render();}if(m.t==="voice-error"){listening=false;render();toast(m.msg||t("voiceErr"));}});
+/* ---------- фото и видео ---------- */
+async function shrink(file,max,q){const u=URL.createObjectURL(file);try{const im=new Image();await new Promise((r,j)=>{im.onload=r;im.onerror=j;im.src=u;});const s=Math.min(1,max/Math.max(im.width,im.height));const c=document.createElement("canvas");c.width=Math.round(im.width*s);c.height=Math.round(im.height*s);c.getContext("2d").drawImage(im,0,0,c.width,c.height);return c.toDataURL("image/jpeg",q);}finally{URL.revokeObjectURL(u);}}
+async function addImages(files,kind){
+  const arr=Array.from(files).slice(0,4);
+  for(const f of arr){try{const keep=await shrink(f,1800,.85);const thumb=await shrink(f,400,.7);pending.push({blob:dataBlob(keep),keep,thumb,kind:kind||"photo"});}catch(e){toast(t("err_img"));}}
+  render();
+}
+async function videoFrames(file,n){
+  const v=document.createElement("video");v.muted=true;v.playsInline=true;v.preload="auto";const u=URL.createObjectURL(file);v.src=u;
+  await new Promise((r,j)=>{v.onloadedmetadata=r;v.onerror=j;setTimeout(j,15000);});
+  const out=[];const dur=v.duration||10;
+  for(let i=0;i<n;i++){
+    v.currentTime=Math.min(dur-0.1,dur*(i+.5)/n);
+    await new Promise(r=>{v.onseeked=r;setTimeout(r,4000);});
+    const s=Math.min(1,1280/Math.max(v.videoWidth||1280,v.videoHeight||720));const c=document.createElement("canvas");c.width=Math.round((v.videoWidth||1280)*s);c.height=Math.round((v.videoHeight||720)*s);c.getContext("2d").drawImage(v,0,0,c.width,c.height);
+    const keep=c.toDataURL("image/jpeg",.75);const tc=document.createElement("canvas");tc.width=240;tc.height=Math.round(240*c.height/c.width);tc.getContext("2d").drawImage(c,0,0,tc.width,tc.height);
+    out.push({blob:dataBlob(keep),keep,thumb:tc.toDataURL("image/jpeg",.6),kind:"frame"});
+  }
+  URL.revokeObjectURL(u);return out;
+}
 
 let zw=100,navStack=[];
 function pushH(){try{history.pushState({d3k:1},"");}catch(e){}}
-function goBack(fromPop){
+function goBack(){
   if(document.querySelector(".zv")){closeZoom();return;}
+  if(modal){modal=null;render();return;}
   if(sheetUI){sheetUI=null;render();return;}
   const prev=navStack.pop();tab=prev||"home";render();
 }
-window.addEventListener("popstate",()=>goBack(true));
+window.addEventListener("popstate",()=>goBack());
 function openZoom(src){zw=100;const v=document.createElement("div");v.className="zv";v.innerHTML=`<div class="zc"><button data-z="x" style="width:auto;padding:0 14px;border-radius:21px;margin-right:auto;font-size:15px">← ${t("back")}</button><button data-z="-">−</button><button data-z="+">+</button></div><img src="${src}" alt="">`;v.addEventListener("click",ev=>{const z=ev.target.closest("[data-z]");if(!z)return;ev.stopPropagation();if(z.dataset.z==="x"){closeZoom();return;}zw=Math.max(100,Math.min(400,zw+(z.dataset.z==="+"?75:-75)));v.style.setProperty("--zw",zw+"%");});document.getElementById("app").appendChild(v);pushH();}
 function closeZoom(){const v=document.querySelector(".zv");if(v)v.remove();}
+let pickKind="photo";
 document.getElementById("app").addEventListener("click",e=>{
   if(e.target.closest(".zv"))return;
   const zi=e.target.closest("img[data-zoom]");if(zi){openZoom(zi.src);return;}
-  if(e.target.closest(".plan")&&S.obmer){openZoom("data:image/svg+xml;charset=utf-8,"+encodeURIComponent(planSVG(S.obmer,{px:2400})));return;}
+  if(e.target.closest(".plan")&&S.obmer){openZoom("data:image/svg+xml;charset=utf-8,"+encodeURIComponent(planSVG(S.obmer,{px:2600})));return;}
   const b=e.target.closest("[data-a]");if(!b)return;const a=b.dataset.a,k=b.dataset.k;
   if(b.tagName==="A")return;
   switch(a){
    case"lang":S.lang=k;save();render();break;
    case"theme":S.theme=k;save();applyTheme();render();break;
-   case"start":S.started=true;S.offer=true;save();navStack=["home"];pushH();tab="chat";render();break;
+   case"start":if(!phoneOk(S.phone)){toast(t("phoneNeed"));break;}S.started=true;S.offer=true;save();sendRequest("support",{note:"Новый клиент начал проект"});navStack=["home"];pushH();tab="chat";render();break;
    case"enter":navStack=["home"];pushH();tab="chat";render();break;
-   case"home":tab="home";render();break;
-   case"tab":if(k!==tab){navStack.push(tab);pushH();}tab=k;render();break;
+   case"tab":if(k!==tab){navStack.push(tab);pushH();}tab=k;modal=null;render();break;
    case"back":goBack();break;
    case"send":doSend();break;
    case"stop":if(ctl)ctl.abort();break;
-   case"q":draft="";send(t(k));break;
-   case"att":document.getElementById("photo").click();break;
-   case"photo":tab="chat";render();if(limits&&limits.images)document.getElementById("photo").click();break;
-   case"unimg":pendingImg=null;pendingThumb=null;render();break;
-   case"chat":tab="chat";render();break;
+   case"qr":if(!busy){draft="";send(k);}break;
+   case"retry":{const lastMe=[...S.chat].reverse().find(m=>m.role==="me");S.chat.pop();save();if(lastMe&&sample){runAgent("",[],photoActive()?t("st_think_plan"):t("typing"));}break;}
+   case"att":pickKind=k||"photo";modal=null;render();if(limits&&limits.images){const inp=document.getElementById("photo");inp.accept="image/*";inp.multiple=true;inp.click();}else toast(t("noSample"));break;
+   case"pickvideo":modal=null;render();{const inp=document.getElementById("photo");inp.accept="video/*";inp.multiple=false;pickKind="video";inp.click();}break;
+   case"unimg":pending=[];render();break;
+   case"chat":if(tab!=="chat"){navStack.push(tab);pushH();}tab="chat";render();break;
    case"approve":approve(k);break;
    case"revise":revise(k);break;
+   case"revsend":{const v=(document.getElementById("f_rev")||{}).value||"";if(v.trim().length<3){toast(t("revNeed"));break;}doRevise(modal.key,v.trim());break;}
    case"pay":pay(+k);break;
    case"var":S.variant=k;save();render();break;
    case"shok":if(sheetUI)sheetUI.fn();break;
    case"shclose":if(b.classList.contains("sheetbg")&&e.target!==b)return;sheetUI=null;render();break;
-   case"xlsx":dl("vedomost-materialov-56.xlsx",b64blob(XLSX_B64,"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"));break;
-   case"svg":if(S.obmer)dl("obmernyj-plan.svg",planSVG(S.obmer,{full:true}));break;
-   case"json":dl("proekt.json",JSON.stringify({obmer:S.obmer,brief:S.brief,approved:S.ok,variant:S.variant,revisions:S.rev,paid:S.paid},null,2));break;
-   case"mgrcall":S.mgrCalled=true;addMsg({role:"sys",text:t("mgrCalled")});save();toast(t("mgrCalled"));break;
+   case"mclose":if(b.classList.contains("sheetbg")&&e.target!==b)return;modal=null;render();break;
+   case"support":modal={kind:"support"};pushH();render();break;
+   case"form":modal={kind:"form",k};render();break;
+   case"zamer":modal={kind:"form",k:"zamer"};pushH();render();break;
+   case"fsend":{const g=id=>((document.getElementById(id)||{}).value||"").trim();const ph=g("f_phone");if(!phoneOk(ph)){toast(t("phoneNeed"));break;}S.phone=ph;if(g("f_name"))S.name=g("f_name");if(k==="zamer"){S.city=g("f_city");S.addr=g("f_addr");}save();
+     sendRequest(k,{name:S.name,phone:ph,city:g("f_city")||null,address:g("f_addr")||null,when:g("f_when"),note:g("f_note")});modal=null;addMsg({role:"sys",text:k==="zamer"?t("zamerOk"):t("callbackOk")});render();toast(k==="zamer"?t("zamerOk"):t("callbackOk"));break;}
+   case"mgrchat":modal=null;S.mgrCalled=true;sendRequest("manager",{note:"Клиент просит менеджера в чат"});addMsg({role:"sys",text:t("mgrCalled")});save();if(tab!=="chat"){navStack.push(tab);pushH();}tab="chat";render();break;
+   case"faqgo":modal=null;if(tab!=="more"){navStack.push(tab);pushH();}tab="more";render();break;
+   case"guide":modal={kind:"guide"};pushH();render();break;
+   case"video":modal={kind:"video"};pushH();render();break;
+   case"newproj":modal={kind:"newproj"};render();break;
+   case"newok":{const keep={lang:S.lang,theme:S.theme,name:S.name,phone:S.phone,offer:S.offer};S=Object.assign(fresh(),keep);save();modal=null;tab="home";openStage=null;render();toast(t("newProjDone"));break;}
+   case"ask":if(stageStatus("brief")==="locked"||stageStatus("brief")==="pay"){toast(t("briefLocked"));break;}navStack.push(tab);pushH();tab="chat";draft=t("letsTalk")+": "+k.toLowerCase();render();{const ta=document.getElementById("ta");if(ta)ta.focus();}break;
+   case"editroom":navStack.push(tab);pushH();tab="chat";draft=t("changeIn").replace("{x}",k);render();{const ta=document.getElementById("ta");if(ta){ta.focus();ta.setSelectionRange(ta.value.length,ta.value.length);}}break;
+   case"mic":toggleVoice();break;
+   case"xlsx":dl("vedomost-materialov-56.xlsx",b64blob(XLSX_B64,"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),"xlsx");break;
+   case"svg":if(S.obmer)dl("obmernyj-plan.svg",planSVG(S.obmer,{full:true}),"svg");break;
+   case"json":dl("proekt.json",JSON.stringify({obmer:S.obmer,brief:S.brief,covered:S.covered,approved:S.ok,variant:S.variant,revisions:S.rev,paid:S.paid},null,2),"json");break;
    case"shift":S.shift+=2*864e5+3600e3;save();render();toast("+2 "+t("days"));break;
-   case"reset":{const keep={lang:S.lang,theme:S.theme};S=Object.assign(fresh(),keep);save();tab="home";openStage=null;render();break;}
   }
 });
 document.getElementById("photo").addEventListener("change",async e=>{
-  const f=e.target.files&&e.target.files[0];e.target.value="";if(!f)return;
-  if(limits&&limits.images&&f.size>limits.images.maxInputBytes){toast(t("err_img"));return;}
-  pendingImg=f;
-  try{const u2=URL.createObjectURL(f);const im2=new Image();await new Promise((r,j)=>{im2.onload=r;im2.onerror=j;im2.src=u2;});const s2=Math.min(1,2000/Math.max(im2.width,im2.height));const c2=document.createElement("canvas");c2.width=Math.round(im2.width*s2);c2.height=Math.round(im2.height*s2);c2.getContext("2d").drawImage(im2,0,0,c2.width,c2.height);S.photo=c2.toDataURL("image/jpeg",.85);URL.revokeObjectURL(u2);save();}catch(err){}
-  try{const url=URL.createObjectURL(f);const im=new Image();await new Promise((r,j)=>{im.onload=r;im.onerror=j;im.src=url;});const s=Math.min(1,520/Math.max(im.width,im.height));const c=document.createElement("canvas");c.width=Math.round(im.width*s);c.height=Math.round(im.height*s);c.getContext("2d").drawImage(im,0,0,c.width,c.height);pendingThumb=c.toDataURL("image/jpeg",.72);URL.revokeObjectURL(url);}catch(err){pendingThumb=null;}
+  const fs=Array.from(e.target.files||[]);e.target.value="";if(!fs.length)return;
+  if(pickKind==="video"){toast(t("framesWait"));try{const fr=await videoFrames(fs[0],6);pending=fr;render();draft=draft||t("videoMsg");render();}catch(err){toast(t("videoErr"));}return;}
+  await addImages(fs,"photo");
+  if(pickKind==="ready"&&!draft)draft=t("readyMsg");
+  if(pickKind==="draw"&&!draft)draft=t("drawMsg");
   render();
 });
-// re-render after tool calls when not in chat; in chat only refresh header pill
+/* заставка */
+(function(){const el=document.getElementById("intro");if(!el)return;let seen=false;try{seen=sessionStorage.getItem("d3kIntro")==="1";}catch(e){}
+  if(seen){el.remove();return;}
+  const fn=document.getElementById("introName");if(fn)fn.textContent=FOUNDER;
+  const done=()=>{el.classList.add("out");setTimeout(()=>el.remove(),450);try{sessionStorage.setItem("d3kIntro","1");}catch(e){}};
+  el.addEventListener("click",done);setTimeout(done,2800);})();
 const _render=render;
 render=function(full){if(full===false){if(tab!=="chat")_render();return;}_render();};
 _render();
