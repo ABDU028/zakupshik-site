@@ -299,6 +299,9 @@ details.grp>summary::-webkit-details-marker{display:none}
 .vsec em{font-style:normal;color:var(--mute);font-size:12px}
 .prev{flex-wrap:wrap}
 nav.tabs button{font-size:10.5px}
+.top{padding-top:calc(12px + env(safe-area-inset-top))}
+.fab.onhome{bottom:calc(20px + env(safe-area-inset-bottom))}
+main.hm{padding-bottom:env(safe-area-inset-bottom)}
 </style>
 
 <div id="intro"><div class="ibox"><svg viewBox="0 0 120 120" class="icube"><path d="M60 14 20 37v46l40 23 40-23V37z"/><path d="M20 37l40 23 40-23M60 60v46"/></svg><div class="iname">Дизайн 3D Квартир</div><div class="isub">дизайн-проект квартиры в телефоне</div><div class="ifounder">основатель · <span id="introName"></span></div><div class="ibar"><i></i></div></div></div>
@@ -876,9 +879,9 @@ function vMore(){
    <div class="tg"><span>${t("theme")}</span><div class="lang">${[["","Auto"],["light","☀"],["dark","☾"]].map(([v,l])=>`<button class="${S.theme===v?"on":""}" data-a="theme" data-k="${v}">${l}</button>`).join("")}</div></div></div>
   <div class="card"><h3 style="margin-bottom:6px">${t("faq")}</h3>${FAQ().map(([q,a])=>`<details class="info"><summary>${q}</summary><p>${a}</p></details>`).join("")}</div>
   <div class="links" style="margin-top:12px"><a href="${LINKS.howto}" target="_blank" rel="noopener">${t("howto")}<span>${t("howtoS")}</span></a><a href="${LINKS.example}" target="_blank" rel="noopener">${t("example")}<span>${t("exampleS")}</span></a></div>
-  <div class="card" style="margin-top:12px"><div class="tg" style="border:0;padding-top:0"><b>${t("mgrMode")}</b><input type="checkbox" id="mm" ${S.mgrMode?"checked":""}></div><p class="xs mute">${t("mgrModeS")}</p>
-   <button class="btn ghost full" style="margin-top:10px" data-a="shift">${t("shift")}</button></div>
-  <p class="xs mute" style="text-align:center;margin-top:16px">Дизайн 3D Квартир · ${FOUNDER}</p><div style="height:90px"></div></div>`;
+  ${S.admin?`<div class="card" style="margin-top:12px"><div class="tg" style="border:0;padding-top:0"><b>${t("mgrMode")}</b><input type="checkbox" id="mm" ${S.mgrMode?"checked":""}></div><p class="xs mute">${t("mgrModeS")}</p>
+   <button class="btn ghost full" style="margin-top:10px" data-a="shift">${t("shift")}</button></div>`:""}
+  <p class="xs mute" data-a="adm" style="text-align:center;margin-top:16px">Дизайн 3D Квартир · ${FOUNDER}</p><div style="height:90px"></div></div>`;
 }
 function FAQ(){return[
  ["Насколько точный обмер по рисунку?","±10–20 мм. Стены в домах не идеально ровные, углы не всегда 90°, поэтому диагонали могут не сходиться — это нормально. Для планировки и чертежей этого хватает; кухню, шкафы и двери заказывают после контрольного замера мастером."],
@@ -940,6 +943,7 @@ function pencil(){
 function guideHTML(){
   return `<h3>${t("o_draw")}</h3><div class="pencilbox">${pencil()}</div><ol class="steps" style="margin:10px 0">${t("guideSteps").split("|").map(s=>`<li>${s}</li>`).join("")}</ol><p class="xs mute">${t("guideNote")}</p><a class="linkb" href="${LINKS.howto}" target="_blank" rel="noopener">${t("howtoAnim")} →</a>`;
 }
+let admTaps=0;
 function render(full){
   const app=document.getElementById("app");
   if(full===false&&tab==="chat")return;
@@ -949,7 +953,8 @@ function render(full){
   document.documentElement.lang=S.lang==="kk"?"kk":S.lang;
   const fab=tab==="chat"?"":`<button class="fab ${tab==="home"?"onhome":""}" data-a="support" aria-label="${t("support")}">${I_HELP}</button>`;
   if(tab==="home"){
-    app.innerHTML=`<div class="top"><span class="logo">${LOGO}</span><div><h1>Дизайн 3D Квартир</h1><small>${t("tag")}</small></div></div><main>${vHome()}</main>${fab}`;
+    const nav=S.started?`<nav class="tabs">${["chat","stages","brief","files","more"].map(k=>`<button data-a="tab" data-k="${k}"><svg viewBox="0 0 24 24">${ICON[k]}</svg>${t(k)}</button>`).join("")}</nav>`:"";
+    app.innerHTML=`<div class="top"><span class="logo">${LOGO}</span><div><h1>Дизайн 3D Квартир</h1><small>${t("tag")}</small></div></div><main class="${nav?"":"hm"}">${vHome()}</main>${nav?fab.replace(" onhome",""):fab}${nav}`;
   }else{
     const sub=S.mgrMode?t("mgrOn"):t("online");
     const body=tab==="chat"?vChat():tab==="stages"?vStages():tab==="brief"?vBrief():tab==="files"?vFiles():vMore();
@@ -1063,13 +1068,14 @@ document.getElementById("app").addEventListener("click",e=>{
    case"guide":modal={kind:"guide"};pushH();render();break;
    case"video":modal={kind:"video"};pushH();render();break;
    case"newproj":modal={kind:"newproj"};render();break;
-   case"newok":{const keep={lang:S.lang,theme:S.theme,name:S.name,phone:S.phone,offer:S.offer};S=Object.assign(fresh(),keep);save();modal=null;tab="home";openStage=null;render();toast(t("newProjDone"));break;}
+   case"newok":{const keep={lang:S.lang,theme:S.theme,name:S.name,phone:S.phone,offer:S.offer,admin:S.admin};S=Object.assign(fresh(),keep);save();modal=null;tab="home";openStage=null;render();toast(t("newProjDone"));break;}
    case"ask":if(stageStatus("brief")==="locked"||stageStatus("brief")==="pay"){toast(t("briefLocked"));break;}navStack.push(tab);pushH();tab="chat";draft=t("letsTalk")+": "+k.toLowerCase();render();{const ta=document.getElementById("ta");if(ta)ta.focus();}break;
    case"editroom":navStack.push(tab);pushH();tab="chat";draft=t("changeIn").replace("{x}",k);render();{const ta=document.getElementById("ta");if(ta){ta.focus();ta.setSelectionRange(ta.value.length,ta.value.length);}}break;
    case"mic":toggleVoice();break;
    case"xlsx":dl("vedomost-materialov-56.xlsx",b64blob(XLSX_B64,"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),"xlsx");break;
    case"svg":if(S.obmer)dl("obmernyj-plan.svg",planSVG(S.obmer,{full:true}),"svg");break;
    case"json":dl("proekt.json",JSON.stringify({obmer:S.obmer,brief:S.brief,covered:S.covered,approved:S.ok,variant:S.variant,revisions:S.rev,paid:S.paid},null,2),"json");break;
+   case"adm":admTaps=(admTaps||0)+1;if(admTaps>=7){admTaps=0;S.admin=!S.admin;save();render();toast(S.admin?"Админ: вкл":"Админ: выкл");}break;
    case"shift":S.shift+=2*864e5+3600e3;save();render();toast("+2 "+t("days"));break;
   }
 });
