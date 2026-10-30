@@ -10,7 +10,7 @@
     try{r=await fetch(FN,{method:"POST",headers:{"content-type":"application/json","apikey":KEY},body:JSON.stringify(Object.assign({app:"d3k"},payload)),signal:signal});}
     catch(e){if(e&&e.name==="AbortError")throw err("cancelled");throw err("upstream_error","network");}
     var j=null;try{j=await r.json();}catch(e){}
-    if(!r.ok||!j||j.error){var c=(j&&j.error)||"upstream_error";throw err(c==="rate_limited"||c==="prompt_too_large"||c==="invalid_request"?c:"upstream_error",j&&j.detail);}
+    if(!r.ok||!j||j.error){var c=(j&&j.error)||"upstream_error";throw err(c==="rate_limited"||c==="prompt_too_large"||c==="invalid_request"||c==="timeout"?c:"upstream_error",j&&j.detail);}
     return j;
   }
   async function b64(blob){var u=new Uint8Array(await blob.arrayBuffer()),s="",i,n=0x8000;for(i=0;i<u.length;i+=n)s+=String.fromCharCode.apply(null,u.subarray(i,i+n));return btoa(s);}
@@ -23,12 +23,22 @@
       var last=msgs[msgs.length-1];last.content=imgs.concat(last.content);
     }
     var tools=opts.tools||[],defs=tools.map(function(t){return{name:t.name,description:t.description,input_schema:t.inputSchema||{type:"object",properties:{}}};});
-    var text="";
-    for(var round=0;round<7;round++){
+    var text="",tier=opts.modelTier||"default",retries=0;
+    function hint(t){var last=msgs[msgs.length-1];last.content=last.content.concat([{type:"text",text:t}]);}
+    for(var round=0;round<8;round++){
       if(opts.signal&&opts.signal.aborted)throw err("cancelled",null,text);
       var r;
-      try{r=await call({messages:msgs,tools:round<6?defs:[],tier:opts.modelTier||"default"},opts.signal);}catch(e){e.text=text;throw e;}
+      try{r=await call({messages:msgs,tools:round<7?defs:[],tier:tier},opts.signal);}
+      catch(e){
+        if((e.code==="timeout"||e.code==="upstream_error")&&retries<2&&!(opts.signal&&opts.signal.aborted)){retries++;if(tier==="complex")tier="default";round--;continue;}
+        e.text=text;throw e;
+      }
       var content=r.content||[];
+      if(r.stop_reason==="max_tokens"&&retries<2){
+        retries++;round--;
+        hint("[Служебно: прошлая попытка ответа оборвалась по длине. Отвечай короче: сразу вызывай нужный инструмент, без длинных рассуждений и пояснений.]");
+        continue;
+      }
       var tt=content.filter(function(c){return c.type==="text";}).map(function(c){return c.text;}).join("");
       if(tt.trim()){text=text?text+"\n\n"+tt:tt;if(opts.onText)try{opts.onText({text:text,delta:tt});}catch(e){}}
       var uses=content.filter(function(c){return c.type==="tool_use";});
@@ -495,7 +505,7 @@ async function runAgent(note){
     if(c==="not_granted"||c==="sampling_disabled"||c==="capability_disabled"||c==="capability_removed"){addMsg({role:"sys",text:t("err_deny")});sample=null;}
     else if(c==="rate_limited")addMsg({role:"sys",text:t("err_rate")});
     else if(c==="image_rejected"||c==="images_unavailable")addMsg({role:"sys",text:t("err_img")});
-    else if(c!=="cancelled")addMsg({role:"sys",text:t("err_gen")});
+    else if(c!=="cancelled")addMsg({role:"sys",text:t("err_gen")+(c?" ("+c+")":"")});
   }
   pendingCards.forEach(addMsg);pendingCards=[];
   busy=false;ctl=null;render();return ok;
