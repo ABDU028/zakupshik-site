@@ -67,7 +67,11 @@
     function hint(t){var last=msgs[msgs.length-1];last.content=last.content.concat([{type:"text",text:t}]);}
     for(var round_i=0;round_i<9;round_i++){
       if(opts.signal&&opts.signal.aborted)throw err("cancelled",null,text);
-      var body={max_tokens:(tier==="vision"||tier==="complex")?32000:16000,stream:true,messages:msgs};if(defs.length&&round_i<8)body.tools=defs;
+      // кэш Anthropic: правила и прошлая переписка читаются в 10 раз дешевле
+      var cm=msgs.map(function(m){return{role:m.role,content:m.content.map(function(c){return Object.assign({},c);})};});
+      function bp(m){if(!m)return;var c=m.content;for(var q=c.length-1;q>=0;q--){if(c[q].type==="text"||c[q].type==="tool_result"||c[q].type==="image"){c[q].cache_control={type:"ephemeral"};return;}}}
+      bp(cm[0]);for(var w=cm.length-2;w>0;w--){if(cm[w].role==="assistant"){bp(cm[w]);break;}}if(round_i>0)bp(cm[cm.length-1]);
+      var body={messages:cm,max_tokens:(tier==="vision"||tier==="complex")?32000:16000,stream:true};if(defs.length&&round_i<8)body.tools=defs;
       var base=text,r;
       try{r=await round(body,tier,opts.signal,function(dt){text+=dt;if(opts.onText)try{opts.onText({text:text,delta:dt});}catch(e){}});}
       catch(e){
@@ -561,7 +565,7 @@ function rules(){
 МЕНЕДЖЕР. Сообщения [Менеджер] писал живой менеджер. Его договорённости — согласованные решения. Вызови call_manager, если клиент недоволен, просит возврат, спорит об оплате или оферте, задаёт юридический вопрос, хочет выезд замерщика, или ты не можешь решить вопрос.
 Не обсуждай цены материалов у поставщиков. Не обещай бесплатных правок сверх двух. Не обещай точность «в миллиметр».
 
-СОСТОЯНИЕ ПРОЕКТА (JSON): ${JSON.stringify(snapshot())}`;
+Актуальное СОСТОЯНИЕ ПРОЕКТА (JSON) приложение добавляет в конец последнего сообщения клиента — опирайся на него, а не на старые цифры из переписки.`;
 }
 const NUM={type:"number"};
 let pendingCards=[],obmerTouched=false,liveStage="";
@@ -632,6 +636,7 @@ function turns(){
     if(last.role===role)last.content+="\n\n"+c;else out.push({role,content:c});
   });
   if(out[out.length-1].role!=="user")out.push({role:"user",content:"(клиент ждёт ответа)"});
+  out[out.length-1].content+="\n\n[СОСТОЯНИЕ ПРОЕКТА (JSON): "+JSON.stringify(snapshot())+"]";
   return out;
 }
 async function runAgent(note,extraImgs,label,tierOver){
