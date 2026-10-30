@@ -16,7 +16,7 @@
   async function b64(blob){var u=new Uint8Array(await blob.arrayBuffer()),s="",i,n=0x8000;for(i=0;i<u.length;i+=n)s+=String.fromCharCode.apply(null,u.subarray(i,i+n));return btoa(s);}
   // один раунд: потоковый запрос, сборка блоков ответа
   async function round(body,tier,signal,onDelta){
-    var r;
+    var r,T=(window.__d3kT=window.__d3kT||[]);T.push([Date.now(),"round",tier,(body.messages||[]).length]);
     try{r=await fetch(FN,{method:"POST",headers:{"content-type":"application/json","apikey":KEY,"x-tier":tier},body:JSON.stringify(body),signal:signal});}
     catch(e){if(e&&e.name==="AbortError")throw err("cancelled");throw err("upstream_error","network");}
     var ct=r.headers.get("content-type")||"";
@@ -50,6 +50,7 @@
         }
       }
     }catch(e){if(e&&e.name==="AbortError")throw err("cancelled");if(e&&e.code)throw e;throw err("upstream_error","stream");}
+    T.push([Date.now(),"end",stop,blocks.filter(Boolean).map(function(b){return b.type==="tool_use"?b.name:b.type;}).join(",")]);
     if(!stop)throw err("timeout","stream cut");
     return{content:blocks.filter(Boolean),stop_reason:stop};
   }
@@ -517,7 +518,7 @@ const STYLES="Современный (чистые линии, нейтраль�
 /* ---------- agent ---------- */
 function snapshot(){
   const miss=CHECK.flatMap(g=>g.items.filter(i=>!(S.covered||{})[i[0]]).map(i=>i[0]+": "+i[1]));
-  return {stage:(current()||{}).id||"done",status:Object.fromEntries(STAGES.map(s=>[s.id,stageStatus(s.id)])),area_m2:area(),area_source:S.obmer&&S.obmer.area?"по обмерному плану":"примерная, клиент сам ввёл в калькулятор — это не договор и не документ",price_kzt:total(),obmer:S.obmer,brief:S.brief,brief_coverage:Math.round(coverage()*100)+"%",brief_not_discussed:miss,revisions_used:S.rev,free_revisions_per_item:FREE_REV,paid_revisions:(S.revPaid||[]),paid_revisions_total_kzt:S.extra||0,client:{name:S.name||null,phone:S.phone?"указан":null}};
+  return {stage:(current()||{}).id||"done",status:Object.fromEntries(STAGES.map(s=>[s.id,stageStatus(s.id)])),area_m2:area(),area_source:S.obmer&&S.obmer.area?"по обмерному плану":"примерная, клиент сам ввёл в калькулятор — это не договор и не документ",price_kzt:total(),obmer:S.obmer,brief:S.brief,brief_coverage:Math.round(coverage()*100)+"%",brief_not_discussed:miss,revisions_counted_including_current:S.rev,free_revisions_per_item:FREE_REV,paid_revisions:(S.revPaid||[]),paid_revisions_total_kzt:S.extra||0,client:{name:S.name||null,phone:S.phone?"указан":null}};
 }
 function rules(){
   const L={ru:"русском",kk:"казахском",en:"английском"}[S.lang];
@@ -616,7 +617,7 @@ let pending=[]; // [{blob,thumb,kind:'photo'|'frame'}]
 function addMsg(m){m.ts=now();S.chat.push(m);if(S.chat.length>200)S.chat=S.chat.slice(-200);save();}
 const photoActive=()=>!!((S.photos&&S.photos.length)&&!S.ok.obmer&&limits&&limits.images);
 function setLive(s){liveLabel=s;const el=document.getElementById("livestat");if(el)el.firstChild.textContent=s;}
-function startLive(s){liveLabel=s;liveT0=Date.now();clearInterval(liveTimer);liveTimer=setInterval(()=>{const el=document.getElementById("livesec");if(el){const sec=Math.round((Date.now()-liveT0)/1000);el.textContent=Math.floor(sec/60)+":"+String(sec%60).padStart(2,"0");}},1000);}
+function startLive(s){(window.__d3kT=window.__d3kT||[]).push([Date.now(),"live",s]);liveLabel=s;liveT0=Date.now();clearInterval(liveTimer);liveTimer=setInterval(()=>{const el=document.getElementById("livesec");if(el){const sec=Math.round((Date.now()-liveT0)/1000);el.textContent=Math.floor(sec/60)+":"+String(sec%60).padStart(2,"0");}},1000);}
 function stopLive(){clearInterval(liveTimer);liveTimer=null;}
 function turns(){
   const out=[{role:"user",content:rules()},{role:"assistant",content:"Понял, работаю по правилам."}];
