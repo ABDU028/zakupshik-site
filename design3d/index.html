@@ -634,7 +634,7 @@ function turns(){
   if(out[out.length-1].role!=="user")out.push({role:"user",content:"(клиент ждёт ответа)"});
   return out;
 }
-async function runAgent(note,extraImgs,label){
+async function runAgent(note,extraImgs,label,tierOver){
   busy=true;startLive(label||t("typing"));render();
   const ph=photoActive();
   ctl=new AbortController();let ok=false;
@@ -645,7 +645,7 @@ async function runAgent(note,extraImgs,label){
     if(ph){S.photos.forEach(p=>imgs.push(dataBlob(p)));tt[tt.length-1].content+=`\n\n[К запросу приложены фото плана квартиры: ${S.photos.length} шт.]`;}
     (extraImgs||[]).forEach(b=>{if(imgs.length<8)imgs.push(b);});
     if(extraImgs&&extraImgs.length)tt[tt.length-1].content+=`\n\n[К этому сообщению клиент приложил ${extraImgs.length} изображ.]`;
-    const opts={signal:ctl.signal,modelTier:imgs.length?"vision":"default",onText:({text})=>{const el=document.getElementById("live");if(el){el.classList.remove("typing");el.innerHTML=md(text,false);scrollChat();}}};
+    const opts={signal:ctl.signal,modelTier:tierOver||(imgs.length?"vision":"default"),onText:({text})=>{const el=document.getElementById("live");if(el){el.classList.remove("typing");el.innerHTML=md(text,false);scrollChat();}}};
     if(limits&&limits.tools)opts.tools=TOOLS();else opts.cache=false;
     if(imgs.length)opts.images=imgs;
     const r=await sample(tt,opts);
@@ -692,7 +692,7 @@ async function send(text,opt){
   const ok=await runAgent(kind==="frame"?"[Это кадры видео-обхода квартиры по порядку. Используй их, чтобы проверить план: стены, проёмы, стояки, радиаторы, высоты.]":"",oneOff,label);
   if(ok&&obmerTouched&&photoActive()&&sample){
     const issues=await verifyPlan();
-    if(issues.length){obmerTouched=false;await runAgent("[Автосверка плана с фото нашла расхождения: "+issues.join("; ")+". Проверь по фото. Где автосверка права — исправь через save_obmer и снова вызови request_approval. Клиенту коротко скажи, что поправил. Если не уверен — спроси клиента.]",[],t("st_fix"));}
+    if(issues.length){obmerTouched=false;await runAgent("[Автосверка плана с фото нашла расхождения: "+issues.join("; ")+". Проверь по фото. Где автосверка права — исправь через save_obmer и снова вызови request_approval. Клиенту коротко скажи, что поправил. Если не уверен — спроси клиента.]",[],t("st_fix"),"default");}
     else render();
   }
 }
