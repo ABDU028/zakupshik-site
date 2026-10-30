@@ -62,6 +62,11 @@
       for(var k=0;k<arr.length&&k<8;k++){var t=arr[k].type;if(!/^image\/(jpeg|png|gif|webp)$/.test(t))t="image/jpeg";imgs.push({type:"image",source:{type:"base64",media_type:t,data:await b64(arr[k])}});}
       var last=msgs[msgs.length-1];last.content=imgs.concat(last.content);
     }
+    // фото плана — в первое сообщение (к правилам): так они попадают в кэш и при каждом уточнении стоят в 10 раз дешевле
+    if(opts.pinnedImages&&opts.pinnedImages.length){
+      var pin=[];for(var k2=0;k2<opts.pinnedImages.length&&k2<6;k2++){var t2=opts.pinnedImages[k2].type;if(!/^image\/(jpeg|png|gif|webp)$/.test(t2))t2="image/jpeg";pin.push({type:"image",source:{type:"base64",media_type:t2,data:await b64(opts.pinnedImages[k2])}});}
+      msgs[0].content=msgs[0].content.concat([{type:"text",text:"[Фото плана квартиры от клиента:]"}],pin);
+    }
     var tools=opts.tools||[],defs=tools.map(function(t){return{name:t.name,description:t.description,input_schema:t.inputSchema||{type:"object",properties:{}}};});
     var text="",tier=opts.modelTier||"default",retries=0;
     function hint(t){var last=msgs[msgs.length-1];last.content=last.content.concat([{type:"text",text:t}]);}
@@ -646,13 +651,14 @@ async function runAgent(note,extraImgs,label,tierOver){
   try{
     const tt=turns();
     if(note)tt[tt.length-1].content+="\n\n"+note;
-    const imgs=[];
-    if(ph){S.photos.forEach(p=>imgs.push(dataBlob(p)));tt[tt.length-1].content+=`\n\n[К запросу приложены фото плана квартиры: ${S.photos.length} шт.]`;}
+    const imgs=[],pinned=[];
+    if(ph){S.photos.forEach(p=>pinned.push(dataBlob(p)));tt[tt.length-1].content+=`\n\n[Фото плана квартиры (${S.photos.length} шт.) — в начале переписки, после правил.]`;}
     (extraImgs||[]).forEach(b=>{if(imgs.length<8)imgs.push(b);});
     if(extraImgs&&extraImgs.length)tt[tt.length-1].content+=`\n\n[К этому сообщению клиент приложил ${extraImgs.length} изображ.]`;
-    const opts={signal:ctl.signal,modelTier:tierOver||(imgs.length?"vision":"default"),onText:({text})=>{const el=document.getElementById("live");if(el){el.classList.remove("typing");el.innerHTML=md(text,false);scrollChat();}}};
+    const opts={signal:ctl.signal,modelTier:tierOver||(imgs.length||(pinned.length&&!S.obmer)?"vision":"default"),onText:({text})=>{const el=document.getElementById("live");if(el){el.classList.remove("typing");el.innerHTML=md(text,false);scrollChat();}}};
     if(limits&&limits.tools)opts.tools=TOOLS();else opts.cache=false;
     if(imgs.length)opts.images=imgs;
+    if(pinned.length){if(window.D3K_API)opts.pinnedImages=pinned;else opts.images=pinned.concat(imgs).slice(0,8);}
     const r=await sample(tt,opts);
     addMsg({role:"ai",text:r.text.trim()+(r.truncated?"\n\n("+t("cut")+")":"")});ok=true;
   }catch(e){
