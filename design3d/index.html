@@ -115,7 +115,7 @@
   document.addEventListener("click",function(e){var a=e.target.closest&&e.target.closest('a[target="_blank"]');if(!a)return;var h=a.getAttribute("href")||"";if(/^https?:/.test(h)&&h.indexOf(location.origin)!==0)return;e.preventDefault();location.href=a.href;},true);
 })();
 
-(function(){var B="da2314a94a";function chk(){if(B.indexOf("__")===0||document.getElementById("live"))return;var a=document.activeElement;if(a&&(a.tagName==="TEXTAREA"||a.tagName==="INPUT")&&a.value)return;
+(function(){var B="a088654af8";function chk(){if(B.indexOf("__")===0||document.getElementById("live"))return;var a=document.activeElement;if(a&&(a.tagName==="TEXTAREA"||a.tagName==="INPUT")&&a.value)return;
  fetch("version.json?t="+Date.now(),{cache:"no-store"}).then(function(r){return r.json();}).then(function(j){if(j&&j.v&&j.v!==B)location.reload();}).catch(function(){});}
  document.addEventListener("visibilitychange",function(){if(!document.hidden)chk();});setInterval(chk,300000);setTimeout(chk,8000);})();
 </script></head><body><title>Дизайн 3D Квартир</title>
@@ -674,7 +674,7 @@ async function runAgent(note,extraImgs,label,tierOver){
     if(ph){S.photos.forEach(p=>pinned.push(dataBlob(p)));tt[tt.length-1].content+=`\n\n[Фото плана квартиры (${S.photos.length} шт.) — в начале переписки, после правил.]`;}
     (extraImgs||[]).forEach(b=>{if(imgs.length<8)imgs.push(b);});
     if(extraImgs&&extraImgs.length)tt[tt.length-1].content+=`\n\n[К этому сообщению клиент приложил ${extraImgs.length} изображ.]`;
-    const opts={signal:ctl.signal,modelTier:tierOver||(imgs.length||(pinned.length&&!S.obmer)?"vision":"default"),onText:({text})=>{const el=document.getElementById("live");if(el){el.classList.remove("typing");el.innerHTML=md(text,false);scrollChat();}}};
+    const opts={signal:ctl.signal,modelTier:tierOver||(imgs.length||(pinned.length&&!S.obmer)?"vision":"quick"),onText:({text})=>{const el=document.getElementById("live");if(el){el.classList.remove("typing");el.innerHTML=md(text,false);scrollChat();}}};
     if(limits&&limits.tools)opts.tools=TOOLS().filter(x=>!(x.name==="save_obmer"&&(S.obmerWait||(S.obmer&&S.obmer.source==="dxf"))));else opts.cache=false;
     if(imgs.length)opts.images=imgs;
     if(pinned.length){if(window.D3K_API)opts.pinnedImages=pinned;else opts.images=pinned.concat(imgs).slice(0,8);}
