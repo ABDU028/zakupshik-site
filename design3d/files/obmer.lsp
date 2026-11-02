@@ -283,6 +283,28 @@
            (setq s (obm:askstr "Подпись" (strcat "радиатор " (rtos (nth 5 inf) 2 0) ", низ 150"))) (obm:label inf s -1 "РАДИАТОРЫ")))
   (princ))
 
+;;; ---------- ВЫНОСКА (своя, всегда нормального размера) ----------
+;; VYN: клик — куда показывает стрелка, клик — где надпись, текст. Стрелка 150, текст 150.
+(defun c:VYN (/ p1 p2 s ang a l r b1 b2 dir w)
+  (setvar "CLAYER" "РАЗМЕРЫ")
+  (while (setq p1 (getpoint "\nВЫНОСКА: куда показывает стрелка (Enter — закончить): "))
+    (setq p2 (getpoint p1 "\nГде будет надпись: "))
+    (if p2
+      (progn
+        (setq s (getstring T "\nТекст надписи: "))
+        (setq ang (angle p2 p1) l 180.0 w 55.0)
+        ;; стрелка — залитый треугольник
+        (setq b1 (polar (polar p1 ang (- l)) (+ ang (/ pi 2)) w) b2 (polar (polar p1 ang (- l)) (- ang (/ pi 2)) w))
+        (entmake (list '(0 . "SOLID") (cons 8 "РАЗМЕРЫ") (cons 10 p1) (cons 11 b1) (cons 12 b2) (cons 13 b2)))
+        (obm:line p1 p2 "РАЗМЕРЫ")
+        ;; полка под текстом
+        (setq dir (if (>= (car p2) (car p1)) 1 -1) r (+ 200 (* 105 (strlen s))))
+        (obm:line p2 (obm:p (+ (car p2) (* dir r)) (cadr p2)) "РАЗМЕРЫ")
+        (entmake (list '(0 . "TEXT") (cons 8 "РАЗМЕРЫ") (cons 7 (obm:style)) (cons 10 (obm:p (+ (car p2) (* dir 100)) (+ (cadr p2) 60)))
+                       (cons 11 (obm:p (+ (car p2) (* dir 100)) (+ (cadr p2) 60))) '(40 . 150.0) (cons 1 s) '(50 . 0.0)
+                       (cons 72 (if (> dir 0) 0 2)) '(73 . 1))))))
+  (princ))
+
 ;;; ---------- 5. РАЗМЕРЫ И СОХРАНЕНИЕ ----------
 (defun c:RAZ () (setvar "CLAYER" "РАЗМЕРЫ") (command "_.DIMLINEAR") (while (> (getvar "CMDACTIVE") 0) (command pause)) (princ))
 (defun c:CEP () (setvar "CLAYER" "РАЗМЕРЫ") (command "_.DIMCONTINUE") (while (> (getvar "CMDACTIVE") 0) (command pause)) (princ))
@@ -302,7 +324,7 @@
   (princ "\n    OKN — окно,  DVR — дверь,  VHD — вход,  PRM — проём без двери")
   (princ "\n 3) ИНЖЕНЕРИЯ:  STK — стояк, KRB — короб, SHT — щиток, VNT — вентканал, RAD — радиатор")
   (princ "\n 4) SST — ПОСТРОИТЬ СТЕНЫ (сами, по комнатам). Изменил что-то — снова SST")
-  (princ "\n 5) RAZ — размер, CEP — цепочка размеров;  SDAT — сохранить DXF")
+  (princ "\n 5) RAZ — размер, CEP — цепочка размеров, VYN — выноска со стрелкой;  SDAT — сохранить DXF")
   (princ "\n    TOLSH — толщина наружных стен (по умолчанию 300)")
   (princ "\n ПРОБЕЛ — повторить последнюю команду. F8 — орто. Esc — отмена.")
   (princ "\n ==================================================")
