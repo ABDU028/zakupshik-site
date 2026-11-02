@@ -115,7 +115,7 @@
   document.addEventListener("click",function(e){var a=e.target.closest&&e.target.closest('a[target="_blank"]');if(!a)return;var h=a.getAttribute("href")||"";if(/^https?:/.test(h)&&h.indexOf(location.origin)!==0)return;e.preventDefault();location.href=a.href;},true);
 })();
 
-(function(){var B="daa5b76e93";function chk(){if(B.indexOf("__")===0||document.getElementById("live"))return;var a=document.activeElement;if(a&&(a.tagName==="TEXTAREA"||a.tagName==="INPUT")&&a.value)return;
+(function(){var B="88c684603e";function chk(){if(B.indexOf("__")===0||document.getElementById("live"))return;var a=document.activeElement;if(a&&(a.tagName==="TEXTAREA"||a.tagName==="INPUT")&&a.value)return;
  fetch("version.json?t="+Date.now(),{cache:"no-store"}).then(function(r){return r.json();}).then(function(j){if(j&&j.v&&j.v!==B)location.reload();}).catch(function(){});}
  document.addEventListener("visibilitychange",function(){if(!document.hidden)chk();});setInterval(chk,300000);setTimeout(chk,8000);})();
 </script></head><body><title>Дизайн 3D Квартир</title>
@@ -1070,24 +1070,28 @@ function bindInputs(){
   const mm=document.getElementById("mm");if(mm)mm.onchange=()=>{S.mgrMode=mm.checked;addMsg({role:"sys",text:S.mgrMode?t("aiPaused"):t("aiBack")});save();toast(S.mgrMode?t("aiPaused"):t("aiBack"));};
   document.querySelectorAll("details.stage").forEach(d=>d.ontoggle=()=>{if(d.open&&openStage!==d.dataset.st){openStage=d.dataset.st;render();}else if(!d.open&&openStage===d.dataset.st){openStage=null;}});
 }
-function doSend(){if(busy)return;const ta=document.getElementById("ta");const v=ta?ta.value:"";draft="";if(ta)ta.value="";if(listening)toggleVoice(false);send(v);}
+let voiceEndWait=null;
+async function doSend(){if(busy)return;
+  // если ещё идёт запись — останавливаем и ждём последние слова (до 1,5 с), потом отправляем
+  if(listening){toggleVoice(false);await new Promise(r=>{voiceEndWait=r;setTimeout(r,1500);});voiceEndWait=null;}
+  const ta=document.getElementById("ta");const v=ta?ta.value:draft;draft="";if(ta){ta.value="";ta.dispatchEvent(new Event("input"));}voiceCut=true;voiceBase="";send(v);}
 /* ---------- голос ---------- */
-let rec=null,voiceBase="";
+let rec=null,voiceBase="",voiceCut=false;
 function toggleVoice(on){
   if(on===undefined)on=!listening;
-  const ta=document.getElementById("ta");voiceBase=ta?ta.value.trim():"";
+  const ta=document.getElementById("ta");if(on){voiceCut=false;voiceBase=ta?ta.value.trim():"";}
   const lang={ru:"ru-RU",kk:"kk-KZ",en:"en-US"}[S.lang]||"ru-RU";
   if(window.D3K_NATIVE){window.D3K_post({t:"voice",on,lang});listening=on;updMic();return;}
   const SR=window.SpeechRecognition||window.webkitSpeechRecognition;if(!SR)return;
   if(!on){try{rec&&rec.stop();}catch(e){}listening=false;updMic();return;}
   rec=new SR();rec.lang=lang;rec.interimResults=true;rec.continuous=false;
   rec.onresult=e=>{let s="";for(let i=0;i<e.results.length;i++)s+=e.results[i][0].transcript;voiceText(s);};
-  rec.onend=()=>{listening=false;updMic();};rec.onerror=()=>{listening=false;updMic();};
+  rec.onend=()=>{listening=false;updMic();if(voiceEndWait)voiceEndWait();};rec.onerror=()=>{listening=false;updMic();};
   try{rec.start();listening=true;updMic();}catch(e){listening=false;}
 }
 function updMic(){const b=document.querySelector(".mic");if(b)b.classList.toggle("on",listening);const ta=document.getElementById("ta");if(ta)ta.placeholder=(S.mgrMode?t("mgr")+": ":"")+(listening?t("listening"):t("ph"));}
-function voiceText(s){const ta=document.getElementById("ta");const v=(voiceBase?voiceBase+" ":"")+s;draft=v;if(ta){ta.value=v;ta.dispatchEvent(new Event("input"));}}
-window.addEventListener("d3k-native",e=>{const m=e.detail||{};if(m.t==="voice"&&m.text!=null)voiceText(m.text);if(m.t==="voice-end"){listening=false;updMic();}if(m.t==="voice-error"){listening=false;updMic();toast(m.msg||t("voiceErr"));}});
+function voiceText(s){if(voiceCut)return;const ta=document.getElementById("ta");const v=(voiceBase?voiceBase+" ":"")+s;draft=v;if(ta){ta.value=v;ta.dispatchEvent(new Event("input"));}}
+window.addEventListener("d3k-native",e=>{const m=e.detail||{};if(m.t==="voice"&&m.text!=null)voiceText(m.text);if(m.t==="voice"&&m.final&&voiceEndWait)voiceEndWait();if(m.t==="voice-end"){listening=false;updMic();if(voiceEndWait)voiceEndWait();}if(m.t==="voice-error"){listening=false;updMic();toast(m.msg||t("voiceErr"));}});
 /* ---------- фото и видео ---------- */
 async function shrink(file,max,q){const u=URL.createObjectURL(file);try{const im=new Image();await new Promise((r,j)=>{im.onload=r;im.onerror=j;im.src=u;});const s=Math.min(1,max/Math.max(im.width,im.height));const c=document.createElement("canvas");c.width=Math.round(im.width*s);c.height=Math.round(im.height*s);c.getContext("2d").drawImage(im,0,0,c.width,c.height);return c.toDataURL("image/jpeg",q);}finally{URL.revokeObjectURL(u);}}
 async function addImages(files,kind){
