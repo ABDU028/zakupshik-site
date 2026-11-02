@@ -114,6 +114,10 @@
   window.claude={use:async function(n){return n==="sample"?sample:null;}};
   document.addEventListener("click",function(e){var a=e.target.closest&&e.target.closest('a[target="_blank"]');if(!a)return;var h=a.getAttribute("href")||"";if(/^https?:/.test(h)&&h.indexOf(location.origin)!==0)return;e.preventDefault();location.href=a.href;},true);
 })();
+
+(function(){var B="c2bdc69041";function chk(){if(B.indexOf("__")===0||document.getElementById("live"))return;var a=document.activeElement;if(a&&(a.tagName==="TEXTAREA"||a.tagName==="INPUT")&&a.value)return;
+ fetch("version.json?t="+Date.now(),{cache:"no-store"}).then(function(r){return r.json();}).then(function(j){if(j&&j.v&&j.v!==B)location.reload();}).catch(function(){});}
+ document.addEventListener("visibilitychange",function(){if(!document.hidden)chk();});setInterval(chk,300000);setTimeout(chk,8000);})();
 </script></head><body><title>Дизайн 3D Квартир</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Caveat:wght@500;700&display=swap" rel="stylesheet">
