@@ -62,7 +62,7 @@
 (defun obm:area (e) (vla-get-Area (vlax-ename->vla-object e)))
 
 ;;; ---------- НАСТРОЙКА ----------
-(defun c:NASTROYKA (/ ce ss)
+(defun c:NASTROYKA (/ ce ss i)
   (setq ce (getvar "CMDECHO")) (setvar "CMDECHO" 0)
   (setvar "INSUNITS" 4) (setvar "MEASUREMENT" 1) (setvar "MEASUREINIT" 1)
   (setvar "LUNITS" 2) (setvar "LUPREC" 0) (setvar "AUNITS" 0) (setvar "AUPREC" 0)
@@ -82,6 +82,10 @@
   (setvar "DIMDEC" 0) (setvar "DIMLUNIT" 2) (setvar "DIMZIN" 8) (setvar "DIMCLRD" 256) (setvar "DIMCLRE" 256) (setvar "DIMCLRT" 256)
   (if (tblsearch "DIMSTYLE" "OBMER") (command "_.-DIMSTYLE" "_S" "OBMER" "_Y") (command "_.-DIMSTYLE" "_S" "OBMER"))
   (if (getvar "DIMLAYER") (setvar "DIMLAYER" "РАЗМЕРЫ"))
+;; выноски: масштаб 40 (текст ~160 мм, стрелка ~160 мм в натуре); уже поставленные - тоже
+  (if (getvar "MLEADERSCALE") (setvar "MLEADERSCALE" 40))
+  (if (setq ss (ssget "_X" '((0 . "MULTILEADER"))))
+    (progn (setq i 0) (repeat (sslength ss) (vl-catch-all-apply 'vla-put-ScaleFactor (list (vlax-ename->vla-object (ssname ss i)) 40)) (setq i (1+ i)))))
   ;; все уже поставленные размеры - на наш стиль (крупные, засечки, цифры вдоль линии)
   (if (setq ss (ssget "_X" '((0 . "DIMENSION")))) (command "_.-DIMSTYLE" "_A" ss ""))
   (setvar "CLAYER" "КОМНАТЫ")
