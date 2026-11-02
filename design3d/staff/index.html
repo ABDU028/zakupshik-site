@@ -34,7 +34,7 @@ main.split{display:grid;grid-template-columns:380px minmax(0,1fr);gap:14px;paddi
 .ib{flex:1;min-width:0}.ib .r1{display:flex;justify-content:space-between;gap:8px;align-items:baseline}.ib .r1 b{font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ib .t{font-size:12px;color:var(--mute);white-space:nowrap}.ib .r3{font-size:13px;color:var(--mute);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:4px}
 .chip{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:700;padding:3px 9px;border-radius:99px;margin-top:4px}
-.chip.red{background:var(--red-bg);color:var(--red)}.chip.amber{background:var(--y-bg);color:var(--y)}.chip.grey{background:var(--s2);color:var(--mute)}.chip.ok{background:var(--ok-bg);color:var(--ok)}
+.chip.red{background:var(--red-bg);color:var(--red)}.chip.amber{background:var(--y-bg);color:var(--y)}.chip.grey{background:var(--s2);color:var(--mute)}.chip.ok{background:var(--ok-bg);color:var(--ok)}.chip.blue,.av.blue{background:var(--blue-bg);color:var(--blue)}
 .chatp{display:flex;flex-direction:column;min-width:0;min-height:0;background:var(--card);border-radius:20px;box-shadow:var(--sh);overflow:hidden}
 .empty{margin:auto;text-align:center;padding:30px;max-width:460px}.empty h2{font-family:var(--disp);font-size:20px;margin:0 0 8px}
 .sum{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-top:18px;text-align:left}.sum div{background:var(--s2);border-radius:14px;padding:12px}.sum b{display:block;font-family:var(--disp);font-size:22px}
@@ -371,6 +371,7 @@ function statusOf(x) {
   if (o.some(q => q.kind === 'obmer')) return { k: 'obmer', t: 'Ждёт обмера', c: 'red' };
   if (x.wait_pay) return { k: 'pay', t: `Ждёт оплаты · блок ${x.wait_pay} · ${fmt((x.sums || {})[x.wait_pay])} ₸`, c: 'amber' };
   if (o.some(q => ['callback', 'manager', 'zamer', 'pay'].includes(q.kind))) return { k: 'call', t: 'Просит звонок', c: 'amber' };
+  if (x.work && x.work.stage) return { k: 'work', t: (x.work.rev ? 'Правка: ' : 'Сделать: ') + (STG[x.work.stage] || x.work.stage) + ' · ' + ago(x.work.since), c: 'blue' };
   if (x.needs_reply) return { k: 'reply', t: 'Нет ответа клиенту', c: 'red' };
   if (x.wait_obmer) return { k: 'obmer', t: 'Обмер на правке', c: 'red' };
   return { k: 'ok', t: STG[x.stage] || x.stage || '—', c: x.stage === 'done' ? 'ok' : 'grey' };
@@ -378,11 +379,12 @@ function statusOf(x) {
 const lastMsg = x => (x.chat || []).filter(m => m.r !== 'ap').slice(-1)[0];
 const unread = x => { const lc = x.last_client_at ? Date.parse(x.last_client_at) : 0; const rq = reqs.filter(q => q.pid === x.pid).map(q => Date.parse(q.created_at)); const last = Math.max(lc, ...rq, 0); return last > (seen[x.pid] || 0); };
 
+const ago = v => { if (!v) return ''; const m = Math.round((Date.now() - (+v || Date.parse(v))) / 6e4); return m < 60 ? m + ' мин' : m < 1440 ? Math.round(m / 60) + ' ч' : Math.round(m / 1440) + ' дн'; };
 const initials = n => { const w = String(n || '?').trim().split(/\s+/); return ((w[0] || '?')[0] + ((w[1] || '')[0] || '')).toUpperCase(); };
 const STAGE_IDS = ['obmer', 'brief', 'plan', 'vis', 'draw', 'ved', 'pdf'];
 let q = '';
 function render() {
-  const F = [['obmer', 'Ждут обмера'], ['pay', 'Ждут оплаты'], ['call', 'Просят звонок'], ['reply', 'Нет ответа']];
+  const F = [['obmer', 'Ждут обмера'], ['work', 'Сделать'], ['pay', 'Ждут оплаты'], ['call', 'Просят звонок'], ['reply', 'Нет ответа']];
   const cnt = k => projects.filter(x => statusOf(x).k === k).length;
   const toPay = projects.filter(x => x.wait_pay).reduce((a, x) => a + (+(x.sums || {})[x.wait_pay] || 0), 0);
   document.getElementById('stats').innerHTML = `<button class="${filter === 'all' ? 'on' : ''}" data-f="all">Все <b>${projects.length}</b></button>` +
@@ -409,7 +411,7 @@ function render() {
 function emptyView(toPay) {
   const c = k => projects.filter(x => statusOf(x).k === k).length;
   return `<div class="empty"><h2>Выберите клиента</h2><p class="mute">Слева все клиенты. Сверху — те, кто чего-то ждёт от вас.</p>
-   <div class="sum"><div><b>${c('obmer')}</b>ждут обмера</div><div><b>${c('pay')}</b>ждут звонка по оплате${toPay ? `<br><span class="sm">${fmt(toPay)} ₸</span>` : ''}</div><div><b>${c('call')}</b>просят позвонить</div><div><b>${c('reply')}</b>без ответа</div></div></div>`;
+   <div class="sum"><div><b>${c('obmer')}</b>ждут обмера</div><div><b>${c('work')}</b>ждут результата (планировки, визуализация…)</div><div><b>${c('pay')}</b>ждут звонка по оплате${toPay ? `<br><span class="sm">${fmt(toPay)} ₸</span>` : ''}</div><div><b>${c('call')}</b>просят позвонить</div><div><b>${c('reply')}</b>без ответа</div></div></div>`;
 }
 function chatView(x) {
   const s = statusOf(x), phone = (x.phone || '').replace(/[^\d+]/g, ''), wa = phone.replace(/^\+/, '').replace(/^8(\d{10})$/, '7$1');
@@ -426,11 +428,13 @@ function chatView(x) {
      <div class="prog-l"><span>Этап: <b>${esc(STG[x.stage] || x.stage || '—')}</b></span><span>${x.area ? esc(String(x.area).replace('.', ',')) + ' м²' : ''}${x.price ? ' · проект ' + fmt(x.price) + ' ₸' : ''}${obm[x.pid] ? ' · обмер v' + obm[x.pid].ver : ''}</span></div></div>
     ${x.price ? `<div class="blocks">${[1, 2, 3].map(b => `<div class="blk ${paid[b] ? 'paid' : x.wait_pay == b ? 'wait' : ''}"><b>${sums[b] ? fmt(sums[b]) + ' ₸' : '—'}</b>Блок ${b} · ${paid[b] ? 'оплачен ✓' : x.wait_pay == b ? 'ждёт оплаты' : 'позже'}</div>`).join('')}</div>` : ''}
     <div class="acts">${x.wait_pay ? `<button class="btn ok" data-paid="${x.wait_pay}">✓ Оплата получена · ${fmt(sums[x.wait_pay])} ₸</button>` : ''}
+     ${resBtn(x)}
      <label class="btn ${o.some(r => r.kind === 'obmer') ? '' : 'ghost'}">📐 ${obm[x.pid] ? 'Загрузить новый DXF' : 'Загрузить DXF обмера'}<input type="file" accept=".dxf" data-dxf="${x.pid}" hidden></label></div>
     ${o.length ? `<div class="reqs">${o.map(r => `<div class="req"><div class="tx"><b>${esc(KIND[r.kind] || r.kind)}</b> · ${tm(r.created_at)}${r.note ? `<br>${esc(r.note)}` : ''}${r.when_text ? `<br>когда: ${esc(r.when_text)}` : ''}${r.address ? `<br>${esc(r.city || '')} ${esc(r.address)}` : ''}</div><button class="lnk" data-st="done" data-id="${r.id}">✓ сделано</button></div>`).join('')}</div>` : ''}
     ${files.length ? `<details class="files" ${o.some(r => r.kind === 'obmer') ? 'open' : ''}><summary>📷 Фото рисунка (${files.reduce((a, r) => a + r.files.length, 0)})</summary><div class="thumbs">${files.map(r => r.files.map(f => `<img src="${f}" data-zoom="1" alt="">`).join('')).join('')}</div></details>` : ''}
    </div>`;
   if (parsed[x.pid]) h += preview(x.pid);
+  if (resUp && resUp.pid === x.pid) h += resPanel();
   h += `<div class="msgs" id="msgs">`;
   if (x._noSync) {
     h += `<div class="note">Клиент ещё не заходил в приложение после обновления — полная переписка появится здесь, как только он его откроет. Ниже — последние сообщения из его заявок.</div>`;
@@ -448,6 +452,41 @@ function chatView(x) {
   if (x.needs_reply) h += `<div class="sysm red">Клиент ждёт ответа</div>`;
   h += `</div><div class="composer"><textarea id="mtext" rows="2" placeholder="Написать клиенту от менеджера… (Ctrl+Enter)"></textarea><button class="btn" data-a="msg">Отправить</button></div>`;
   return h;
+}
+/* ---- результат этапа: файлы клиенту ---- */
+const STUDIO = ['plan', 'vis', 'draw', 'ved', 'pdf'];
+let resUp = null;
+function resBtn(x) {
+  const st = (x.work && x.work.stage) || STUDIO.find(id => !(x.ok || {})[id] && STUDIO.indexOf(id) <= STUDIO.indexOf(x.stage)) || '';
+  if (!STUDIO.includes(x.stage) && !(x.work && x.work.stage)) return '';
+  return `<button class="btn ${x.work ? '' : 'ghost'}" data-a="resopen" data-k="${st}">📤 Отправить ${x.work && x.work.rev ? 'исправленные ' : ''}${(STG[st] || '').toLowerCase()}</button>`;
+}
+function resPanel() {
+  const r = resUp;
+  return `<div class="card" style="margin:12px 18px"><b>Отправить клиенту результат</b>
+   <div class="row" style="margin:8px 0"><span class="sm">Этап:</span>${STUDIO.map(id => `<button class="lnk" style="${r.stage === id ? 'background:var(--ink);color:var(--card)' : ''}" data-a="resst" data-k="${id}">${STG[id]}</button>`).join('')}</div>
+   <label class="btn ghost">🖼 Выбрать файлы (картинки, PDF, Excel)<input type="file" multiple accept="image/*,.pdf,.xlsx,.xls,.dwg,.dxf,.zip" id="resfiles" hidden></label>
+   <div class="thumbs">${r.files.map((f, i) => /^image\//.test(f.type) ? `<img src="${f.prev}" alt="">` : `<span class="chip grey">${esc(f.name)}</span>`).join('')}</div>
+   ${r.stage === 'plan' ? '<p class="sm mute">Каждая картинка = вариант планировки (клиент выберет «Вариант 1, 2, 3…»).</p>' : ''}
+   <textarea id="restext" rows="2" style="width:100%;margin-top:8px;border:1px solid var(--line);border-radius:10px;padding:8px;background:var(--bg)" placeholder="Пояснение для клиента (необязательно)">${esc(r.text || '')}</textarea>
+   <div class="row" style="margin-top:8px"><button class="btn ok" data-a="ressend" ${r.files.length && !r.busy ? '' : 'disabled'}>${r.busy ? 'Загружаю…' : 'Отправить клиенту (' + r.files.length + ')'}</button><button class="btn ghost" data-a="rescancel">Отмена</button></div></div>`;
+}
+async function resSend() {
+  const r = resUp; if (!r || !r.files.length) return;
+  r.text = (document.getElementById('restext') || {}).value || ''; r.busy = true; render();
+  const out = [];
+  for (let i = 0; i < r.files.length; i++) {
+    const f = r.files[i].file, ext = (f.name.split('.').pop() || 'bin').toLowerCase().replace(/[^a-z0-9]/g, '');
+    const path = `${r.pid}/${r.stage}/${Date.now()}_${i + 1}.${ext}`;
+    const up = await SB.storage.from('d3k').upload(path, f, { contentType: f.type || undefined, upsert: true });
+    if (up.error) { alert('Не загрузился ' + f.name + ': ' + up.error.message); r.busy = false; render(); return; }
+    out.push({ url: SB.storage.from('d3k').getPublicUrl(path).data.publicUrl, name: f.name, type: f.type });
+  }
+  const { error } = await SB.from('d3k_events').insert({ pid: r.pid, kind: 'result', data: { stage: r.stage, files: out, text: r.text.trim() } });
+  if (error) { alert('Ошибка: ' + error.message); r.busy = false; render(); return; }
+  await SB.from('d3k_requests').update({ status: 'done' }).eq('pid', r.pid).eq('kind', 'manager');
+  await SB.from('d3k_projects').update({ work: null }).eq('pid', r.pid);
+  resUp = null; alert('Отправлено. Клиенту придёт уведомление «Готово: ' + STG[r.stage].toLowerCase() + '».'); load();
 }
 function preview(pid) {
   const A = parsed[pid];
@@ -510,12 +549,17 @@ app.addEventListener('click', async e => {
   else if (t.dataset.a === 'back') { sel = null; render(); }
   else if (t.dataset.a === 'msg') sendMsg();
   else if (t.dataset.a === 'cancelDxf') { delete parsed[sel]; render(); }
+  else if (t.dataset.a === 'resopen') { resUp = { pid: sel, stage: t.dataset.k || 'plan', files: [], text: '' }; render(); }
+  else if (t.dataset.a === 'resst') { resUp.stage = t.dataset.k; render(); }
+  else if (t.dataset.a === 'rescancel') { resUp = null; render(); }
+  else if (t.dataset.a === 'ressend') resSend();
   else if (t.dataset.paid) markPaid(+t.dataset.paid);
   else if (t.dataset.st) { await SB.from('d3k_requests').update({ status: t.dataset.st }).eq('id', +t.dataset.id); load(); }
   else if (t.dataset.send) sendObmer(t.dataset.send);
   else if (t.dataset.zoom) { const z = document.createElement('div'); z.className = 'zoom'; z.innerHTML = `<img src="${t.src}">`; z.onclick = () => z.remove(); document.body.appendChild(z); }
 });
-app.addEventListener('change', e => { const t = e.target; if (t.dataset && t.dataset.dxf && t.files[0]) onDXF(t.dataset.dxf, t.files[0]); });
+app.addEventListener('change', e => { const t = e.target; if (t.dataset && t.dataset.dxf && t.files[0]) onDXF(t.dataset.dxf, t.files[0]);
+  if (t.id === 'resfiles' && resUp) { const tx = document.getElementById('restext'); if (tx) resUp.text = tx.value; [...t.files].forEach(f => resUp.files.push({ file: f, name: f.name, type: f.type, prev: /^image\//.test(f.type) ? URL.createObjectURL(f) : '' })); render(); } });
 document.getElementById('stats').addEventListener('click', e => { const t = e.target.closest('[data-f]'); if (t) { filter = t.dataset.f; sel = null; render(); } });
 app.addEventListener('input', e => { if (e.target.id === 'q') { q = e.target.value; render(); } });
 app.addEventListener('keydown', e => { if (e.target.id === 'mtext' && e.key === 'Enter' && (e.ctrlKey || e.metaKey)) sendMsg(); });
@@ -530,7 +574,7 @@ async function start() {
   document.getElementById('who').textContent = data.session.user.email; const out = document.getElementById('out'); out.hidden = false; out.onclick = async () => { await SB.auth.signOut(); location.reload(); };
   load();
   // обновление каждые 15 с, но не трогаем экран, пока менеджер печатает или смотрит DXF
-  setInterval(() => { const ta = document.getElementById('mtext'); if (Object.keys(parsed).length || (ta && ta.value) || document.activeElement && document.activeElement.tagName === 'INPUT') return; load(); }, 15000);
+  setInterval(() => { const ta = document.getElementById('mtext'); if (Object.keys(parsed).length || resUp || (ta && ta.value) || document.activeElement && document.activeElement.tagName === 'INPUT') return; load(); }, 15000);
 }
 window.D3K_TEST = { parseDXF, decodeDXF, flatten, analyze, renderSVG };
 start();
