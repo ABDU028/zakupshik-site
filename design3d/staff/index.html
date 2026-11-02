@@ -371,6 +371,7 @@ function statusOf(x) {
   if (o.some(q => q.kind === 'obmer')) return { k: 'obmer', t: 'Ждёт обмера', c: 'red' };
   if (x.wait_pay) return { k: 'pay', t: `Ждёт оплаты · блок ${x.wait_pay} · ${fmt((x.sums || {})[x.wait_pay])} ₸`, c: 'amber' };
   if (o.some(q => ['callback', 'manager', 'zamer', 'pay'].includes(q.kind))) return { k: 'call', t: 'Просит звонок', c: 'amber' };
+  if (x.work && x.work.stage && x.draft && !x.draft.sent && x.draft.stage === x.work.stage && !(x.gen && x.gen.state === 'running')) return { k: 'work', t: 'Проверить: ' + (STG[x.work.stage] || '') + ' (ИИ сделал)', c: 'amber' };
   if (x.work && x.work.stage) return { k: 'work', t: (x.work.rev ? 'Правка: ' : 'Сделать: ') + (STG[x.work.stage] || x.work.stage) + ' · ' + ago(x.work.since), c: 'blue' };
   if (x.needs_reply) return { k: 'reply', t: 'Нет ответа клиенту', c: 'red' };
   if (x.wait_obmer) return { k: 'obmer', t: 'Обмер на правке', c: 'red' };
@@ -434,6 +435,7 @@ function chatView(x) {
     ${files.length ? `<details class="files" ${o.some(r => r.kind === 'obmer') ? 'open' : ''}><summary>📷 Фото рисунка (${files.reduce((a, r) => a + r.files.length, 0)})</summary><div class="thumbs">${files.map(r => r.files.map(f => `<img src="${f}" data-zoom="1" alt="">`).join('')).join('')}</div></details>` : ''}
    </div>`;
   if (parsed[x.pid]) h += preview(x.pid);
+  if (x.work && x.work.stage) h += draftView(x);
   if (resUp && resUp.pid === x.pid) h += resPanel();
   h += `<div class="msgs" id="msgs">`;
   if (x._noSync) {
@@ -452,6 +454,37 @@ function chatView(x) {
   if (x.needs_reply) h += `<div class="sysm red">Клиент ждёт ответа</div>`;
   h += `</div><div class="composer"><textarea id="mtext" rows="2" placeholder="Написать клиенту от менеджера… (Ctrl+Enter)"></textarea><button class="btn" data-a="msg">Отправить</button></div>`;
   return h;
+}
+/* ---- черновик ИИ ---- */
+let drop = {};
+function draftView(x) {
+  const d = x.draft, g = x.gen || {};
+  if (g.state === 'running' && g.stage === x.work.stage) return `<div class="note" style="margin:12px 18px">🤖 ИИ сейчас делает ${(STG[x.work.stage] || '').toLowerCase()} — обычно 5–10 минут. Обновится само.</div>`;
+  if (g.state === 'error') return `<div class="warn" style="margin:12px 18px">ИИ не смог сделать ${(STG[x.work.stage] || '').toLowerCase()}: ${esc(g.err || '')}. <button class="lnk" data-a="regen">Попробовать снова</button></div>`;
+  if (!d || d.sent || d.stage !== x.work.stage) return x.work.stage === 'plan' ? `<div class="note" style="margin:12px 18px">🤖 ИИ возьмёт планировки в работу в течение часа (проверка раз в час).</div>` : '';
+  const dr = drop[x.pid] || {};
+  return `<div class="card" style="margin:12px 18px"><b>🤖 ИИ подготовил: ${esc(STG[d.stage] || d.stage)} — проверьте и отправьте клиенту</b>
+   <div class="sm mute" style="margin:4px 0 8px">Лишний вариант можно убрать. Если всё плохо — «Переделать».</div>
+   <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px">${d.files.map((f, i) => { const n = (d.notes || [])[i] || {}; return `<div style="opacity:${dr[i] ? .35 : 1}"><img src="${esc(f.url)}" data-zoom="1" style="width:100%;border-radius:10px;border:1px solid var(--line);cursor:zoom-in"><div class="sm"><b>${esc(n.title || f.name)}</b><br>${esc(n.idea || '')}</div>${(n.errors || []).length ? `<div class="warn">Замечаний проверки: ${n.errors.length}<br><span class="sm">${esc(n.errors.slice(0, 3).join('; '))}</span></div>` : ''}<button class="lnk" data-a="dropv" data-k="${i}">${dr[i] ? 'Вернуть' : 'Убрать'}</button></div>`; }).join('')}</div>
+   <div class="row" style="margin-top:10px"><button class="btn ok" data-a="draftsend">✓ Отправить клиенту (${d.files.filter((_, i) => !dr[i]).length})</button><button class="btn ghost" data-a="regen">↻ Переделать</button></div></div>`;
+}
+async function draftSend() {
+  const x = projects.find(p => p.pid === sel); if (!x || !x.draft) return;
+  const d = x.draft, dr = drop[x.pid] || {};
+  const idx = d.files.map((_, i) => i).filter(i => !dr[i]); if (!idx.length) return alert('Не осталось вариантов');
+  const files = idx.map((i, k) => Object.assign({}, d.files[i], { name: 'Вариант ' + (k + 1) }));
+  const text = idx.map((i, k) => { const n = (d.notes || [])[i] || {}; return `Вариант ${k + 1}${n.title ? ' — ' + n.title.replace(/^Вариант \d+\.\s*/, '') : ''}: ${n.idea || ''}`; }).join('\n');
+  if (!confirm('Отправить клиенту ' + files.length + ' вариант(а)?')) return;
+  const { error } = await SB.from('d3k_events').insert({ pid: x.pid, kind: 'result', data: { stage: d.stage, files, text } });
+  if (error) return alert('Ошибка: ' + error.message);
+  await SB.from('d3k_projects').update({ work: null, draft: Object.assign({}, d, { sent: Date.now() }) }).eq('pid', x.pid);
+  await SB.from('d3k_requests').update({ status: 'done' }).eq('pid', x.pid).eq('kind', 'manager');
+  delete drop[x.pid]; alert('Отправлено клиенту.'); load();
+}
+async function regen() {
+  const x = projects.find(p => p.pid === sel); if (!x) return;
+  await SB.from('d3k_projects').update({ gen: null, draft: null }).eq('pid', x.pid); delete drop[x.pid];
+  alert('ИИ переделает в течение часа.'); load();
 }
 /* ---- результат этапа: файлы клиенту ---- */
 const STUDIO = ['plan', 'vis', 'draw', 'ved', 'pdf'];
@@ -553,6 +586,9 @@ app.addEventListener('click', async e => {
   else if (t.dataset.a === 'resst') { resUp.stage = t.dataset.k; render(); }
   else if (t.dataset.a === 'rescancel') { resUp = null; render(); }
   else if (t.dataset.a === 'ressend') resSend();
+  else if (t.dataset.a === 'dropv') { const d = drop[sel] = drop[sel] || {}; d[t.dataset.k] = !d[t.dataset.k]; render(); }
+  else if (t.dataset.a === 'draftsend') draftSend();
+  else if (t.dataset.a === 'regen') regen();
   else if (t.dataset.paid) markPaid(+t.dataset.paid);
   else if (t.dataset.st) { await SB.from('d3k_requests').update({ status: t.dataset.st }).eq('id', +t.dataset.id); load(); }
   else if (t.dataset.send) sendObmer(t.dataset.send);

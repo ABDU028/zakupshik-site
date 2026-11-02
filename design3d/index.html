@@ -115,7 +115,7 @@
   document.addEventListener("click",function(e){var a=e.target.closest&&e.target.closest('a[target="_blank"]');if(!a)return;var h=a.getAttribute("href")||"";if(/^https?:/.test(h)&&h.indexOf(location.origin)!==0)return;e.preventDefault();location.href=a.href;},true);
 })();
 
-(function(){var B="f4b0d09e22";function chk(){if(B.indexOf("__")===0||document.getElementById("live"))return;var a=document.activeElement;if(a&&(a.tagName==="TEXTAREA"||a.tagName==="INPUT")&&a.value)return;
+(function(){var B="da2314a94a";function chk(){if(B.indexOf("__")===0||document.getElementById("live"))return;var a=document.activeElement;if(a&&(a.tagName==="TEXTAREA"||a.tagName==="INPUT")&&a.value)return;
  fetch("version.json?t="+Date.now(),{cache:"no-store"}).then(function(r){return r.json();}).then(function(j){if(j&&j.v&&j.v!==B)location.reload();}).catch(function(){});}
  document.addEventListener("visibilitychange",function(){if(!document.hidden)chk();});setInterval(chk,300000);setTimeout(chk,8000);})();
 </script></head><body><title>Дизайн 3D Квартир</title>
@@ -757,7 +757,7 @@ function syncState(){
   const lastReal=[...S.chat].reverse().find(m=>m.role==="me"||m.role==="ai"||m.role==="mgr");
   const lastMe=[...S.chat].reverse().find(m=>m.role==="me");
   return {name:S.name,phone:S.phone,area:area(),price:total(),stage:(current()||{}).id||"done",wait_pay:payBlock()||null,wait_obmer:!!S.obmerWait&&!S.ok.obmer,
-    paid:S.paid,ok:Object.fromEntries(STAGES.map(s=>[s.id,!!S.ok[s.id]])),sums:{1:blockSum(1),2:blockSum(2),3:blockSum(3)},chat:ch,needs_reply:!!(lastReal&&lastReal.role==="me"),work:workNow(),res:Object.keys(S.res||{}),last_client_at:lastMe?lastMe.ts:null};
+    paid:S.paid,ok:Object.fromEntries(STAGES.map(s=>[s.id,!!S.ok[s.id]])),sums:{1:blockSum(1),2:blockSum(2),3:blockSum(3)},chat:ch,needs_reply:!!(lastReal&&lastReal.role==="me"),work:workNow(),res:Object.keys(S.res||{}),brief:S.brief,last_client_at:lastMe?lastMe.ts:null};
 }
 async function syncNow(){
   if(!S.pid||!S.started||!window.D3K_API||!window.D3K_API.sync||syncing)return;
