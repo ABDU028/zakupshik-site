@@ -3,15 +3,44 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Дизайн 3D — заявки и обмеры</title>
+<title>Дизайн 3D — клиенты</title>
 <link rel="icon" href="../favicon.png">
 <style>
 :root{--bg:#f4f1ec;--card:#fff;--ink:#1d1b19;--mute:#6f6860;--line:#e3ddd4;--acc:#b5532c;--ok:#2e7d4f;--warn:#b7791f;--blue:#2b5fd9}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
-header{display:flex;align-items:center;gap:12px;padding:12px 16px;background:var(--ink);color:#fff;position:sticky;top:0;z-index:5}
+header{display:flex;align-items:center;gap:12px;padding:0 16px;height:52px;white-space:nowrap;background:var(--ink);color:#fff;position:sticky;top:0;z-index:5}
 header b{font-size:16px}header .sp{flex:1}header button{background:transparent;color:#fff;border:1px solid #fff5;border-radius:8px;padding:6px 10px;cursor:pointer}
-main{max-width:1180px;margin:0 auto;padding:16px}
+main{max-width:1400px;margin:0 auto;padding:16px}
+main.split{display:grid;grid-template-columns:340px minmax(0,1fr);gap:0;padding:0;height:calc(100vh - 52px);height:calc(100dvh - 52px)}
+.list{border-right:1px solid var(--line);overflow:auto;background:#fff}
+.filters{display:flex;gap:4px;flex-wrap:wrap;padding:10px;position:sticky;top:0;background:#fff;border-bottom:1px solid var(--line);z-index:2}
+.filters button{border:1px solid var(--line);background:#fff;border-radius:99px;padding:5px 10px;cursor:pointer;font:inherit;font-size:13px}
+.filters button.on{background:var(--ink);color:#fff;border-color:var(--ink)}.filters i{font-style:normal;background:var(--acc);color:#fff;border-radius:99px;padding:0 6px;margin-left:2px;font-size:11px}
+.item{display:block;width:100%;text-align:left;border:0;border-bottom:1px solid var(--line);background:#fff;padding:10px 12px;cursor:pointer;font:inherit;color:inherit}
+.item:hover{background:#faf7f2}.item.on{background:#f3ece2}
+.item .r1{display:flex;justify-content:space-between;gap:8px}.item .t{font-size:12px;color:var(--mute);white-space:nowrap}
+.item .r2{display:flex;align-items:center;gap:6px;margin:3px 0}.item .r3{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dot{width:9px;height:9px;border-radius:50%;background:var(--blue)}
+.chip{display:inline-block;font-size:12px;font-weight:600;padding:2px 8px;border-radius:99px;background:#eee;color:#555}
+.chip.red{background:#fbe0dc;color:#b42318}.chip.amber{background:#fbeccb;color:#8a5a00}.chip.grey{background:#ece8e2;color:#5d564e}
+.chatp{display:flex;flex-direction:column;min-width:0;overflow:hidden}
+.empty{margin:auto}.pad{padding:12px}.orphan{padding:6px 0;border-bottom:1px solid var(--line)}
+.lnk{border:0;background:none;color:var(--blue);cursor:pointer;font:inherit;font-size:13px;padding:0 4px}
+.ch-head{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--line);background:#fff}.ch-head .who{flex:1;min-width:0}
+.back{display:none;border:0;background:none;font-size:28px;line-height:1;cursor:pointer;padding:0 6px}
+.facts{display:flex;flex-wrap:wrap;gap:6px;padding:8px 14px;background:#fff;border-bottom:1px solid var(--line)}.facts span{background:#f4f1ec;border-radius:8px;padding:3px 8px}.facts .okc{background:#dcefe3;color:var(--ok)}
+.acts{display:flex;flex-wrap:wrap;gap:8px;padding:10px 14px}
+.reqs{padding:0 14px}.req{background:#fff8ea;border:1px solid #f1d39b;border-radius:10px;padding:8px 10px;margin-bottom:6px}
+.files{padding:0 14px}.files .thumbs img{width:110px;height:110px}
+.prev.card{margin:10px 14px}
+.msgs{flex:1;overflow:auto;padding:12px 14px;display:flex;flex-direction:column;gap:6px;background:#efeae2}
+.b{max-width:78%;padding:7px 10px;border-radius:12px;background:#fff;font-size:14px;word-wrap:break-word;align-self:flex-start;box-shadow:0 1px 1px #0001}
+.b .w{font-size:11px;color:var(--mute);margin-bottom:2px}
+.b.cl{align-self:flex-start;background:#fff}.b.ai{align-self:flex-end;background:#e7eefc}.b.mg{align-self:flex-end;background:#dcf5d9}.b.pend{opacity:.75}
+.sysm{align-self:center;font-size:12px;color:#5d564e;background:#fff9;border-radius:8px;padding:3px 10px;max-width:90%;text-align:center;white-space:pre-line}.sysm span{color:var(--mute)}.sysm.red{background:#fbe0dc;color:#b42318}
+.composer{display:flex;gap:8px;padding:10px 14px;background:#fff;border-top:1px solid var(--line)}.composer textarea{flex:1;resize:none}
+@media(max-width:820px){header a,.hm,#who{display:none}main.split{grid-template-columns:1fr}main.split.sel .list{display:none}main.split:not(.sel) .chatp{display:none}.back{display:block}.b{max-width:90%}}
 .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:12px}
 .tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
 .tabs button{border:1px solid var(--line);background:#fff;border-radius:99px;padding:7px 14px;cursor:pointer;font:inherit}
@@ -36,14 +65,14 @@ td input{width:100%;padding:5px 7px}
 </style>
 </head>
 <body>
-<header><b>Дизайн 3D Квартир · персонал</b><span class="sp"></span><a href="../files/obmer.lsp" download style="color:#fff;font-size:13px">obmer.lsp</a><a href="../files/ramka-A3-obmer.dxf" download style="color:#fff;font-size:13px">Рамка A3</a><span id="who" class="sm"></span><button id="out" hidden>Выйти</button></header>
+<header><b>Дизайн 3D <span class="hm">Квартир · персонал</span></b><span class="sp"></span><a href="../files/obmer.lsp" download style="color:#fff;font-size:13px">obmer.lsp</a><a href="../files/ramka-A3-obmer.dxf" download style="color:#fff;font-size:13px">Рамка A3</a><span id="who" class="sm"></span><button id="out" hidden>Выйти</button></header>
 <main id="app"></main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.js"></script>
 <script>
 const SB = window.supabase.createClient('https://tqhigjvyoqtwukqqnlmb.supabase.co', 'sb_publishable_LBGMjPTdbjINAwQa-uchpA_okvE5SQY');
 const app = document.getElementById('app');
 const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-const KIND = { obmer: 'Обмер по рисунку', zamer: 'Заказ замера', callback: 'Перезвонить', manager: 'Позвать менеджера', support: 'Вопрос' };
+const KIND = { obmer: 'Обмер по рисунку', zamer: 'Заказ замера', callback: 'Перезвонить', manager: 'Позвать менеджера', support: 'Вопрос', pay: 'Позвонить по оплате' };
 let tab = 'obmer', rows = [], open = {}, parsed = {};
 
 /* ================== DXF: разбор ================== */
@@ -292,86 +321,180 @@ function renderSVG(A) {
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W.toFixed(0)} ${H.toFixed(0)}" width="${pw}" height="${ph}"><rect width="100%" height="100%" fill="#fffdf9"/>${g.join('')}</svg>`;
 }
 
-/* ================== интерфейс ================== */
+/* ================== интерфейс: чаты клиентов ================== */
+const STG = { obmer: 'Обмер', brief: 'Анкета', plan: 'Планировки', vis: 'Визуализация', draw: 'Чертежи', ved: 'Ведомость', pdf: 'PDF', done: 'Проект готов' };
+const fmt = n => Math.round(+n || 0).toLocaleString('ru-RU').replace(/,/g, ' ');
+const tm = v => { if (!v) return ''; const d = new Date(v), n = new Date(); return d.toDateString() === n.toDateString() ? d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) : d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' }) + ' ' + d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }); };
+let projects = [], reqs = [], evs = [], obm = {}, sel = null, filter = 'all', firstLoad = true, prevSig = {};
+const SEEN_KEY = 'd3k_staff_seen';
+let seen = {}; try { seen = JSON.parse(localStorage.getItem(SEEN_KEY) || '{}'); } catch (e) { }
+const markSeen = pid => { seen[pid] = Date.now(); try { localStorage.setItem(SEEN_KEY, JSON.stringify(seen)); } catch (e) { } };
+
 async function load() {
-  const { data, error } = await SB.from('d3k_requests').select('*').order('created_at', { ascending: false }).limit(200);
-  if (error) { app.innerHTML = `<div class="card">Ошибка: ${esc(error.message)}</div>`; return; }
-  rows = data || [];
-  const pids = [...new Set(rows.filter(r => r.pid).map(r => r.pid))];
-  if (pids.length) { const { data: ob } = await SB.from('d3k_obmer').select('pid,ver,updated_at').in('pid', pids); (ob || []).forEach(o => { rows.filter(r => r.pid === o.pid).forEach(r => r._ob = o); }); }
+  const [p, r] = await Promise.all([
+    SB.from('d3k_projects').select('*').order('updated_at', { ascending: false }).limit(300),
+    SB.from('d3k_requests').select('*').order('created_at', { ascending: false }).limit(300)]);
+  if (p.error || r.error) { app.innerHTML = `<div class="card">Ошибка: ${esc((p.error || r.error).message)}</div>`; return; }
+  projects = p.data || []; reqs = r.data || [];
+  const pids = [...new Set(projects.map(x => x.pid).concat(reqs.filter(x => x.pid).map(x => x.pid)))];
+  // клиенты, у которых есть заявки, но проект ещё не синхронизирован (старая версия приложения)
+  pids.forEach(pid => { if (!projects.find(x => x.pid === pid)) { const q = reqs.find(x => x.pid === pid); projects.push({ pid, name: q.name, phone: q.phone, area: q.project && q.project.area, stage: q.stage, chat: null, updated_at: q.created_at, _noSync: true }); } });
+  if (pids.length) {
+    const [o, e] = await Promise.all([SB.from('d3k_obmer').select('pid,ver,updated_at').in('pid', pids), SB.from('d3k_events').select('*').in('pid', pids).order('id')]);
+    obm = {}; (o.data || []).forEach(x => obm[x.pid] = x); evs = e.data || [];
+  }
+  // звук на новое
+  let fresh = false;
+  projects.forEach(x => { const s = sigOf(x); if (!firstLoad && prevSig[x.pid] !== undefined && s > prevSig[x.pid]) fresh = true; if (!firstLoad && prevSig[x.pid] === undefined) fresh = true; prevSig[x.pid] = s; });
+  if (fresh) beep();
+  firstLoad = false;
   render();
 }
-function render() {
-  const list = rows.filter(r => tab === 'all' ? true : tab === 'obmer' ? r.kind === 'obmer' && r.status !== 'done' : tab === 'other' ? r.kind !== 'obmer' && r.status !== 'done' : r.status === 'done');
-  const cnt = k => rows.filter(r => k === 'obmer' ? r.kind === 'obmer' && r.status !== 'done' : k === 'other' ? r.kind !== 'obmer' && r.status !== 'done' : k === 'done' ? r.status === 'done' : true).length;
-  app.innerHTML = `<div class="tabs">${[['obmer', 'Ждут обмера'], ['other', 'Звонки и вопросы'], ['done', 'Готово'], ['all', 'Все']].map(([k, n]) => `<button class="${tab === k ? 'on' : ''}" data-tab="${k}">${n} · ${cnt(k)}</button>`).join('')}<button data-a="reload">↻ Обновить</button></div>` +
-    (list.length ? list.map(card).join('') : `<div class="card mute">Здесь пусто.</div>`);
+function sigOf(x) { const rq = reqs.filter(q => q.pid === x.pid).length; const lc = x.last_client_at ? Date.parse(x.last_client_at) : 0; return rq * 1e13 + lc; }
+function beep() { try { const c = new (window.AudioContext || window.webkitAudioContext)(), o = c.createOscillator(), g = c.createGain(); o.frequency.value = 880; o.connect(g); g.connect(c.destination); g.gain.setValueAtTime(.15, c.currentTime); g.gain.exponentialRampToValueAtTime(.001, c.currentTime + .4); o.start(); o.stop(c.currentTime + .4); } catch (e) { } if (document.hidden) document.title = '● Новое — Дизайн 3D'; }
+document.addEventListener('visibilitychange', () => { if (!document.hidden) document.title = 'Дизайн 3D — клиенты'; });
+
+const openReqs = pid => reqs.filter(q => q.pid === pid && q.status !== 'done');
+function statusOf(x) {
+  const o = openReqs(x.pid);
+  if (o.some(q => q.kind === 'obmer')) return { k: 'obmer', t: 'Ждёт обмера', c: 'red' };
+  if (x.wait_pay) return { k: 'pay', t: `Ждёт оплаты · блок ${x.wait_pay} · ${fmt((x.sums || {})[x.wait_pay])} ₸`, c: 'amber' };
+  if (o.some(q => ['callback', 'manager', 'zamer', 'pay'].includes(q.kind))) return { k: 'call', t: 'Просит звонок', c: 'amber' };
+  if (x.needs_reply) return { k: 'reply', t: 'Нет ответа клиенту', c: 'red' };
+  if (x.wait_obmer) return { k: 'obmer', t: 'Обмер на правке', c: 'red' };
+  return { k: 'ok', t: STG[x.stage] || x.stage || '—', c: 'grey' };
 }
-function card(r) {
-  const p = r.project || {}, phone = (r.phone || '').replace(/[^\d+]/g, '');
-  const st = r.status === 'done' ? '<span class="pill ok">готово</span>' : r.status === 'work' ? '<span class="pill work">в работе</span>' : '<span class="pill">новая</span>';
-  let h = `<div class="card" id="c${r.id}"><div class="row"><b>${esc(KIND[r.kind] || r.kind)}</b>${st}<span class="mute sm">#${r.id} · ${new Date(r.created_at).toLocaleString('ru-RU')}</span></div>
-   <div class="row sm" style="margin-top:6px"><span>${esc(r.name || 'без имени')}</span>${phone ? `<a href="tel:${phone}">${esc(r.phone)}</a><a href="https://wa.me/${phone.replace('+', '')}" target="_blank">WhatsApp</a>` : ''}${r.city ? `<span>${esc(r.city)}</span>` : ''}${r.address ? `<span>${esc(r.address)}</span>` : ''}${r.when_text ? `<span>когда: ${esc(r.when_text)}</span>` : ''}</div>
-   ${r.note ? `<p class="sm" style="margin:8px 0 0">${esc(r.note)}</p>` : ''}
-   ${p.area ? `<p class="sm mute" style="margin:6px 0 0">Площадь (клиент): ${esc(p.area)} м² · этап: ${esc(r.stage || '')}</p>` : ''}
-   ${Array.isArray(p.last) && p.last.length ? `<details class="sm" style="margin-top:6px"><summary>Последние сообщения</summary>${p.last.map(x => `<div>${esc(x)}</div>`).join('')}</details>` : ''}
-   ${Array.isArray(r.files) && r.files.length ? `<div class="thumbs">${r.files.map((f, i) => `<img src="${f}" data-zoom="${r.id}:${i}" alt="">`).join('')}</div>` : ''}`;
-  if (r.kind === 'obmer') {
-    h += r.pid ? `<div class="row" style="margin-top:8px">${r._ob ? `<span class="pill ok">обмер отправлен · версия ${r._ob.ver}</span>` : ''}<label class="btn ghost">Загрузить DXF<input type="file" accept=".dxf" data-dxf="${r.id}" hidden></label></div>` : `<p class="warn">У заявки нет id проекта (старая версия приложения) — отправить обмер в приложение нельзя.</p>`;
-    if (parsed[r.id]) h += preview(r);
-  }
-  h += `<div class="row" style="margin-top:10px">${r.status !== 'work' && r.status !== 'done' ? `<button class="btn ghost" data-st="work" data-id="${r.id}">Взять в работу</button>` : ''}${r.status !== 'done' ? `<button class="btn ghost" data-st="done" data-id="${r.id}">Готово</button>` : `<button class="btn ghost" data-st="new" data-id="${r.id}">Вернуть в работу</button>`}</div></div>`;
+const lastMsg = x => (x.chat || []).filter(m => m.r !== 'ap').slice(-1)[0];
+const unread = x => { const lc = x.last_client_at ? Date.parse(x.last_client_at) : 0; const rq = reqs.filter(q => q.pid === x.pid).map(q => Date.parse(q.created_at)); const last = Math.max(lc, ...rq, 0); return last > (seen[x.pid] || 0); };
+
+function render() {
+  const F = { all: 'Все', obmer: 'Обмер', pay: 'Оплата', call: 'Звонки', reply: 'Нет ответа' };
+  const cnt = k => k === 'all' ? projects.length : projects.filter(x => statusOf(x).k === k).length;
+  const list = projects.filter(x => filter === 'all' || statusOf(x).k === filter)
+    .sort((a, b) => { const pa = statusOf(a).k !== 'ok', pb = statusOf(b).k !== 'ok'; if (pa !== pb) return pa ? -1 : 1; return Date.parse(b.updated_at) - Date.parse(a.updated_at); });
+  const orphans = reqs.filter(q => !q.pid && q.status !== 'done');
+  const L = `<aside class="list">
+    <div class="filters">${Object.entries(F).map(([k, n]) => `<button class="${filter === k ? 'on' : ''}" data-f="${k}">${n}${cnt(k) && k !== 'all' ? ` <i>${cnt(k)}</i>` : ''}</button>`).join('')}</div>
+    ${list.map(x => { const s = statusOf(x), m = lastMsg(x); return `<button class="item ${sel === x.pid ? 'on' : ''}" data-p="${x.pid}">
+      <div class="r1"><b>${esc(x.name || 'Без имени')}</b><span class="t">${tm(m ? m.ts : x.updated_at)}</span></div>
+      <div class="r2"><span class="chip ${s.c}">${esc(s.t)}</span>${unread(x) ? '<span class="dot"></span>' : ''}</div>
+      <div class="r3">${m ? `<span class="mute">${m.r === 'me' ? '' : m.r === 'mgr' ? 'Вы: ' : m.r === 'ai' ? 'ИИ: ' : ''}</span>${esc(String(m.t || (m.i ? '📷 фото' : '')).slice(0, 80))}` : '<span class="mute">нет сообщений</span>'}</div></button>`; }).join('') || '<p class="mute pad">Пусто.</p>'}
+    ${orphans.length ? `<div class="pad"><b class="sm">Заявки без проекта · ${orphans.length}</b>${orphans.map(q => `<div class="sm orphan">${esc(KIND[q.kind] || q.kind)} · ${esc(q.name || '')} <a href="tel:${esc((q.phone || '').replace(/[^\d+]/g, ''))}">${esc(q.phone || '')}</a> <span class="mute">${tm(q.created_at)}</span><br>${esc(q.note || '')} <button class="lnk" data-st="done" data-id="${q.id}">готово</button></div>`).join('')}</div>` : ''}
+  </aside>`;
+  const x = projects.find(p => p.pid === sel);
+  app.className = x ? 'split sel' : 'split';
+  app.innerHTML = L + `<section class="chatp">${x ? chatView(x) : '<div class="empty mute">Выберите клиента слева</div>'}</section>`;
+  const b = document.getElementById('msgs'); if (b) b.scrollTop = b.scrollHeight;
+}
+
+function chatView(x) {
+  const s = statusOf(x), phone = (x.phone || '').replace(/[^\d+]/g, ''), wa = phone.replace(/^\+/, '').replace(/^8(\d{10})$/, '7$1');
+  const paid = x.paid || {}, sums = x.sums || {};
+  const o = openReqs(x.pid), files = reqs.filter(q => q.pid === x.pid && Array.isArray(q.files) && q.files.length);
+  const obReq = reqs.find(q => q.pid === x.pid && q.kind === 'obmer');
+  const myEv = evs.filter(e => e.pid === x.pid);
+  const chatTs = (x.chat || []).map(m => m.ts || 0);
+  const pendingMsgs = myEv.filter(e => e.kind === 'msg' && !(x.chat || []).some(m => m.r === 'mgr' && m.t === (e.data || {}).text));
+  let h = `<div class="ch-head"><button class="back" data-a="back">‹</button><div class="who"><b>${esc(x.name || 'Без имени')}</b>
+     <div class="sm">${phone ? `<a href="tel:${phone}">📞 ${esc(x.phone)}</a> · <a href="https://wa.me/${wa}" target="_blank">WhatsApp</a>` : '<span class="mute">телефона нет</span>'}</div></div>
+     <span class="chip ${s.c}">${esc(s.t)}</span></div>
+   <div class="facts sm">${x.area ? `<span>${esc(String(x.area).replace('.', ','))} м²</span>` : ''}${x.price ? `<span>Проект ${fmt(x.price)} ₸</span>` : ''}
+     ${[1, 2, 3].map(b => `<span class="${paid[b] ? 'okc' : ''}">Блок ${b}${sums[b] ? ' · ' + fmt(sums[b]) + ' ₸' : ''} ${paid[b] ? '✓ оплачен' : x.wait_pay == b ? '— ждёт оплаты' : ''}</span>`).join('')}
+     <span>Этап: ${esc(STG[x.stage] || x.stage || '—')}</span>${obm[x.pid] ? `<span class="okc">обмер v${obm[x.pid].ver}</span>` : ''}</div>`;
+  // действия
+  h += `<div class="acts">`;
+  if (x.wait_pay) h += `<button class="btn ok" data-paid="${x.wait_pay}">✓ Оплата получена — блок ${x.wait_pay} · ${fmt(sums[x.wait_pay])} ₸</button>`;
+  h += `<label class="btn ghost">${obm[x.pid] ? 'Загрузить новый DXF' : 'Загрузить DXF обмера'}<input type="file" accept=".dxf" data-dxf="${x.pid}" hidden></label>`;
+  if (x._noSync) h += `<span class="sm mute">Клиент на старой версии приложения — чат не виден</span>`;
+  h += `</div>`;
+  if (o.length) h += `<div class="reqs">${o.map(q => `<div class="req"><b>${esc(KIND[q.kind] || q.kind)}</b> <span class="mute sm">${tm(q.created_at)}</span> ${q.note ? `<div class="sm">${esc(q.note)}</div>` : ''}${q.when_text ? `<div class="sm">когда: ${esc(q.when_text)}</div>` : ''}${q.address ? `<div class="sm">${esc(q.city || '')} ${esc(q.address)}</div>` : ''}<button class="lnk" data-st="done" data-id="${q.id}">✓ сделано</button></div>`).join('')}</div>`;
+  if (files.length) h += `<details class="files" ${o.some(q => q.kind === 'obmer') ? 'open' : ''}><summary class="sm">Фото рисунка (${files.reduce((a, q) => a + q.files.length, 0)})</summary><div class="thumbs">${files.map(q => q.files.map(f => `<img src="${f}" data-zoom="1" alt="">`).join('')).join('')}</div></details>`;
+  if (parsed[x.pid]) h += preview(x.pid);
+  // переписка
+  h += `<div class="msgs" id="msgs">`;
+  (x.chat || []).forEach(m => {
+    if (m.r === 'sys' || m.r === 'ap') { h += `<div class="sysm">${esc(m.t)}${m.ts ? ` <span>${tm(m.ts)}</span>` : ''}</div>`; return; }
+    const cls = m.r === 'me' ? 'cl' : m.r === 'mgr' ? 'mg' : 'ai';
+    const who = m.r === 'me' ? (x.name || 'Клиент') : m.r === 'mgr' ? 'Менеджер' : 'ИИ-дизайнер';
+    h += `<div class="b ${cls}"><div class="w">${esc(who)} · ${tm(m.ts)}</div>${m.i ? `<div class="sm mute">📷 ${m.i} фото</div>` : ''}${esc(m.t).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').replace(/\n/g, '<br>')}</div>`;
+  });
+  if (!(x.chat || []).length) h += `<div class="sysm">Переписки пока нет</div>`;
+  pendingMsgs.forEach(e => { h += `<div class="b mg pend"><div class="w">Менеджер · ${tm(e.created_at)}</div>${esc(e.data.text)}<div class="sm">⏳ дойдёт, когда клиент откроет приложение</div></div>`; });
+  if (x.needs_reply) h += `<div class="sysm red">Клиент ждёт ответа</div>`;
+  h += `</div><div class="composer"><textarea id="mtext" rows="2" placeholder="Написать клиенту от менеджера…"></textarea><button class="btn" data-a="msg">Отправить</button></div>`;
   return h;
 }
-function preview(r) {
-  const A = parsed[r.id];
+
+function preview(pid) {
+  const A = parsed[pid];
   if (A.error) return `<p class="warn">${esc(A.error)}</p>`;
-  return `<div class="prev"><div class="plan">${A.svg}</div><div>
+  return `<div class="prev card"><div class="plan">${A.svg}</div><div>
     <b>Как увидит клиент</b>${A.warn.map(w => `<div class="warn">${esc(w)}</div>`).join('')}
     <table><tr><th>Помещение</th><th>м²</th><th>Потолок</th></tr>
-    ${A.rooms.map((x, i) => `<tr><td><input value="${esc(x.name)}" data-rn="${r.id}:${i}"></td><td>${x.area_m2}</td><td><input value="${x.h_mm || ''}" placeholder="2700" data-rh="${r.id}:${i}" style="width:80px"></td></tr>`).join('')}</table>
-    <p class="sm">Итого площадь: <input value="${A.area || ''}" data-area="${r.id}" style="width:90px"> м² ${A.rooms.length ? '' : '<span class="mute">(введи вручную)</span>'}</p>
+    ${A.rooms.map((x, i) => `<tr><td><input value="${esc(x.name)}" data-rn="${i}"></td><td>${x.area_m2}</td><td><input value="${x.h_mm || ''}" placeholder="2700" data-rh="${i}" style="width:80px"></td></tr>`).join('')}</table>
+    <p class="sm">Итого площадь: <input value="${A.area || ''}" id="ob_area" style="width:90px"> м² ${A.rooms.length ? '' : '<span class="mute">(введи вручную)</span>'}</p>
     <p class="sm mute">Окна: ${A.openings.filter(o => o.kind === 'window').length} · двери/проёмы: ${A.openings.filter(o => o.kind !== 'window').length} · стояки: ${A.risers.length} · щиток: ${A.panels.length ? 'да' : 'нет'}</p>
-    <textarea data-note="${r.id}" rows="2" style="width:100%" placeholder="Примечание для клиента (необязательно)"></textarea>
-    <button class="btn ok" data-send="${r.id}" style="margin-top:8px;width:100%">Отправить клиенту на утверждение</button></div></div>`;
+    <textarea id="ob_note" rows="2" style="width:100%" placeholder="Примечание для клиента (необязательно)"></textarea>
+    <div class="row" style="margin-top:8px"><button class="btn ok" data-send="${pid}">Отправить клиенту на утверждение</button><button class="btn ghost" data-a="cancelDxf">Отмена</button></div></div></div>`;
 }
-async function onDXF(id, file) {
+async function onDXF(pid, file) {
   try {
-    const buf = await file.arrayBuffer();
-    const dxf = parseDXF(decodeDXF(buf));
+    const dxf = parseDXF(decodeDXF(await file.arrayBuffer()));
     const A = analyze(flatten(dxf));
     if (!A.error) A.svg = renderSVG(A);
-    A.file = file.name; parsed[id] = A;
-  } catch (e) { parsed[id] = { error: 'Не получилось прочитать файл: ' + (e.message || e) + '. Сохрани как DXF.' }; }
-  render(); document.getElementById('c' + id)?.scrollIntoView({ behavior: 'smooth' });
+    A.file = file.name; parsed[pid] = A;
+  } catch (e) { parsed[pid] = { error: 'Не получилось прочитать файл: ' + (e.message || e) + '. Сохрани как DXF.' }; }
+  render();
 }
-async function sendObmer(id) {
-  const r = rows.find(x => x.id === id), A = parsed[id]; if (!r || !A || A.error) return;
-  document.querySelectorAll(`[data-rn^="${id}:"]`).forEach(inp => { A.rooms[+inp.dataset.rn.split(':')[1]].name = inp.value.trim() || 'Помещение'; });
-  document.querySelectorAll(`[data-rh^="${id}:"]`).forEach(inp => { const v = parseInt(inp.value, 10); A.rooms[+inp.dataset.rh.split(':')[1]].h_mm = v || null; });
-  const area = parseFloat(String(document.querySelector(`[data-area="${id}"]`).value).replace(',', '.')) || A.area;
+async function sendObmer(pid) {
+  const A = parsed[pid]; if (!A || A.error) return;
+  document.querySelectorAll('[data-rn]').forEach(inp => { A.rooms[+inp.dataset.rn].name = inp.value.trim() || 'Помещение'; });
+  document.querySelectorAll('[data-rh]').forEach(inp => { A.rooms[+inp.dataset.rh].h_mm = parseInt(inp.value, 10) || null; });
+  const area = parseFloat(String(document.getElementById('ob_area').value).replace(',', '.')) || A.area;
   if (!area) { alert('Укажи площадь'); return; }
-  const note = document.querySelector(`[data-note="${id}"]`).value.trim();
+  const note = document.getElementById('ob_note').value.trim();
   const hs = A.rooms.map(x => x.h_mm).filter(Boolean);
   const data = { source: 'dxf', file: A.file, area: Math.round(area * 10) / 10, ceiling_mm: hs.length ? Math.max(...hs) : null,
     rooms: A.rooms.map(x => ({ name: x.name, h_mm: x.h_mm, area_m2: x.area_m2, poly: x.poly })), openings: A.openings, risers: A.risers, panels: A.panels, vents: A.vents,
     total_w_mm: Math.round(A.bbox[2] - A.bbox[0]), total_d_mm: Math.round(A.bbox[3] - A.bbox[1]), notes: note || 'Обмерный план начерчен специалистом по вашему рисунку. Точность ±10–20 мм.', svg: A.svg };
-  const ver = r._ob ? r._ob.ver + 1 : 1;
-  const { error } = await SB.from('d3k_obmer').upsert({ pid: r.pid, ver, data, updated_at: new Date().toISOString() });
+  const ver = obm[pid] ? obm[pid].ver + 1 : 1;
+  const { error } = await SB.from('d3k_obmer').upsert({ pid, ver, data, updated_at: new Date().toISOString() });
   if (error) { alert('Не отправилось: ' + error.message); return; }
-  await SB.from('d3k_requests').update({ status: 'done' }).eq('id', id);
-  delete parsed[id]; alert('Обмер отправлен клиенту (версия ' + ver + '). В приложении он появится в течение минуты.'); load();
+  await SB.from('d3k_requests').update({ status: 'done' }).eq('pid', pid).eq('kind', 'obmer');
+  delete parsed[pid]; alert('Обмер отправлен клиенту (версия ' + ver + '). В приложении появится в течение минуты.'); load();
+}
+async function markPaid(b) {
+  const x = projects.find(p => p.pid === sel); if (!x) return;
+  const sum = (x.sums || {})[b];
+  if (!confirm(`Подтвердить: клиент ${x.name || ''} оплатил блок ${b} — ${fmt(sum)} ₸?\n\nКлиенту придёт «Оплата получена», и ИИ начнёт следующий этап.`)) return;
+  const { error } = await SB.from('d3k_events').insert({ pid: x.pid, kind: 'paid', data: { block: b, sum } });
+  if (error) { alert('Ошибка: ' + error.message); return; }
+  await SB.from('d3k_requests').update({ status: 'done' }).eq('pid', x.pid).in('kind', ['pay', 'callback']);
+  await SB.from('d3k_projects').update({ wait_pay: null, paid: Object.assign({}, x.paid, { [b]: true }) }).eq('pid', x.pid);
+  load();
+}
+async function sendMsg() {
+  const ta = document.getElementById('mtext'), text = (ta.value || '').trim(); if (!text || !sel) return;
+  const { error } = await SB.from('d3k_events').insert({ pid: sel, kind: 'msg', data: { text } });
+  if (error) { alert('Ошибка: ' + error.message); return; }
+  ta.value = ''; load();
 }
 app.addEventListener('click', async e => {
-  const t = e.target.closest('[data-tab],[data-a],[data-st],[data-send],[data-zoom]'); if (!t) return;
-  if (t.dataset.tab) { tab = t.dataset.tab; render(); }
-  else if (t.dataset.a === 'reload') load();
+  const t = e.target.closest('[data-f],[data-p],[data-a],[data-st],[data-send],[data-zoom],[data-paid]'); if (!t) return;
+  if (t.dataset.f) { filter = t.dataset.f; render(); }
+  else if (t.dataset.p) { sel = t.dataset.p; markSeen(sel); render(); }
+  else if (t.dataset.a === 'back') { sel = null; render(); }
+  else if (t.dataset.a === 'msg') sendMsg();
+  else if (t.dataset.a === 'cancelDxf') { delete parsed[sel]; render(); }
+  else if (t.dataset.paid) markPaid(+t.dataset.paid);
   else if (t.dataset.st) { await SB.from('d3k_requests').update({ status: t.dataset.st }).eq('id', +t.dataset.id); load(); }
-  else if (t.dataset.send) sendObmer(+t.dataset.send);
+  else if (t.dataset.send) sendObmer(t.dataset.send);
   else if (t.dataset.zoom) { const z = document.createElement('div'); z.className = 'zoom'; z.innerHTML = `<img src="${t.src}">`; z.onclick = () => z.remove(); document.body.appendChild(z); }
 });
-app.addEventListener('change', e => { const t = e.target; if (t.dataset && t.dataset.dxf && t.files[0]) onDXF(+t.dataset.dxf, t.files[0]); });
+app.addEventListener('change', e => { const t = e.target; if (t.dataset && t.dataset.dxf && t.files[0]) onDXF(t.dataset.dxf, t.files[0]); });
+app.addEventListener('keydown', e => { if (e.target.id === 'mtext' && e.key === 'Enter' && (e.ctrlKey || e.metaKey)) sendMsg(); });
 function loginUI(msg) {
+  app.className = '';
   app.innerHTML = `<div class="card login"><h3>Вход для персонала</h3><p class="sm mute">Тот же логин и пароль, что в панели Закупщика.</p>${msg ? `<p class="warn">${esc(msg)}</p>` : ''}<input id="em" type="email" placeholder="Email"><input id="pw" type="password" placeholder="Пароль"><button class="btn" id="go" style="width:100%">Войти</button></div>`;
   document.getElementById('go').onclick = async () => { const { error } = await SB.auth.signInWithPassword({ email: document.getElementById('em').value.trim(), password: document.getElementById('pw').value }); if (error) loginUI('Неверный email или пароль'); else start(); };
 }
@@ -379,7 +502,9 @@ async function start() {
   const { data } = await SB.auth.getSession();
   if (!data.session) return loginUI();
   document.getElementById('who').textContent = data.session.user.email; const out = document.getElementById('out'); out.hidden = false; out.onclick = async () => { await SB.auth.signOut(); location.reload(); };
-  load(); setInterval(() => { if (!Object.keys(parsed).length) load(); }, 60000);
+  load();
+  // обновление каждые 15 с, но не трогаем экран, пока менеджер печатает или смотрит DXF
+  setInterval(() => { const ta = document.getElementById('mtext'); if (Object.keys(parsed).length || (ta && ta.value) || document.activeElement && document.activeElement.tagName === 'INPUT') return; load(); }, 15000);
 }
 window.D3K_TEST = { parseDXF, decodeDXF, flatten, analyze, renderSVG };
 start();
