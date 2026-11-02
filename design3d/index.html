@@ -5,6 +5,7 @@
   var KEY="sb_publishable_LBGMjPTdbjINAwQa-uchpA_okvE5SQY";
   window.D3K_LINKS={howto:"howto/",example:"primer/",project:"proekt/"};
   window.D3K_API={
+    obmer:function(pid){return fetch(FN+"?action=obmer",{method:"POST",headers:{"content-type":"application/json","apikey":KEY},body:JSON.stringify({pid:pid})}).then(function(r){return r.json();});},
     request:function(data){return fetch(FN+"?action=request",{method:"POST",headers:{"content-type":"application/json","apikey":KEY},body:JSON.stringify(data)}).then(function(r){return r.json();});}
   };
   // мост к приложению на телефоне (голос, файлы)
@@ -335,6 +336,7 @@ kk:{tag:"Чаттағы дизайн-жоба",hero:"Пәтердің дизай
 en:{tag:"Design project in a chat",hero:"Your apartment design project, on your phone",heroP:"Sketch your apartment by hand and take a photo — the AI designer makes the measured plan, layouts, renders, working drawings and a materials list.",calc:"What it costs",area:"Apartment area, m²",total:"Project price",perm:"₸ per m²",b1:"Survey + brief + layouts",b2:"Visualisation",b3:"Drawings + materials + PDF",free:"The measured plan is free — it gives us the exact area.",how:"How it works",s1:"Draw your apartment following the guide and send a photo",s2:"The AI builds the measured plan — you approve it",s3:"A detailed brief for every room",s4:"5 layout options, 2 days to choose",s5:"Renders of every room",s6:"Working drawings — each sheet approved",s7:"Materials list and the whole project as PDF",offer:"I accept the offer terms: I provide the dimensions and am responsible for them, and I check and approve each stage. 2 free revisions per stage, then 5,000 ₸ per revision. Prepaid, stage by stage.",start:"Start a project",cont:"Continue project",howto:"How to draw",howtoS:"Guide with an example",example:"Example project",exampleS:"56 m², stage by stage",chat:"Chat",stages:"Stages",files:"Files",more:"More",designer:"AI designer",online:"online",mgrOn:"manager on the line",ph:"Message…",typing:"Typing…",you:"You",ai:"AI designer",mgr:"Manager",approve:"Approve",revise:"Revise",revLeft:"free revisions",revPaid:"Revision 5,000 ₸",approved:"Approved",pay:"Pay",payDemo:"Payment (demo). The real app uses Kaspi Pay.",paid:"Paid",locked:"Opens after the previous stage",needPay:"Block payment needed",st_obmer:"Measured plan",st_brief:"Room brief",st_plan:"Layout options",st_vis:"Visualisation",st_draw:"Working drawings",st_ved:"Materials list",st_pdf:"Project PDF",d_obmer:"Photo of your sketch → dimensioned plan",d_brief:"Who lives here, furniture, appliances, finishes",d_plan:"5 options, 2 days to choose",d_vis:"White model and colour for each room",d_draw:"Sheet by sheet, each approved",d_ved:"Materials, consumables and tools",d_pdf:"Everything in one file",sendPhoto:"Send a photo of the sketch",openChat:"Open chat",fillBrief:"Fill the brief in chat",demoNote:"Prototype: this shows the 56 m² example. The real app shows your own files here.",choose:"Choose an option",chosen:"Chosen",deadline:"Time left to choose",days:"d",hours:"h",stall:"No reply for over 2 days — a manager has been notified and will call you.",noSample:"The AI chat works when the app is opened in Claude. Stages, payment and examples work anyway.",dl:"Download",xlsx:"Materials list, Excel",pdfOpen:"Open the full project to print as PDF",json:"Project data (JSON)",svg:"Measured plan, image",noFiles:"Files appear as you go through the stages.",name:"Name",phone:"Contact phone",language:"Language",theme:"Theme",mgrMode:"Manager mode (admin demo)",mgrModeS:"The manager writes to the client and the AI pauses. When switched off, the AI continues with the conversation in mind.",shift:"Demo: skip 2 days",reset:"Start the project over",extraTotal:"Paid revisions",areaFact:"Area from the plan",rooms:"Rooms",askMgr:"Call a manager",mgrCalled:"A manager has been notified and will contact you.",aiPaused:"AI agent paused — a manager is in the chat.",aiBack:"The AI agent is back and sees the conversation with the manager.",revPrompt:"Revision for “{x}”: ",payRev:"Free revisions are used up. A revision costs 5,000 ₸.",cancel:"Cancel",sheets:"Sheets",allSheets:"All sheets approved",briefSaved:"Saved by room",greet:"Hello! I'm the AI designer at Дизайн 3D Квартир. Let's start with the measured plan: sketch your apartment by hand following the guide, write every dimension in millimetres and send me a photo 📷",q1:"How do I draw it?",q2:"How much is it?",q3:"How long does it take?",err_rate:"Too many requests, wait a minute.",err_gen:"Couldn't answer. Please try again.",err_img:"That photo didn't work. Send a JPG or PNG.",err_deny:"AI access isn't allowed in this window.",cut:"The answer was cut off — ask for less.",back:"Back",checking:"Checking the plan against your sketch…",paidOk:"Payment done",block:"Block",ofTotal:"of total"}
 };
 Object.assign(T.ru,{brief:"Анкета",what:"Что это и зачем",payBefore:"Оплата перед блоком",freeW:"бесплатно",totalTime:"Весь проект — около 10–14 рабочих дней, если вы быстро отвечаете и утверждаете. Каждый блок оплачивается перед стартом, результат вы проверяете сами.",calcHint:"Введите площадь — покажем цену, этапы и когда платить. Это пример: точную площадь посчитаем по обмеру.",howPay:"Этапы, сроки и оплата",incl:"Что входит и что нет",inclT:"Входит: обмерный план, анкета, 5 вариантов планировки, белые модели и цветные эскизы, 17 листов рабочих чертежей, ведомость материалов, PDF и Excel. Не входит: выезд замерщика (заказывается отдельно), авторский надзор на стройке, закупка материалов, 3D-тур.",tol:"Про точность и допуски",tolT:"Чертежи строятся по вашим размерам с точностью ±10–20 мм. В реальных домах стены не идеально ровные, углы не всегда прямые, диагонали могут не сходиться — это нормально и учитывается в проекте. Перед заказом кухни, шкафов, дверей и стеклянных перегородок мастер делает контрольный замер.",startT:"Начнём",phoneWhy:"Телефон нужен, чтобы менеджер мог связаться, если что-то пойдёт не так. Не передаём третьим лицам.",o_title:"Как начнём обмер? Выберите удобный способ:",o_draw:"Нарисую от руки",o_drawS:"Пример и правила — за 1 минуту",o_ready:"У меня есть готовый обмер",o_readyS:"Фото или скриншот чертежа замерщика, БТИ",o_zamer:"Заказать замер",o_zamerS:"Специалист приедет и всё измерит (платно)",o_video:"Видео-обход квартиры",o_videoS:"Дополнительно к рисунку — проверим углы и стояки",updBelow:"обновлён ниже",retry:"Повторить",ver:"версия",tapZoom:"нажмите на чертёж, чтобы увеличить",tolShort:"точность ±10–20 мм",seeBrief:"Открыть анкету",listening:"Говорите…",briefCov:"Анкета заполнена",openBrief:"Открыть анкету",ex3of5:"В примере 3 варианта, в работе клиент получает 5.",variant:"Вариант",whiteM:"Белая модель",colorM:"В цвете",vedSec:"Из чего состоит ведомость",vedNote:"Количества примерные: посчитаны по чертежам с запасом 5–15%. Мастер на объекте может уточнить. Вёдра и инструмент — если у бригады своих нет.",payHist:"История оплат",briefHint:"Нажмите на пункт — ИИ-дизайнер спросит о нём в чате. Зелёные — уже обсудили.",briefLocked:"Анкета откроется после утверждения обмера и оплаты блока 1.",edit:"Изменить",newProj:"Новый проект",faq:"Частые вопросы",support:"Поддержка",supportS:"Мы на связи на любом этапе.",callUs:"Позвонить",callback:"Заказать звонок",callbackS:"Менеджер перезвонит в удобное время",toMgr:"Написать менеджеру",toMgrS:"Живой человек подключится к чату",faqS:"Ответы на главные вопросы",zamerT:"В Алматы приедет наш специалист, в других городах — партнёр. Менеджер уточнит стоимость и время.",callbackT:"Оставьте номер — перезвоним.",city:"Город",address:"Адрес",whenCall:"Когда удобно",whenPh:"например, сегодня после 18:00",comment:"Комментарий",sendReq:"Отправить",revWhat:"Что поправить",revPh:"Например: сдвинуть дверь в спальню на 300 мм к окну",andSend:"и отправить",sendRev:"Отправить правку",newProjT:"Текущий проект будет удалён с этого телефона: чат, обмер, анкета и оплаты. Отменить это нельзя.",newProjOk:"Да, начать новый",shootDraw:"Сфотографировать рисунок",videoSteps:"Сначала нарисуйте план и сфотографируйте его — видео дополняет рисунок.|Включите свет, держите телефон горизонтально.|Идите медленно по кругу, снимайте каждую стену от пола до потолка.|В каждом углу задержитесь на 2–3 секунды.|Покажите стояки, щиток, радиаторы, вентрешётки, окна и двери.|Видео до 2–3 минут.",videoNote:"Мы возьмём из видео 6 кадров и сверим с рисунком: не сходятся ли углы, где стояки и короба.",pickVideo:"Выбрать видео",guideSteps:"Лист в клетку, вид сверху — как будто смотрите с потолка. Масштаб не важен.|Нарисуйте все стены, подпишите каждую комнату.|Окна и двери — разрывом в стене. Подпишите ширину и расстояние от угла.|Рулеткой измерьте каждую стену у пола, от угла до угла. Пишите в миллиметрах: 3450, а не 3,45.|Обязательно общая длина и ширина квартиры — по ним проверим, что всё сходится.|Высота потолка в каждой комнате, высота подоконников.|Отметьте: стояки — кружком, щиток — квадратом, радиаторы, вентрешётки, короба.|Фото — сверху, при дневном свете, весь лист в кадре.",guideNote:"Если какой-то размер не сходится на 1–3 см — ничего страшного, стены не идеальны. Мы переспросим, если будет непонятно.",howtoAnim:"Анимированная инструкция",phoneNeed:"Укажите телефон — 10 цифр или больше",revNeed:"Опишите правку хотя бы парой слов",zamerOk:"Заявка на замер отправлена. Менеджер свяжется с вами.",callbackOk:"Заявка отправлена. Менеджер перезвонит.",newProjDone:"Новый проект создан",letsTalk:"Давайте обсудим",changeIn:"Хочу изменить в «{x}»: ",voiceErr:"Голосовой ввод не сработал. Попробуйте ещё раз или напишите текстом.",framesWait:"Готовлю кадры из видео…",videoErr:"Не получилось прочитать видео. Попробуйте другое или пришлите фото.",videoMsg:"Видео-обход квартиры",readyMsg:"Вот готовый обмер моей квартиры",drawMsg:"Вот мой рисунок квартиры",st_build:"Строю план…",st_read:"Читаю рисунок…",st_think_plan:"Сверяюсь с вашим планом…",st_fix:"Исправляю план…",err_credits:"ИИ-дизайнер временно недоступен. Менеджер уже получил уведомление и свяжется с вами.",greet:"Здравствуйте! Я ИИ-дизайнер «Дизайн 3D Квартир». Всё начинается с обмерного плана — чертежа вашей квартиры с размерами. Выберите ниже, как удобнее: нарисовать от руки, прислать готовый обмер или заказать замерщика. Можно писать и наговаривать голосом 🎙"});
+Object.assign(T.ru,{obmerSent:"Получили ваш рисунок ✓ Специалист начертит по нему точный обмерный план — обычно в течение дня. План придёт сюда: вы проверите размеры и утвердите. Если что-то будет непонятно, менеджер позвонит. А пока можно рассказать о семье и о том, какой ремонт хотите.",obmerFixSent:"Передали специалисту ✓ Исправленный план появится здесь — обычно в течение дня.",obmerSendErr:"Не получилось отправить рисунок. Проверьте интернет и отправьте ещё раз.",obmerReady:"Обмерный план готов ✓ Проверьте размеры и утвердите — или нажмите «Правка» и напишите, что не так.",obmerUpd:"Специалист обновил обмерный план — посмотрите новую версию.",obmerCard:"Обмерный план: {a} м², помещений — {n}: {r}.",greet:"Здравствуйте! Я ИИ-дизайнер «Дизайн 3D Квартир». Всё начинается с обмерного плана. Нарисуйте квартиру от руки с размерами (или сфотографируйте план застройщика / техпаспорт) и отправьте фото — специалист начертит точный чертёж, обычно в течение дня. Можно писать и наговаривать голосом 🎙"});
 T.kk.brief="Сауалнама";T.en.brief="Brief";
 
 const STAGES=[
@@ -352,7 +354,8 @@ let S;
 function fresh(){return{lang:"ru",theme:"",started:false,offer:false,area:56,name:"",phone:"",obmer:null,brief:{},paid:{},ok:{},rev:{},extra:0,variant:null,since:{},shift:0,mgrMode:false,mgrCalled:false,photo:null,photos:[],covered:{},planVer:0,payLog:[],reqs:[],chat:[]};}
 function load(){try{const v=JSON.parse(localStorage.getItem(KEY)||"null");S=Object.assign(fresh(),v||{});}catch(e){S=fresh();}if(S.photo&&!(S.photos||[]).length){S.photos=[S.photo];}delete S.photo;}
 function save(){try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}}
-load();
+function ensurePid(){if(!S.pid){S.pid=(window.crypto&&crypto.randomUUID)?crypto.randomUUID():("p"+Date.now().toString(36)+Math.random().toString(36).slice(2,12)+Math.random().toString(36).slice(2,12));save();}}
+load();ensurePid();
 const t=k=>(T[S.lang]&&T[S.lang][k])||T.ru[k]||k;
 const now=()=>Date.now()+S.shift;
 const fmt=n=>Math.round(n).toLocaleString("ru-RU").replace(/,/g," ");
@@ -438,6 +441,7 @@ function chains(o){
   });
 }
 function planSVG(o,opt){
+  if(o&&o.svg)return o.svg;
   opt=opt||{};const Z=zonesOf(o);if(!Z.length)return"";
   const bb=bbox(Z),E=+o.outer_wall_mm||300,P=1700,vw=bb.w+2*P,vh=bb.d+2*P,ox=P-bb.x,oy=P-bb.y;
   const X=x=>ox+x,Y=y=>oy+y,ink="#1d1b19",wc="#cfc6ba",blue="#2b6cb0",dc="#b5532c",paper="#fffdf9",red="#d9534f";
@@ -527,7 +531,7 @@ const STYLES="Современный (чистые линии, нейтраль�
 /* ---------- agent ---------- */
 function snapshot(){
   const miss=CHECK.flatMap(g=>g.items.filter(i=>!(S.covered||{})[i[0]]).map(i=>i[0]+": "+i[1]));
-  return {stage:(current()||{}).id||"done",status:Object.fromEntries(STAGES.map(s=>[s.id,stageStatus(s.id)])),area_m2:area(),area_source:S.obmer&&S.obmer.area?"по обмерному плану":"примерная, клиент сам ввёл в калькулятор — это не договор и не документ",price_kzt:total(),obmer:S.obmer,brief:S.brief,brief_coverage:Math.round(coverage()*100)+"%",brief_not_discussed:miss,revisions_counted_including_current:S.rev,free_revisions_per_item:FREE_REV,paid_revisions:(S.revPaid||[]),paid_revisions_total_kzt:S.extra||0,client:{name:S.name||null,phone:S.phone?"указан":null}};
+  return {stage:(current()||{}).id||"done",status:Object.fromEntries(STAGES.map(s=>[s.id,stageStatus(s.id)])),area_m2:area(),area_source:S.obmer&&S.obmer.area?"по обмерному плану":"примерная, клиент сам ввёл в калькулятор — это не договор и не документ",price_kzt:total(),obmer:S.obmer&&S.obmer.svg?Object.assign({},S.obmer,{svg:undefined}):S.obmer,obmer_by:S.obmer&&S.obmer.source==="dxf"?"начерчен специалистом в AutoCAD — точный, не меняй его; правки обмера клиент отправляет кнопкой «Правка» под планом, их делает специалист":(S.obmerWait?"ждём специалиста: он чертит обмер по рисунку клиента, обычно в течение дня; сам обмер не строй":null),brief:S.brief,brief_coverage:Math.round(coverage()*100)+"%",brief_not_discussed:miss,revisions_counted_including_current:S.rev,free_revisions_per_item:FREE_REV,paid_revisions:(S.revPaid||[]),paid_revisions_total_kzt:S.extra||0,client:{name:S.name||null,phone:S.phone?"указан":null}};
 }
 function rules(){
   const L={ru:"русском",kk:"казахском",en:"английском"}[S.lang];
@@ -656,7 +660,7 @@ async function runAgent(note,extraImgs,label,tierOver){
     (extraImgs||[]).forEach(b=>{if(imgs.length<8)imgs.push(b);});
     if(extraImgs&&extraImgs.length)tt[tt.length-1].content+=`\n\n[К этому сообщению клиент приложил ${extraImgs.length} изображ.]`;
     const opts={signal:ctl.signal,modelTier:tierOver||(imgs.length||(pinned.length&&!S.obmer)?"vision":"default"),onText:({text})=>{const el=document.getElementById("live");if(el){el.classList.remove("typing");el.innerHTML=md(text,false);scrollChat();}}};
-    if(limits&&limits.tools)opts.tools=TOOLS();else opts.cache=false;
+    if(limits&&limits.tools)opts.tools=TOOLS().filter(x=>!(x.name==="save_obmer"&&(S.obmerWait||(S.obmer&&S.obmer.source==="dxf"))));else opts.cache=false;
     if(imgs.length)opts.images=imgs;
     if(pinned.length){if(window.D3K_API)opts.pinnedImages=pinned;else opts.images=pinned.concat(imgs).slice(0,8);}
     const r=await sample(tt,opts);
@@ -696,6 +700,13 @@ async function send(text,opt){
   // фото плана до утверждения обмера сохраняем — они нужны ИИ на каждом шаге
   if(imgs.length&&kind!=="frame"&&!S.ok.obmer&&!opt.reference){S.photos=imgs.map(p=>p.keep).slice(0,4);}
   addMsg({role:"me",text:text||"",img:imgs.length?imgs[0].thumb:null,imgs:imgs.length||0,kind});
+  // до утверждения обмера фото/кадры уходят специалисту — ИИ их не разглядывает (дёшево и точно)
+  if(imgs.length&&!S.ok.obmer&&!opt.reference){
+    S.obmerWait=now();save();addMsg({role:"sys",text:S.obmer?t("obmerFixSent"):t("obmerSent")});render();
+    const r=await sendRequest("obmer",{pid:S.pid,files:imgs.map(p=>p.keep).slice(0,6),note:(text||"")+(kind==="frame"?" [кадры видео-обхода]":"")});
+    if(!r||!r.ok){addMsg({role:"sys",text:t("obmerSendErr")});render();}
+    return;
+  }
   if(!sample){render();return;}
   obmerTouched=false;
   const oneOff=(kind==="frame"||S.ok.obmer||opt.reference)?imgs.map(p=>p.blob):[];
@@ -707,6 +718,22 @@ async function send(text,opt){
     else render();
   }
 }
+async function pollObmer(){
+  if(!S.pid||!window.D3K_API||!window.D3K_API.obmer||S.ok.obmer)return;
+  if(!S.obmerWait&&!(S.obmer&&S.obmer.source==="dxf"))return;
+  try{
+    const r=await window.D3K_API.obmer(S.pid);
+    if(r&&r.ready&&r.data&&r.ver!==S.obmerVer){
+      const first=!S.obmer;S.obmer=r.data;S.obmerVer=r.ver;S.planVer=r.ver;S.obmerWait=0;S.since.obmer=now();
+      const rooms=(r.data.rooms||[]).map(x=>x.name).filter(Boolean);
+      addMsg({role:"sys",text:first?t("obmerReady"):t("obmerUpd")});
+      addMsg({role:"ap",stage:"obmer",text:t("obmerCard").replace("{a}",String(r.data.area).replace(".",",")).replace("{n}",rooms.length||"—").replace("{r}",rooms.join(", "))+(r.data.notes?"\n\n"+r.data.notes:"")});
+      save();render();
+    }
+  }catch(e){}
+}
+setInterval(pollObmer,45000);setTimeout(pollObmer,2500);
+document.addEventListener("visibilitychange",()=>{if(!document.hidden)pollObmer();});
 function sendRequest(kind,extra){
   const d=Object.assign({kind,name:S.name,phone:S.phone,stage:(current()||{}).id||"done",project:{area:area(),obmer:!!S.obmer,brief_coverage:Math.round(coverage()*100),last:S.chat.filter(m=>m.role==="me"||m.role==="ai").slice(-6).map(m=>(m.role==="me"?"К: ":"ИИ: ")+String(m.text||"").slice(0,300))}},extra||{});
   S.reqs=(S.reqs||[]).concat([{kind,at:now()}]);save();
@@ -747,6 +774,13 @@ function revise(key){
   modal={kind:"revise",key,paid:n>=FREE_REV};render();
 }
 function doRevise(key,text){
+  if(key==="obmer"&&S.obmer&&S.obmer.source==="dxf"){
+    const n0=S.rev[key]||0;S.rev[key]=n0+1;if(n0>=FREE_REV){S.extra+=EXTRA;S.revPaid=(S.revPaid||[]).concat(["obmer №"+(n0+1)]);S.payLog=(S.payLog||[]).concat([{b:"rev",sum:EXTRA,at:now(),key}]);}
+    S.obmerWait=now();save();modal=null;tab="chat";
+    addMsg({role:"me",text:t("revPrompt").replace("{x}",label(key))+text});addMsg({role:"sys",text:t("obmerFixSent")});render();
+    sendRequest("obmer",{pid:S.pid,note:"ПРАВКА ОБМЕРА: "+text});
+    return;
+  }
   const n=S.rev[key]||0;S.rev[key]=n+1;if(n>=FREE_REV){S.extra+=EXTRA;S.revPaid=(S.revPaid||[]).concat([key+" №"+(n+1)]);S.payLog=(S.payLog||[]).concat([{b:"rev",sum:EXTRA,at:now(),key}]);addMsg({role:"sys",text:"✓ "+t("paidOk")+": "+t("revise")+" «"+label(key)+"» — 5 000 ₸"});}delete S.since[key];S.since[key]=now();save();modal=null;
   tab="chat";render();send(t("revPrompt").replace("{x}",label(key))+text);
 }
@@ -835,7 +869,7 @@ function stageBody(id){
   switch(id){
    case"obmer":
     if(!S.obmer)return h+`<p class="sm mute" style="margin-bottom:10px">${t("d_obmer")}</p><button class="btn full" data-a="chat">${t("openChat")}</button>`;
-    return h+`<div class="plan">${planSVG(S.obmer)}</div><p class="xs mute" style="margin-top:6px">${t("tapZoom")}</p><table class="rt">${Object.entries(zonesOf(S.obmer).reduce((m,r)=>{m[r.name]=(m[r.name]||0)+r.w*r.d/1e6;return m;},{})).map(([n,a])=>`<tr><td>${esc(n)}</td><td>${a.toFixed(1).replace(".",",")} м²</td></tr>`).join("")}<tr><td><b>${t("areaFact")}</b></td><td><b>${String(S.obmer.area).replace(".",",")} м²</b></td></tr></table>${done?okRow("obmer"):revBtns("obmer")}`;
+    return h+`<div class="plan">${planSVG(S.obmer)}</div><p class="xs mute" style="margin-top:6px">${t("tapZoom")}</p><table class="rt">${Object.entries(zonesOf(S.obmer).reduce((m,r)=>{m[r.name]=(m[r.name]||0)+(r.area_m2!=null?+r.area_m2:r.w*r.d/1e6);return m;},{})).map(([n,a])=>`<tr><td>${esc(n)}</td><td>${a.toFixed(1).replace(".",",")} м²</td></tr>`).join("")}<tr><td><b>${t("areaFact")}</b></td><td><b>${String(S.obmer.area).replace(".",",")} м²</b></td></tr></table>${done?okRow("obmer"):revBtns("obmer")}`;
    case"brief":{
     const pc=Math.round(coverage()*100);
     h+=`<div class="sm" style="margin-bottom:4px">${t("briefCov")}: <b>${pc}%</b></div><div class="prog"><i style="width:${pc}%"></i></div><button class="btn soft full" data-a="tab" data-k="brief">${t("openBrief")}</button>`;
@@ -1083,7 +1117,7 @@ document.getElementById("app").addEventListener("click",e=>{
    case"guide":modal={kind:"guide"};pushH();render();break;
    case"video":modal={kind:"video"};pushH();render();break;
    case"newproj":modal={kind:"newproj"};render();break;
-   case"newok":{const keep={lang:S.lang,theme:S.theme,name:S.name,phone:S.phone,offer:S.offer,admin:S.admin};S=Object.assign(fresh(),keep);save();modal=null;tab="home";openStage=null;render();toast(t("newProjDone"));break;}
+   case"newok":{const keep={lang:S.lang,theme:S.theme,name:S.name,phone:S.phone,offer:S.offer,admin:S.admin};S=Object.assign(fresh(),keep);ensurePid();save();modal=null;tab="home";openStage=null;render();toast(t("newProjDone"));break;}
    case"ask":if(stageStatus("brief")==="locked"||stageStatus("brief")==="pay"){toast(t("briefLocked"));break;}navStack.push(tab);pushH();tab="chat";draft=t("letsTalk")+": "+k.toLowerCase();render();{const ta=document.getElementById("ta");if(ta)ta.focus();}break;
    case"editroom":navStack.push(tab);pushH();tab="chat";draft=t("changeIn").replace("{x}",k);render();{const ta=document.getElementById("ta");if(ta){ta.focus();ta.setSelectionRange(ta.value.length,ta.value.length);}}break;
    case"mic":toggleVoice();break;

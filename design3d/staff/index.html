@@ -1,0 +1,336 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Дизайн 3D — заявки и обмеры</title>
+<link rel="icon" href="../favicon.png">
+<style>
+:root{--bg:#f4f1ec;--card:#fff;--ink:#1d1b19;--mute:#6f6860;--line:#e3ddd4;--acc:#b5532c;--ok:#2e7d4f;--warn:#b7791f;--blue:#2b5fd9}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+header{display:flex;align-items:center;gap:12px;padding:12px 16px;background:var(--ink);color:#fff;position:sticky;top:0;z-index:5}
+header b{font-size:16px}header .sp{flex:1}header button{background:transparent;color:#fff;border:1px solid #fff5;border-radius:8px;padding:6px 10px;cursor:pointer}
+main{max-width:1180px;margin:0 auto;padding:16px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:12px}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+.tabs button{border:1px solid var(--line);background:#fff;border-radius:99px;padding:7px 14px;cursor:pointer;font:inherit}
+.tabs button.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+.pill{display:inline-block;font-size:12px;font-weight:600;padding:3px 9px;border-radius:99px;background:#f5e3d9;color:var(--acc)}
+.pill.ok{background:#dcefe3;color:var(--ok)}.pill.work{background:#f8ecd2;color:var(--warn)}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.btn{border:0;border-radius:10px;padding:9px 14px;cursor:pointer;font:inherit;font-weight:600;background:var(--acc);color:#fff}
+.btn.ghost{background:#fff;color:var(--ink);border:1px solid var(--line)}.btn.ok{background:var(--ok)}
+.btn:disabled{opacity:.5;cursor:default}
+.mute{color:var(--mute)}.sm{font-size:13px}
+.thumbs{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}.thumbs img{width:150px;height:150px;object-fit:cover;border-radius:10px;border:1px solid var(--line);cursor:zoom-in}
+input,textarea{font:inherit;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:#fff}
+.login{max-width:360px;margin:60px auto}.login input{width:100%;margin-bottom:10px}
+.prev{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);gap:14px;margin-top:12px}
+@media(max-width:820px){.prev{grid-template-columns:1fr}}
+.plan{background:#fffdf9;border:1px solid var(--line);border-radius:12px;padding:8px;overflow:auto}.plan svg{width:100%;height:auto;display:block}
+table{border-collapse:collapse;width:100%;font-size:14px}td,th{border-bottom:1px solid var(--line);padding:6px 4px;text-align:left}
+td input{width:100%;padding:5px 7px}
+.warn{background:#fff6e5;border:1px solid #f1d39b;border-radius:10px;padding:8px 10px;font-size:13px;margin:6px 0}
+.zoom{position:fixed;inset:0;background:#000d;display:flex;align-items:center;justify-content:center;z-index:50}.zoom img{max-width:96vw;max-height:96vh}
+</style>
+</head>
+<body>
+<header><b>Дизайн 3D Квартир · персонал</b><span class="sp"></span><a href="../files/obmer.lsp" download style="color:#fff;font-size:13px">obmer.lsp</a><a href="../files/ramka-A3-obmer.dxf" download style="color:#fff;font-size:13px">Рамка A3</a><span id="who" class="sm"></span><button id="out" hidden>Выйти</button></header>
+<main id="app"></main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.js"></script>
+<script>
+const SB = window.supabase.createClient('https://tqhigjvyoqtwukqqnlmb.supabase.co', 'sb_publishable_LBGMjPTdbjINAwQa-uchpA_okvE5SQY');
+const app = document.getElementById('app');
+const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const KIND = { obmer: 'Обмер по рисунку', zamer: 'Заказ замера', callback: 'Перезвонить', manager: 'Позвать менеджера', support: 'Вопрос' };
+let tab = 'obmer', rows = [], open = {}, parsed = {};
+
+/* ================== DXF: разбор ================== */
+function decodeDXF(buf) {
+  let t = new TextDecoder('utf-8').decode(buf);
+  if (t.includes('�')) t = new TextDecoder('windows-1251').decode(buf);
+  return t.replace(/\\U\+([0-9A-Fa-f]{4})/g, (m, h) => String.fromCharCode(parseInt(h, 16)));
+}
+function parseDXF(text) {
+  const L = text.split(/\r\n|\r|\n/), P = [];
+  for (let i = 0; i + 1 < L.length; i += 2) { const c = parseInt(L[i].trim(), 10); if (!isNaN(c)) P.push([c, L[i + 1].replace(/\s+$/, '')]); }
+  const layers = {}, blocks = {}, ents = [];
+  let i = 0, sec = null, curBlock = null;
+  const readEnt = () => { const type = P[i][1], d = [[0, type]]; i++; while (i < P.length && P[i][0] !== 0) { d.push(P[i]); i++; } return d; };
+  while (i < P.length) {
+    const [c, v] = P[i];
+    if (c === 0 && v === 'SECTION') { sec = P[i + 1] && P[i + 1][1]; i += 2; continue; }
+    if (c === 0 && v === 'ENDSEC') { sec = null; i++; continue; }
+    if (sec === 'TABLES' && c === 0 && v === 'LAYER') { const d = readEnt(); const g = k => (d.find(p => p[0] === k) || [])[1]; layers[g(2)] = { color: Math.abs(parseInt(g(62) || '7', 10)), lt: g(6) }; continue; }
+    if (sec === 'BLOCKS' && c === 0 && v === 'BLOCK') { const d = readEnt(); const g = k => (d.find(p => p[0] === k) || [])[1]; curBlock = { name: g(2), bx: +g(10) || 0, by: +g(20) || 0, ents: [] }; blocks[curBlock.name] = curBlock; continue; }
+    if (sec === 'BLOCKS' && c === 0 && v === 'ENDBLK') { curBlock = null; i++; continue; }
+    if ((sec === 'ENTITIES' || (sec === 'BLOCKS' && curBlock)) && c === 0) {
+      const d = readEnt(); const type = d[0][1];
+      if (type === 'POLYLINE') { // старый формат: VERTEX … SEQEND
+        const pts = []; while (i < P.length && P[i][0] === 0 && P[i][1] === 'VERTEX') { const vd = readEnt(); pts.push([+((vd.find(p => p[0] === 10) || [])[1]) || 0, +((vd.find(p => p[0] === 20) || [])[1]) || 0]); }
+        if (i < P.length && P[i][1] === 'SEQEND') readEnt();
+        d.push(['_pts', pts]);
+      }
+      (curBlock ? curBlock.ents : ents).push(d);
+      continue;
+    }
+    i++;
+  }
+  return { layers, blocks, ents };
+}
+function entObj(d, layers) {
+  const g = k => { const p = d.find(q => q[0] === k); return p ? p[1] : undefined; };
+  const gn = (k, def = 0) => { const v = g(k); return v === undefined ? def : +v; };
+  const type = d[0][1], layer = g(8) || '0';
+  let color = g(62) !== undefined ? Math.abs(+g(62)) : 256;
+  if (color === 256 || color === 0) color = (layers[layer] || {}).color || 7;
+  const o = { type, layer, color, lt: g(6) || (layers[layer] || {}).lt };
+  if (type === 'LINE') o.pts = [[gn(10), gn(20)], [gn(11), gn(21)]];
+  else if (type === 'LWPOLYLINE') { o.pts = []; let x = null; d.forEach(([c, v]) => { if (c === 10) x = +v; if (c === 20 && x !== null) { o.pts.push([x, +v]); x = null; } }); o.closed = (gn(70) & 1) === 1; }
+  else if (type === 'POLYLINE') { o.pts = (d.find(q => q[0] === '_pts') || [0, []])[1]; o.closed = (gn(70) & 1) === 1; }
+  else if (type === 'CIRCLE') { o.x = gn(10); o.y = gn(20); o.r = gn(40); }
+  else if (type === 'ARC') { o.x = gn(10); o.y = gn(20); o.r = gn(40); o.a0 = gn(50); o.a1 = gn(51); }
+  else if (type === 'TEXT' || type === 'MTEXT' || type === 'ATTRIB') {
+    const al = gn(72) || gn(73);
+    o.x = (type === 'TEXT' && al && g(11) !== undefined) ? gn(11) : gn(10); o.y = (type === 'TEXT' && al && g(21) !== undefined) ? gn(21) : gn(20);
+    o.h = gn(40, 150); o.rot = gn(50);
+    if (type === 'MTEXT') { o.text = d.filter(q => q[0] === 3).map(q => q[1]).join('') + (g(1) || ''); o.text = o.text.replace(/\\P/g, ' ').replace(/\\[A-Za-z][^;\\]*;/g, '').replace(/[{}]/g, ''); o.mtext = true; const ax = gn(11), ay = gn(21); if (ax || ay) o.rot = Math.atan2(ay, ax) * 180 / Math.PI; }
+    else o.text = g(1) || '';
+    o.text = o.text.replace(/%%c/gi, 'Ø').replace(/%%d/gi, '°').replace(/%%p/gi, '±');
+    o.center = type === 'TEXT' ? (gn(72) === 1 || gn(72) === 4) : (gn(71) === 2 || gn(71) === 5 || gn(71) === 8);
+  }
+  else if (type === 'INSERT') { o.block = g(2); o.x = gn(10); o.y = gn(20); o.sx = gn(41, 1); o.sy = gn(42, 1); o.rot = gn(50); }
+  else if (type === 'DIMENSION') { o.block = g(2); }
+  return o;
+}
+function flatten(dxf) {
+  const out = [];
+  const tf = (o, T) => { // T: {x,y,sx,sy,rot,bx,by}
+    if (!T) return o;
+    const c = Math.cos(T.rot * Math.PI / 180), s = Math.sin(T.rot * Math.PI / 180);
+    const P = ([x, y]) => { x = (x - T.bx) * T.sx; y = (y - T.by) * T.sy; return [T.x + x * c - y * s, T.y + x * s + y * c]; };
+    const n = Object.assign({}, o);
+    if (o.pts) n.pts = o.pts.map(P);
+    if (o.x !== undefined) { const p = P([o.x, o.y]); n.x = p[0]; n.y = p[1]; }
+    if (o.r) n.r = o.r * Math.abs(T.sx);
+    if (o.h) n.h = o.h * Math.abs(T.sy);
+    if (o.a0 !== undefined) { n.a0 = o.a0 + T.rot; n.a1 = o.a1 + T.rot; }
+    if (o.rot !== undefined && o.type !== 'INSERT') n.rot = (o.rot || 0) + T.rot;
+    return n;
+  };
+  const walk = (list, T, depth, parentLayer) => {
+    list.forEach(d => {
+      let o = entObj(d, dxf.layers);
+      if (parentLayer && o.layer === '0') o.layer = parentLayer;
+      if ((o.type === 'INSERT' || o.type === 'DIMENSION') && dxf.blocks[o.block] && depth < 4) {
+        const b = dxf.blocks[o.block];
+        const T2 = o.type === 'DIMENSION' ? { x: 0, y: 0, sx: 1, sy: 1, rot: 0, bx: 0, by: 0 } : { x: o.x, y: o.y, sx: o.sx, sy: o.sy, rot: o.rot, bx: b.bx, by: b.by };
+        const sub = []; walk(b.ents, null, depth + 1, o.type === 'DIMENSION' ? (o.layer) : o.layer);
+        // walk пишет в out — переносим с трансформацией
+        return;
+      }
+      out.push(T ? tf(o, T) : o);
+    });
+  };
+  // отдельная рекурсия с трансформациями (вложенные блоки)
+  const walkT = (list, Ts, depth, parentLayer) => {
+    list.forEach(d => {
+      let o = entObj(d, dxf.layers);
+      if (parentLayer && (o.layer === '0' || o.type === 'DIMENSION')) o.layer = o.layer === '0' ? parentLayer : o.layer;
+      if ((o.type === 'INSERT' || o.type === 'DIMENSION') && dxf.blocks[o.block] && depth < 5) {
+        const b = dxf.blocks[o.block];
+        const T = o.type === 'DIMENSION' ? null : { x: o.x, y: o.y, sx: o.sx || 1, sy: o.sy || 1, rot: o.rot || 0, bx: b.bx, by: b.by };
+        walkT(b.ents, T ? [T].concat(Ts) : Ts, depth + 1, o.layer);
+        return;
+      }
+      if (['HATCH', 'SOLID', 'POINT', 'VIEWPORT', 'SEQEND', 'ATTDEF'].includes(o.type)) return;
+      Ts.forEach(T => { o = tf(o, T); });
+      out.push(o);
+    });
+  };
+  walkT(dxf.ents, [], 0, null);
+  return out;
+}
+const ACI = { 1: '#d93a3a', 2: '#b58a00', 3: '#2e8b57', 4: '#0e8fa3', 5: '#2b5fd9', 6: '#b0309e', 7: '#1d1b19', 8: '#8a8a8a', 9: '#a0a0a0', 30: '#e07b1a', 10: '#d93a3a', 250: '#555', 251: '#666', 252: '#777', 253: '#888', 254: '#aaa' };
+const col = c => ACI[c] || '#444';
+const isLayer = (o, re) => re.test(o.layer.toUpperCase());
+function bboxOf(o) {
+  if (o.pts && o.pts.length) { const xs = o.pts.map(p => p[0]), ys = o.pts.map(p => p[1]); return [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)]; }
+  if (o.r) return [o.x - o.r, o.y - o.r, o.x + o.r, o.y + o.r];
+  if (o.x !== undefined) return [o.x, o.y, o.x + (o.text ? o.text.length * o.h * .6 : 0), o.y + (o.h || 0)];
+  return null;
+}
+function polyArea(p) { let a = 0; for (let i = 0; i < p.length; i++) { const [x1, y1] = p[i], [x2, y2] = p[(i + 1) % p.length]; a += x1 * y2 - x2 * y1; } return Math.abs(a) / 2; }
+function inPoly(x, y, p) { let c = false; for (let i = 0, j = p.length - 1; i < p.length; j = i++) { const [xi, yi] = p[i], [xj, yj] = p[j]; if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) c = !c; } return c; }
+function centroid(p) { let x = 0, y = 0; p.forEach(q => { x += q[0]; y += q[1]; }); return [x / p.length, y / p.length]; }
+const num = (s, re) => { const m = String(s).match(re); return m ? +m[1] : null; };
+
+function analyze(ents) {
+  const warn = [];
+  // рамка: всё на слое РАМКА и колонка условных обозначений/штамп — не чертёж
+  const frame = ents.filter(o => isLayer(o, /РАМК|FRAME/));
+  const bands = [];
+  const rects = frame.filter(o => o.pts && o.closed && o.pts.length === 4).map(bboxOf).sort((a, b) => (b[2] - b[0]) * (b[3] - b[1]) - (a[2] - a[0]) * (a[3] - a[1]));
+  frame.filter(o => o.type === 'LINE').forEach(o => {
+    const [[x1, y1], [x2, y2]] = o.pts;
+    if (Math.abs(x1 - x2) < 1 && Math.abs(y1 - y2) > 3000) {
+      const r = rects.find(b => x1 > b[0] && x1 < b[2] && Math.min(y1, y2) >= b[1] - 10 && Math.max(y1, y2) <= b[3] + 10);
+      if (r) bands.push([x1, r[1], r[2], r[3]]);
+    }
+  });
+  // штамп: прямоугольник рамки у нижнего правого угла
+  rects.forEach(b => { if ((b[2] - b[0]) < 12000 && (b[3] - b[1]) < 4000) bands.push(b); });
+  const inBand = o => { const b = bboxOf(o); if (!b) return false; const cx = (b[0] + b[2]) / 2, cy = (b[1] + b[3]) / 2; return bands.some(B => cx >= B[0] && cx <= B[2] && cy >= B[1] && cy <= B[3]); };
+  const draw = ents.filter(o => !isLayer(o, /РАМК|FRAME/) && !inBand(o));
+  if (!draw.length) return { error: 'В файле нет чертежа (только рамка?)' };
+  const texts = draw.filter(o => o.text);
+  // комнаты
+  let rooms = draw.filter(o => isLayer(o, /КОМНАТ|ROOM/) && o.pts && o.closed && o.pts.length >= 3).map(o => {
+    const p = o.pts, a = polyArea(p) / 1e6, c = centroid(p);
+    const ins = texts.filter(t => inPoly(t.x, t.y, p) && (isLayer(t, /ПОМЕЩ|КОМНАТ|ROOM/) || t.color === 2));
+    let name = '', h = null;
+    ins.forEach(t => { const hh = num(t.text, /(?:потол[а-яё]*|h\s*=?|н\s*=?)\s*[:=]?\s*(\d{4})/i); if (hh) h = hh; else if (!/м2|м²|^\s*[-+]?\d/i.test(t.text) && !name) name = t.text.trim(); });
+    return { name: name || 'Помещение', h_mm: h, area_m2: Math.round(a * 10) / 10, poly: p.map(q => [Math.round(q[0]), Math.round(q[1])]), cx: c[0], cy: c[1] };
+  }).filter(r => r.area_m2 > 0.3);
+  if (!rooms.length) warn.push('Нет комнат на слое КОМНАТЫ. В AutoCAD набери KMT и кликни внутри каждой комнаты — или впиши площадь и комнаты вручную ниже.');
+  // проёмы
+  const near = (x, y, pred, maxd) => { let best = null, bd = maxd; texts.forEach(t => { if (!pred(t)) return; const d = Math.hypot(t.x - x, t.y - y); if (d < bd) { bd = d; best = t; } }); return best; };
+  const roomAt = (x, y) => { let r = rooms.find(R => inPoly(x, y, R.poly)); if (r) return r.name; let bd = 1e12; rooms.forEach(R => { R.poly.forEach(q => { const d = Math.hypot(q[0] - x, q[1] - y); if (d < bd) { bd = d; r = R; } }); }); return r ? r.name : null; };
+  const openings = draw.filter(o => o.pts && o.closed && o.pts.length === 4 && (isLayer(o, /ОКН|ДВЕР|ПРО[ЁЕ]М|WIN|DOOR/) || o.color === 5 || o.color === 6)).map(o => {
+    const b = bboxOf(o), w = Math.max(b[2] - b[0], b[3] - b[1]), th = Math.min(b[2] - b[0], b[3] - b[1]);
+    const win = isLayer(o, /ОКН|WIN/) || (o.color === 5 && !isLayer(o, /ДВЕР|DOOR/));
+    const cx = (b[0] + b[2]) / 2, cy = (b[1] + b[3]) / 2;
+    const t = near(cx, cy, tt => (win ? (isLayer(tt, /ОКН|WIN/) || tt.color === 5) : (isLayer(tt, /ДВЕР|DOOR/) || tt.color === 6)), Math.max(1500, w));
+    const lab = t ? t.text : '';
+    return { kind: win ? 'window' : (/вход/i.test(lab) ? 'entry' : /про[её]м|арк/i.test(lab) ? 'arch' : 'door'), width_mm: Math.round(w), wall_mm: Math.round(th), sill_mm: num(lab, /(?:пд|подоконн[а-яё]*)\s*[:=]?\s*(\d{3,4})/i), top_mm: num(lab, /верх\s*[:=]?\s*(\d{3,4})/i), label: lab, room: roomAt(cx, cy), x: Math.round(cx), y: Math.round(cy) };
+  }).filter(o => o.width_mm >= 400 && o.width_mm <= 6000);
+  if (openings.some(o => o.kind === 'window' && !o.sill_mm)) warn.push('У части окон нет подписи «пд …, верх …» — высоты подоконника/окна неизвестны.');
+  const risers = draw.filter(o => o.type === 'CIRCLE' && o.r < 400 && (isLayer(o, /СТОЯК|RISER|ВОД|КАНАЛ/) || o.color === 4)).map(o => { const t = near(o.x, o.y, tt => isLayer(tt, /СТОЯК|RISER/) || tt.color === 4, 1200); return { label: t ? t.text : 'стояк', d_mm: Math.round(o.r * 2), x: Math.round(o.x), y: Math.round(o.y), room: roomAt(o.x, o.y) }; });
+  if (!risers.length) warn.push('Стояки не найдены (кружки на слое СТОЯКИ / голубым).');
+  const panels = draw.filter(o => o.pts && o.closed && (isLayer(o, /ЩИТ|ЩК|PANEL/) || o.color === 1) && o.pts.length === 4).map(o => { const b = bboxOf(o); const t = near((b[0] + b[2]) / 2, (b[1] + b[3]) / 2, tt => isLayer(tt, /ЩИТ|ЩК|PANEL/) || tt.color === 1, 1500); return { label: t ? t.text : 'щиток', h_mm: t ? num(t.text, /h\s*=?\s*(\d{3,4})/i) : null, room: roomAt((b[0] + b[2]) / 2, (b[1] + b[3]) / 2) }; });
+  const vents = draw.filter(o => o.pts && o.closed && (isLayer(o, /ВЕНТ|VENT/)) && o.pts.length === 4).map(o => { const b = bboxOf(o); return { w_mm: Math.round(b[2] - b[0]), d_mm: Math.round(b[3] - b[1]), room: roomAt((b[0] + b[2]) / 2, (b[1] + b[3]) / 2) }; });
+  // габарит чертежа (без текста)
+  let X0 = 1e12, Y0 = 1e12, X1 = -1e12, Y1 = -1e12;
+  draw.forEach(o => { if (o.text) return; const b = bboxOf(o); if (!b) return; X0 = Math.min(X0, b[0]); Y0 = Math.min(Y0, b[1]); X1 = Math.max(X1, b[2]); Y1 = Math.max(Y1, b[3]); });
+  const hs = rooms.map(r => r.h_mm).filter(Boolean);
+  if (rooms.length && !hs.length) warn.push('Высота потолка не подписана («Потолок 2700» внутри комнаты).');
+  const area = Math.round(rooms.reduce((s, r) => s + r.area_m2, 0) * 10) / 10;
+  return { draw, rooms, openings, risers, panels, vents, warn, area, bbox: [X0, Y0, X1, Y1], ceiling_mm: hs.length ? Math.max(...hs) : null };
+}
+function renderSVG(A) {
+  const [X0, Y0, X1, Y1] = A.bbox, pad = 600, W = X1 - X0 + 2 * pad, H = Y1 - Y0 + 2 * pad;
+  const X = x => (x - X0 + pad).toFixed(1), Y = y => (Y1 - y + pad).toFixed(1);
+  const sw = Math.max(W, H) / 900;
+  const g = [];
+  A.rooms.forEach(r => g.push(`<polygon points="${r.poly.map(p => X(p[0]) + ',' + Y(p[1])).join(' ')}" fill="#fbf7f0" stroke="none"/>`));
+  A.draw.forEach(o => {
+    const c = col(o.color), dash = /DASH|HIDDEN|ПУНКТ/i.test(o.lt || '') ? ` stroke-dasharray="${sw * 8} ${sw * 5}"` : '';
+    const w = isLayer(o, /СТЕН|WALL|ГАЗО|МОНОЛ/) || (o.color === 7 && !o.text) ? sw * 2.2 : sw * 1.2;
+    if (o.type === 'LINE') g.push(`<line x1="${X(o.pts[0][0])}" y1="${Y(o.pts[0][1])}" x2="${X(o.pts[1][0])}" y2="${Y(o.pts[1][1])}" stroke="${c}" stroke-width="${w}"${dash}/>`);
+    else if (o.pts && o.pts.length > 1) g.push(`<${o.closed ? 'polygon' : 'polyline'} points="${o.pts.map(p => X(p[0]) + ',' + Y(p[1])).join(' ')}" fill="none" stroke="${c}" stroke-width="${w}"${dash}/>`);
+    else if (o.type === 'CIRCLE') g.push(`<circle cx="${X(o.x)}" cy="${Y(o.y)}" r="${o.r.toFixed(1)}" fill="none" stroke="${c}" stroke-width="${w}"/>`);
+    else if (o.type === 'ARC') {
+      let a0 = o.a0 * Math.PI / 180, a1 = o.a1 * Math.PI / 180; if (a1 < a0) a1 += 2 * Math.PI;
+      const p0 = [o.x + o.r * Math.cos(a0), o.y + o.r * Math.sin(a0)], p1 = [o.x + o.r * Math.cos(a1), o.y + o.r * Math.sin(a1)];
+      g.push(`<path d="M${X(p0[0])} ${Y(p0[1])} A${o.r.toFixed(1)} ${o.r.toFixed(1)} 0 ${a1 - a0 > Math.PI ? 1 : 0} 0 ${X(p1[0])} ${Y(p1[1])}" fill="none" stroke="${c}" stroke-width="${sw}"/>`);
+    } else if (o.text) g.push(`<text transform="translate(${X(o.x)} ${Y(o.y)}) rotate(${-(o.rot || 0)})" font-size="${(o.h || 150).toFixed(0)}" fill="${c === '#b58a00' ? '#8a6a00' : c}" font-family="Arial" ${o.center ? 'text-anchor="middle"' : ''}>${esc(o.text)}</text>`);
+  });
+  const pw = 1600, ph = Math.round(pw * H / W);
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W.toFixed(0)} ${H.toFixed(0)}" width="${pw}" height="${ph}"><rect width="100%" height="100%" fill="#fffdf9"/>${g.join('')}</svg>`;
+}
+
+/* ================== интерфейс ================== */
+async function load() {
+  const { data, error } = await SB.from('d3k_requests').select('*').order('created_at', { ascending: false }).limit(200);
+  if (error) { app.innerHTML = `<div class="card">Ошибка: ${esc(error.message)}</div>`; return; }
+  rows = data || [];
+  const pids = [...new Set(rows.filter(r => r.pid).map(r => r.pid))];
+  if (pids.length) { const { data: ob } = await SB.from('d3k_obmer').select('pid,ver,updated_at').in('pid', pids); (ob || []).forEach(o => { rows.filter(r => r.pid === o.pid).forEach(r => r._ob = o); }); }
+  render();
+}
+function render() {
+  const list = rows.filter(r => tab === 'all' ? true : tab === 'obmer' ? r.kind === 'obmer' && r.status !== 'done' : tab === 'other' ? r.kind !== 'obmer' && r.status !== 'done' : r.status === 'done');
+  const cnt = k => rows.filter(r => k === 'obmer' ? r.kind === 'obmer' && r.status !== 'done' : k === 'other' ? r.kind !== 'obmer' && r.status !== 'done' : k === 'done' ? r.status === 'done' : true).length;
+  app.innerHTML = `<div class="tabs">${[['obmer', 'Ждут обмера'], ['other', 'Звонки и вопросы'], ['done', 'Готово'], ['all', 'Все']].map(([k, n]) => `<button class="${tab === k ? 'on' : ''}" data-tab="${k}">${n} · ${cnt(k)}</button>`).join('')}<button data-a="reload">↻ Обновить</button></div>` +
+    (list.length ? list.map(card).join('') : `<div class="card mute">Здесь пусто.</div>`);
+}
+function card(r) {
+  const p = r.project || {}, phone = (r.phone || '').replace(/[^\d+]/g, '');
+  const st = r.status === 'done' ? '<span class="pill ok">готово</span>' : r.status === 'work' ? '<span class="pill work">в работе</span>' : '<span class="pill">новая</span>';
+  let h = `<div class="card" id="c${r.id}"><div class="row"><b>${esc(KIND[r.kind] || r.kind)}</b>${st}<span class="mute sm">#${r.id} · ${new Date(r.created_at).toLocaleString('ru-RU')}</span></div>
+   <div class="row sm" style="margin-top:6px"><span>${esc(r.name || 'без имени')}</span>${phone ? `<a href="tel:${phone}">${esc(r.phone)}</a><a href="https://wa.me/${phone.replace('+', '')}" target="_blank">WhatsApp</a>` : ''}${r.city ? `<span>${esc(r.city)}</span>` : ''}${r.address ? `<span>${esc(r.address)}</span>` : ''}${r.when_text ? `<span>когда: ${esc(r.when_text)}</span>` : ''}</div>
+   ${r.note ? `<p class="sm" style="margin:8px 0 0">${esc(r.note)}</p>` : ''}
+   ${p.area ? `<p class="sm mute" style="margin:6px 0 0">Площадь (клиент): ${esc(p.area)} м² · этап: ${esc(r.stage || '')}</p>` : ''}
+   ${Array.isArray(p.last) && p.last.length ? `<details class="sm" style="margin-top:6px"><summary>Последние сообщения</summary>${p.last.map(x => `<div>${esc(x)}</div>`).join('')}</details>` : ''}
+   ${Array.isArray(r.files) && r.files.length ? `<div class="thumbs">${r.files.map((f, i) => `<img src="${f}" data-zoom="${r.id}:${i}" alt="">`).join('')}</div>` : ''}`;
+  if (r.kind === 'obmer') {
+    h += r.pid ? `<div class="row" style="margin-top:8px">${r._ob ? `<span class="pill ok">обмер отправлен · версия ${r._ob.ver}</span>` : ''}<label class="btn ghost">Загрузить DXF<input type="file" accept=".dxf" data-dxf="${r.id}" hidden></label></div>` : `<p class="warn">У заявки нет id проекта (старая версия приложения) — отправить обмер в приложение нельзя.</p>`;
+    if (parsed[r.id]) h += preview(r);
+  }
+  h += `<div class="row" style="margin-top:10px">${r.status !== 'work' && r.status !== 'done' ? `<button class="btn ghost" data-st="work" data-id="${r.id}">Взять в работу</button>` : ''}${r.status !== 'done' ? `<button class="btn ghost" data-st="done" data-id="${r.id}">Готово</button>` : `<button class="btn ghost" data-st="new" data-id="${r.id}">Вернуть в работу</button>`}</div></div>`;
+  return h;
+}
+function preview(r) {
+  const A = parsed[r.id];
+  if (A.error) return `<p class="warn">${esc(A.error)}</p>`;
+  return `<div class="prev"><div class="plan">${A.svg}</div><div>
+    <b>Как увидит клиент</b>${A.warn.map(w => `<div class="warn">${esc(w)}</div>`).join('')}
+    <table><tr><th>Помещение</th><th>м²</th><th>Потолок</th></tr>
+    ${A.rooms.map((x, i) => `<tr><td><input value="${esc(x.name)}" data-rn="${r.id}:${i}"></td><td>${x.area_m2}</td><td><input value="${x.h_mm || ''}" placeholder="2700" data-rh="${r.id}:${i}" style="width:80px"></td></tr>`).join('')}</table>
+    <p class="sm">Итого площадь: <input value="${A.area || ''}" data-area="${r.id}" style="width:90px"> м² ${A.rooms.length ? '' : '<span class="mute">(введи вручную)</span>'}</p>
+    <p class="sm mute">Окна: ${A.openings.filter(o => o.kind === 'window').length} · двери/проёмы: ${A.openings.filter(o => o.kind !== 'window').length} · стояки: ${A.risers.length} · щиток: ${A.panels.length ? 'да' : 'нет'}</p>
+    <textarea data-note="${r.id}" rows="2" style="width:100%" placeholder="Примечание для клиента (необязательно)"></textarea>
+    <button class="btn ok" data-send="${r.id}" style="margin-top:8px;width:100%">Отправить клиенту на утверждение</button></div></div>`;
+}
+async function onDXF(id, file) {
+  try {
+    const buf = await file.arrayBuffer();
+    const dxf = parseDXF(decodeDXF(buf));
+    const A = analyze(flatten(dxf));
+    if (!A.error) A.svg = renderSVG(A);
+    A.file = file.name; parsed[id] = A;
+  } catch (e) { parsed[id] = { error: 'Не получилось прочитать файл: ' + (e.message || e) + '. Сохрани как DXF.' }; }
+  render(); document.getElementById('c' + id)?.scrollIntoView({ behavior: 'smooth' });
+}
+async function sendObmer(id) {
+  const r = rows.find(x => x.id === id), A = parsed[id]; if (!r || !A || A.error) return;
+  document.querySelectorAll(`[data-rn^="${id}:"]`).forEach(inp => { A.rooms[+inp.dataset.rn.split(':')[1]].name = inp.value.trim() || 'Помещение'; });
+  document.querySelectorAll(`[data-rh^="${id}:"]`).forEach(inp => { const v = parseInt(inp.value, 10); A.rooms[+inp.dataset.rh.split(':')[1]].h_mm = v || null; });
+  const area = parseFloat(String(document.querySelector(`[data-area="${id}"]`).value).replace(',', '.')) || A.area;
+  if (!area) { alert('Укажи площадь'); return; }
+  const note = document.querySelector(`[data-note="${id}"]`).value.trim();
+  const hs = A.rooms.map(x => x.h_mm).filter(Boolean);
+  const data = { source: 'dxf', file: A.file, area: Math.round(area * 10) / 10, ceiling_mm: hs.length ? Math.max(...hs) : null,
+    rooms: A.rooms.map(x => ({ name: x.name, h_mm: x.h_mm, area_m2: x.area_m2, poly: x.poly })), openings: A.openings, risers: A.risers, panels: A.panels, vents: A.vents,
+    total_w_mm: Math.round(A.bbox[2] - A.bbox[0]), total_d_mm: Math.round(A.bbox[3] - A.bbox[1]), notes: note || 'Обмерный план начерчен специалистом по вашему рисунку. Точность ±10–20 мм.', svg: A.svg };
+  const ver = r._ob ? r._ob.ver + 1 : 1;
+  const { error } = await SB.from('d3k_obmer').upsert({ pid: r.pid, ver, data, updated_at: new Date().toISOString() });
+  if (error) { alert('Не отправилось: ' + error.message); return; }
+  await SB.from('d3k_requests').update({ status: 'done' }).eq('id', id);
+  delete parsed[id]; alert('Обмер отправлен клиенту (версия ' + ver + '). В приложении он появится в течение минуты.'); load();
+}
+app.addEventListener('click', async e => {
+  const t = e.target.closest('[data-tab],[data-a],[data-st],[data-send],[data-zoom]'); if (!t) return;
+  if (t.dataset.tab) { tab = t.dataset.tab; render(); }
+  else if (t.dataset.a === 'reload') load();
+  else if (t.dataset.st) { await SB.from('d3k_requests').update({ status: t.dataset.st }).eq('id', +t.dataset.id); load(); }
+  else if (t.dataset.send) sendObmer(+t.dataset.send);
+  else if (t.dataset.zoom) { const z = document.createElement('div'); z.className = 'zoom'; z.innerHTML = `<img src="${t.src}">`; z.onclick = () => z.remove(); document.body.appendChild(z); }
+});
+app.addEventListener('change', e => { const t = e.target; if (t.dataset && t.dataset.dxf && t.files[0]) onDXF(+t.dataset.dxf, t.files[0]); });
+function loginUI(msg) {
+  app.innerHTML = `<div class="card login"><h3>Вход для персонала</h3><p class="sm mute">Тот же логин и пароль, что в панели Закупщика.</p>${msg ? `<p class="warn">${esc(msg)}</p>` : ''}<input id="em" type="email" placeholder="Email"><input id="pw" type="password" placeholder="Пароль"><button class="btn" id="go" style="width:100%">Войти</button></div>`;
+  document.getElementById('go').onclick = async () => { const { error } = await SB.auth.signInWithPassword({ email: document.getElementById('em').value.trim(), password: document.getElementById('pw').value }); if (error) loginUI('Неверный email или пароль'); else start(); };
+}
+async function start() {
+  const { data } = await SB.auth.getSession();
+  if (!data.session) return loginUI();
+  document.getElementById('who').textContent = data.session.user.email; const out = document.getElementById('out'); out.hidden = false; out.onclick = async () => { await SB.auth.signOut(); location.reload(); };
+  load(); setInterval(() => { if (!Object.keys(parsed).length) load(); }, 60000);
+}
+window.D3K_TEST = { parseDXF, decodeDXF, flatten, analyze, renderSVG };
+start();
+</script>
+</body>
+</html>
