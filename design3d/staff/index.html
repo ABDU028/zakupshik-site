@@ -183,7 +183,7 @@ function analyze(ents) {
   rects.forEach(b => { if ((b[2] - b[0]) < 12000 && (b[3] - b[1]) < 4000) bands.push(b); });
   const inBand = o => { const b = bboxOf(o); if (!b) return false; const cx = (b[0] + b[2]) / 2, cy = (b[1] + b[3]) / 2; return bands.some(B => cx >= B[0] && cx <= B[2] && cy >= B[1] && cy <= B[3]); };
   const draw = ents.filter(o => !isLayer(o, /РАМК|FRAME/) && !inBand(o));
-  if (!draw.length) return { error: 'В файле нет чертежа (только рамка?)' };
+  if (!draw.length) { const lc = {}; ents.forEach(o => { lc[o.layer] = (lc[o.layer] || 0) + 1; }); return { error: 'В файле не найден чертёж. Объектов в файле: ' + ents.length + ' (на рамке: ' + frame.length + ', в колонке обозначений/штампе: ' + (ents.length - frame.length) + '). Слои: ' + Object.entries(lc).map(([k, v]) => k + ' ' + v).join(', ') + '. Пришли файл — разберём.' }; }
   const texts = draw.filter(o => o.text);
   // комнаты
   let rooms = draw.filter(o => isLayer(o, /КОМНАТ|ROOM/) && o.pts && o.closed && o.pts.length >= 3).map(o => {
