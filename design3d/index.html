@@ -115,7 +115,7 @@
   document.addEventListener("click",function(e){var a=e.target.closest&&e.target.closest('a[target="_blank"]');if(!a)return;var h=a.getAttribute("href")||"";if(/^https?:/.test(h)&&h.indexOf(location.origin)!==0)return;e.preventDefault();location.href=a.href;},true);
 })();
 
-(function(){var B="c2bdc69041";function chk(){if(B.indexOf("__")===0||document.getElementById("live"))return;var a=document.activeElement;if(a&&(a.tagName==="TEXTAREA"||a.tagName==="INPUT")&&a.value)return;
+(function(){var B="daa5b76e93";function chk(){if(B.indexOf("__")===0||document.getElementById("live"))return;var a=document.activeElement;if(a&&(a.tagName==="TEXTAREA"||a.tagName==="INPUT")&&a.value)return;
  fetch("version.json?t="+Date.now(),{cache:"no-store"}).then(function(r){return r.json();}).then(function(j){if(j&&j.v&&j.v!==B)location.reload();}).catch(function(){});}
  document.addEventListener("visibilitychange",function(){if(!document.hidden)chk();});setInterval(chk,300000);setTimeout(chk,8000);})();
 </script></head><body><title>Дизайн 3D Квартир</title>
@@ -1037,7 +1037,7 @@ function render(full){
   const app=document.getElementById("app");
   if(full===false&&tab==="chat")return;
   const ta=document.getElementById("ta");if(ta)draft=ta.value;
-  const ms=document.getElementById("msgs");const atBottom=!ms||ms.scrollHeight-ms.scrollTop-ms.clientHeight<80;
+  const ms=document.getElementById("msgs");const atBottom=!ms||ms.scrollHeight-ms.scrollTop-ms.clientHeight<80;const chatTop=ms?ms.scrollTop:0;const hadTa=document.activeElement&&document.activeElement.id==="ta";
   const mainScroll=app.querySelector("main")?app.querySelector("main").scrollTop:0;
   document.documentElement.lang=S.lang==="kk"?"kk":S.lang;
   const fab=tab==="chat"?"":`<button class="fab ${tab==="home"?"onhome":""}" data-a="support" aria-label="${t("support")}">${I_HELP}</button>`;
@@ -1055,8 +1055,9 @@ function render(full){
   if(modal)app.insertAdjacentHTML("beforeend",`<div class="sheetbg" data-a="mclose"><div class="sh tall">${modalHTML()}</div></div>`);
   const m=app.querySelector("main");if(m&&tab!=="chat")m.scrollTop=mainScroll;
   const fb=app.querySelector(".fab");if(m&&fb&&tab!=="chat"){let ft=null;m.addEventListener("scroll",()=>{fb.classList.add("hid");clearTimeout(ft);ft=setTimeout(()=>fb.classList.remove("hid"),900);},{passive:true});}
-  if(tab==="chat"&&atBottom)scrollChat();
+  if(tab==="chat"){if(atBottom)scrollChat();else{const m2=document.getElementById("msgs");if(m2)m2.scrollTop=chatTop;}}
   bindInputs();
+  if(hadTa){const t2=document.getElementById("ta");if(t2){try{t2.focus({preventScroll:true});}catch(e){}}}
 }
 function scrollChat(){const ms=document.getElementById("msgs");if(ms)ms.scrollTop=ms.scrollHeight;}
 function bindInputs(){
@@ -1076,16 +1077,17 @@ function toggleVoice(on){
   if(on===undefined)on=!listening;
   const ta=document.getElementById("ta");voiceBase=ta?ta.value.trim():"";
   const lang={ru:"ru-RU",kk:"kk-KZ",en:"en-US"}[S.lang]||"ru-RU";
-  if(window.D3K_NATIVE){window.D3K_post({t:"voice",on,lang});listening=on;render();return;}
+  if(window.D3K_NATIVE){window.D3K_post({t:"voice",on,lang});listening=on;updMic();return;}
   const SR=window.SpeechRecognition||window.webkitSpeechRecognition;if(!SR)return;
-  if(!on){try{rec&&rec.stop();}catch(e){}listening=false;render();return;}
+  if(!on){try{rec&&rec.stop();}catch(e){}listening=false;updMic();return;}
   rec=new SR();rec.lang=lang;rec.interimResults=true;rec.continuous=false;
   rec.onresult=e=>{let s="";for(let i=0;i<e.results.length;i++)s+=e.results[i][0].transcript;voiceText(s);};
-  rec.onend=()=>{listening=false;render();};rec.onerror=()=>{listening=false;render();};
-  try{rec.start();listening=true;render();}catch(e){listening=false;}
+  rec.onend=()=>{listening=false;updMic();};rec.onerror=()=>{listening=false;updMic();};
+  try{rec.start();listening=true;updMic();}catch(e){listening=false;}
 }
+function updMic(){const b=document.querySelector(".mic");if(b)b.classList.toggle("on",listening);const ta=document.getElementById("ta");if(ta)ta.placeholder=(S.mgrMode?t("mgr")+": ":"")+(listening?t("listening"):t("ph"));}
 function voiceText(s){const ta=document.getElementById("ta");const v=(voiceBase?voiceBase+" ":"")+s;draft=v;if(ta){ta.value=v;ta.dispatchEvent(new Event("input"));}}
-window.addEventListener("d3k-native",e=>{const m=e.detail||{};if(m.t==="voice"&&m.text!=null)voiceText(m.text);if(m.t==="voice-end"){listening=false;render();}if(m.t==="voice-error"){listening=false;render();toast(m.msg||t("voiceErr"));}});
+window.addEventListener("d3k-native",e=>{const m=e.detail||{};if(m.t==="voice"&&m.text!=null)voiceText(m.text);if(m.t==="voice-end"){listening=false;updMic();}if(m.t==="voice-error"){listening=false;updMic();toast(m.msg||t("voiceErr"));}});
 /* ---------- фото и видео ---------- */
 async function shrink(file,max,q){const u=URL.createObjectURL(file);try{const im=new Image();await new Promise((r,j)=>{im.onload=r;im.onerror=j;im.src=u;});const s=Math.min(1,max/Math.max(im.width,im.height));const c=document.createElement("canvas");c.width=Math.round(im.width*s);c.height=Math.round(im.height*s);c.getContext("2d").drawImage(im,0,0,c.width,c.height);return c.toDataURL("image/jpeg",q);}finally{URL.revokeObjectURL(u);}}
 async function addImages(files,kind){
