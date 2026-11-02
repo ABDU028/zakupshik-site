@@ -190,13 +190,20 @@ function analyze(ents) {
     const p = o.pts, a = polyArea(p) / 1e6, c = centroid(p);
     const ins = texts.filter(t => inPoly(t.x, t.y, p) && (isLayer(t, /ПОМЕЩ|КОМНАТ|ROOM/) || t.color === 2));
     let name = '', h = null;
-    ins.forEach(t => { const hh = num(t.text, /(?:потол[а-яё]*|h\s*=?|н\s*=?)\s*[:=]?\s*(\d{4})/i); if (hh) h = hh; else if (!/м2|м²|^\s*[-+]?\d/i.test(t.text) && !name) name = t.text.trim(); });
+    ins.forEach(t => { const hh0 = (isLayer(t, /ЩИТ|ЩК|СТОЯК|ОКН|ДВЕР/) || t.color === 1) ? null : num(t.text, /(?:потол[а-яё]*|h\s*=?|н\s*=?)\s*[:=]?\s*(\d{4})/i); const hh = hh0 && hh0 >= 2200 && hh0 <= 4500 ? hh0 : null; if (hh) h = hh; else if (!/м2|м²|^\s*[-+]?\d/i.test(t.text) && !name) name = t.text.trim(); });
     return { name: name || 'Помещение', h_mm: h, area_m2: Math.round(a * 10) / 10, poly: p.map(q => [Math.round(q[0]), Math.round(q[1])]), cx: c[0], cy: c[1] };
   }).filter(r => r.area_m2 > 0.3);
-  if (!rooms.length) warn.push('Нет комнат на слое КОМНАТЫ. В AutoCAD набери KMT и кликни внутри каждой комнаты — или впиши площадь и комнаты вручную ниже.');
+  if (!rooms.length) {
+    rooms = autoRooms(draw, texts);
+    if (rooms.length) warn.push('Помещения найдены автоматически по линиям стен (' + rooms.length + '). Проверь названия и площадь; точнее — отметить комнаты командой KMT в AutoCAD.');
+    else warn.push('Не получилось найти помещения. В AutoCAD набери KMT и кликни внутри каждой комнаты — или впиши площадь вручную ниже.');
+  }
+  // стены не под прямым углом — обмер мог не сойтись
+  const skew = draw.filter(o => o.type === 'LINE' && !isLayer(o, /РАЗМЕР|DIM/) && o.pts && Math.hypot(o.pts[1][0] - o.pts[0][0], o.pts[1][1] - o.pts[0][1]) > 1500).filter(o => { const a = Math.abs(Math.atan2(o.pts[1][1] - o.pts[0][1], o.pts[1][0] - o.pts[0][0]) * 180 / Math.PI) % 90; return a > 0.4 && a < 89.6; });
+  if (skew.length) warn.push('Есть стены не под прямым углом (' + skew.length + ' шт.). Если в квартире углы прямые — значит, размеры в контуре не сошлись, проверь замер.');
   // проёмы
   const near = (x, y, pred, maxd) => { let best = null, bd = maxd; texts.forEach(t => { if (!pred(t)) return; const d = Math.hypot(t.x - x, t.y - y); if (d < bd) { bd = d; best = t; } }); return best; };
-  const roomAt = (x, y) => { let r = rooms.find(R => inPoly(x, y, R.poly)); if (r) return r.name; let bd = 1e12; rooms.forEach(R => { R.poly.forEach(q => { const d = Math.hypot(q[0] - x, q[1] - y); if (d < bd) { bd = d; r = R; } }); }); return r ? r.name : null; };
+  const roomAt = (x, y) => { if (rooms.length === 1) return rooms[0].name; let r = rooms.find(R => R.poly.length && inPoly(x, y, R.poly)); if (r) return r.name; let bd = 1e12; rooms.forEach(R => { (R.poly || []).forEach(q => { const d = Math.hypot(q[0] - x, q[1] - y); if (d < bd) { bd = d; r = R; } }); }); return r ? r.name : null; };
   const openings = draw.filter(o => o.pts && o.closed && o.pts.length === 4 && (isLayer(o, /ОКН|ДВЕР|ПРО[ЁЕ]М|WIN|DOOR/) || o.color === 5 || o.color === 6)).map(o => {
     const b = bboxOf(o), w = Math.max(b[2] - b[0], b[3] - b[1]), th = Math.min(b[2] - b[0], b[3] - b[1]);
     const win = isLayer(o, /ОКН|WIN/) || (o.color === 5 && !isLayer(o, /ДВЕР|DOOR/));
@@ -217,6 +224,51 @@ function analyze(ents) {
   if (rooms.length && !hs.length) warn.push('Высота потолка не подписана («Потолок 2700» внутри комнаты).');
   const area = Math.round(rooms.reduce((s, r) => s + r.area_m2, 0) * 10) / 10;
   return { draw, rooms, openings, risers, panels, vents, warn, area, bbox: [X0, Y0, X1, Y1], ceiling_mm: hs.length ? Math.max(...hs) : null };
+}
+// помещения по линиям: растр 20 мм, «закрываем» проёмы до ~1 м, ищем замкнутые области
+function autoRooms(draw, texts) {
+  const segs = [];
+  draw.forEach(o => {
+    if (o.text || isLayer(o, /РАЗМЕР|DIM|СТОЯК|ВЕНТ|РАДИАТ|ЩИТ|ПОМЕЩ|СКРЫТ/)) return;
+    if (o.pts && o.pts.length > 1) { for (let i = 0; i + 1 < o.pts.length; i++) segs.push([o.pts[i], o.pts[i + 1]]); if (o.closed) segs.push([o.pts[o.pts.length - 1], o.pts[0]]); }
+    else if (o.type === 'ARC' || o.type === 'CIRCLE') { const a0 = (o.a0 || 0) * Math.PI / 180; let a1 = o.type === 'CIRCLE' ? a0 + 2 * Math.PI : (o.a1 || 0) * Math.PI / 180; if (a1 < a0) a1 += 2 * Math.PI; const n = 24; for (let k = 0; k < n; k++) { const t0 = a0 + (a1 - a0) * k / n, t1 = a0 + (a1 - a0) * (k + 1) / n; segs.push([[o.x + o.r * Math.cos(t0), o.y + o.r * Math.sin(t0)], [o.x + o.r * Math.cos(t1), o.y + o.r * Math.sin(t1)]]); } }
+  });
+  if (!segs.length) return [];
+  let X0 = 1e12, Y0 = 1e12, X1 = -1e12, Y1 = -1e12;
+  segs.forEach(([a, b]) => { X0 = Math.min(X0, a[0], b[0]); Y0 = Math.min(Y0, a[1], b[1]); X1 = Math.max(X1, a[0], b[0]); Y1 = Math.max(Y1, a[1], b[1]); });
+  const C = 20, pad = 40, W = Math.ceil((X1 - X0) / C) + 2 * pad, H = Math.ceil((Y1 - Y0) / C) + 2 * pad;
+  if (W * H > 6e6) return [];
+  const wall = new Uint8Array(W * H);
+  const gx = x => Math.round((x - X0) / C) + pad, gy = y => Math.round((y - Y0) / C) + pad;
+  segs.forEach(([a, b]) => { const x0 = gx(a[0]), y0 = gy(a[1]), x1 = gx(b[0]), y1 = gy(b[1]); const n = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0), 1); for (let k = 0; k <= n; k++) { const x = Math.round(x0 + (x1 - x0) * k / n), y = Math.round(y0 + (y1 - y0) * k / n); wall[y * W + x] = 1; } });
+  // расстояние до стены (BFS, шахматная метрика)
+  const dist = new Int32Array(W * H).fill(-1), q = new Int32Array(W * H); let qh = 0, qt = 0;
+  for (let i = 0; i < W * H; i++) if (wall[i]) { dist[i] = 0; q[qt++] = i; }
+  while (qh < qt) { const i = q[qh++], x = i % W, y = (i / W) | 0; for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const nx = x + dx, ny = y + dy; if (nx < 0 || ny < 0 || nx >= W || ny >= H) continue; const j = ny * W + nx; if (dist[j] < 0) { dist[j] = dist[i] + 1; q[qt++] = j; } } }
+  const R = 27; // ≈540 мм: проёмы до ~1,05 м «закрыты»
+  const lab = new Int32Array(W * H); let nl = 0; const seeds = [];
+  for (let i = 0; i < W * H; i++) {
+    if (lab[i] || dist[i] <= R) continue;
+    nl++; let touch = false, cnt = 0; const st = [i]; lab[i] = nl;
+    while (st.length) { const k = st.pop(); cnt++; const x = k % W, y = (k / W) | 0; if (x === 0 || y === 0 || x === W - 1 || y === H - 1) touch = true; [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach(([dx, dy]) => { const nx = x + dx, ny = y + dy; if (nx < 0 || ny < 0 || nx >= W || ny >= H) return; const j = ny * W + nx; if (!lab[j] && dist[j] > R) { lab[j] = nl; st.push(j); } }); }
+    seeds.push({ id: nl, outside: touch });
+  }
+  // возвращаем области к стенам (рост по пустым клеткам)
+  qh = 0; qt = 0; for (let i = 0; i < W * H; i++) if (lab[i]) q[qt++] = i;
+  while (qh < qt) { const i = q[qh++], x = i % W, y = (i / W) | 0; [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach(([dx, dy]) => { const nx = x + dx, ny = y + dy; if (nx < 0 || ny < 0 || nx >= W || ny >= H) return; const j = ny * W + nx; if (!lab[j] && !wall[j]) { lab[j] = lab[i]; q[qt++] = j; } }); }
+  const area = {}; for (let i = 0; i < W * H; i++) if (lab[i]) area[lab[i]] = (area[lab[i]] || 0) + 1;
+  const labelAt = (x, y) => { const X = gx(x), Y = gy(y); return X >= 0 && Y >= 0 && X < W && Y < H ? lab[Y * W + X] : 0; };
+  const rooms = [];
+  seeds.forEach(sd => {
+    if (sd.outside) return;
+    const a = (area[sd.id] || 0) * C * C / 1e6; if (a < 2.5) return;
+    let name = '', h = null;
+    texts.forEach(t => { if (labelAt(t.x, t.y) !== sd.id) return; const hh0 = (isLayer(t, /ЩИТ|ЩК|СТОЯК|ОКН|ДВЕР/) || t.color === 1) ? null : num(t.text, /(?:потол[а-яё]*|h\s*=?|н\s*=?)\s*[:=]?\s*(\d{4})/i); const hh = hh0 && hh0 >= 2200 && hh0 <= 4500 ? hh0 : null; if (hh) h = h || hh; else if ((isLayer(t, /ПОМЕЩ|КОМНАТ/) || t.color === 2) && !/м2|м²|^\s*[-+]?\d/i.test(t.text) && !name) name = t.text.trim(); });
+    // контур для подсветки — прямоугольник по клеткам области (для площади не используется)
+    let mx0 = 1e9, my0 = 1e9, mx1 = -1, my1 = -1; for (let i = 0; i < W * H; i++) if (lab[i] === sd.id) { const x = i % W, y = (i / W) | 0; if (x < mx0) mx0 = x; if (x > mx1) mx1 = x; if (y < my0) my0 = y; if (y > my1) my1 = y; }
+    rooms.push({ name: name || ('Помещение ' + (rooms.length + 1)), h_mm: h, area_m2: Math.round(a * 10) / 10, poly: [], auto: true });
+  });
+  return rooms;
 }
 function renderSVG(A) {
   const [X0, Y0, X1, Y1] = A.bbox, pad = 600, W = X1 - X0 + 2 * pad, H = Y1 - Y0 + 2 * pad;
