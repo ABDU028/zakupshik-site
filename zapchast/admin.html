@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Detalka — админка</title>
+<link rel="icon" href="icon.svg">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&family=Unbounded:wght@800&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#f4f2ef;--card:#fff;--line:#e6e2dc;--tx:#1b1d22;--mu:#7a7f8c;--ac:#ff6a1a;--ok:#1fa463;--warn:#c98400;--bad:#c0392b}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font:14px/1.45 Manrope,system-ui,sans-serif}
+button{font:inherit;cursor:pointer;border:0}button:disabled{opacity:.5}
+input,textarea{font:inherit;border:1px solid var(--line);border-radius:10px;padding:9px 11px;width:100%;background:#fff}
+header{background:#0d0f13;color:#fff;padding:12px 16px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:5;flex-wrap:wrap}
+.logo{font:800 18px Unbounded}.logo b{color:var(--ac)}
+.tabs{display:flex;gap:6px;margin-left:auto;flex-wrap:wrap}.tabs button{background:#1d2129;color:#c9cdd8;padding:8px 12px;border-radius:10px;font-weight:700}.tabs button.on{background:var(--ac);color:#fff}
+.tabs .n{background:#fff;color:var(--ac);border-radius:9px;padding:0 6px;margin-left:5px;font-size:11px}
+main{max-width:1000px;margin:0 auto;padding:16px}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:14px}
+.st{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 14px}.st b{display:block;font-size:21px}.st span{color:var(--mu);font-size:12.5px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:12px}
+.card.new{border-color:var(--ac);box-shadow:0 0 0 2px #ff6a1a33}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.sp{flex:1}
+.mu{color:var(--mu);font-size:13px}
+.tag{font-size:11.5px;font-weight:800;padding:3px 9px;border-radius:999px;background:#eee;white-space:nowrap}
+.tag.y{background:#fff1d6;color:var(--warn)}.tag.g{background:#dcf5e8;color:var(--ok)}.tag.o{background:#ffe6d8;color:var(--ac)}.tag.r{background:#fde2df;color:var(--bad)}
+.btn{background:var(--ac);color:#fff;font-weight:800;padding:9px 14px;border-radius:10px;text-decoration:none;display:inline-block}.btn.sec{background:#eee;color:var(--tx)}.btn.bad{background:#fde2df;color:var(--bad)}
+.route{display:grid;grid-template-columns:1fr auto 1fr;gap:10px;align-items:center;background:#faf8f5;border:1px dashed var(--line);border-radius:12px;padding:10px;margin:10px 0}
+.route div b{display:block}
+table{width:100%;border-collapse:collapse;font-size:13px}td,th{padding:7px 6px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}th{color:var(--mu);font-weight:700}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}@media(max-width:640px){.grid2{grid-template-columns:1fr}.route{grid-template-columns:1fr}.route>div:nth-child(2){display:none}}
+label{font-weight:700;font-size:12.5px;color:var(--mu);display:block;margin:10px 0 5px}
+.empty{color:var(--mu);text-align:center;padding:40px}
+.ph{max-width:220px;max-height:220px;border-radius:10px;margin-top:8px;cursor:zoom-in;display:block}
+.login{max-width:380px;margin:12vh auto;background:#fff;border:1px solid var(--line);border-radius:16px;padding:22px}
+.live{font-size:12px;color:#9aa0ad}.live i{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--ok);margin-right:5px}
+</style>
+</head>
+<body>
+<header><div class="logo">Detal<b>ka</b> · админка</div><span class="live" id="live"></span><div class="tabs" id="tabs"></div></header>
+<main id="m"></main>
+<script src="data.js"></script>
+<script>
+const D = window.DTL, LS = D.LS, $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const tg = n => new Intl.NumberFormat('ru-RU').format(n || 0) + ' ₸';
+const dt = t => new Date(t).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+const DLV = { courier: 'Курьер по Алматы', pickup: 'Самовывоз, Кар Сити', region: 'В другой город (ТК)' };
+let tab = LS.get('atab', 'orders'), data = null, err = '', seen = LS.get('seen', { o: 0, r: 0 }), lastAt = 0;
+
+async function api(action, body) {
+  const r = await fetch(D.AGENT + '?action=' + action, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-admin': LS.get('admkey', '') }, body: JSON.stringify(body || {}) });
+  if (r.status === 403) throw new Error('forbidden');
+  if (!r.ok) throw new Error('Сервер ответил ' + r.status);
+  return r.json();
+}
+function beep() { try { const a = new (window.AudioContext || window.webkitAudioContext)(), o = a.createOscillator(), g = a.createGain(); o.connect(g); g.connect(a.destination); o.frequency.value = 880; g.gain.setValueAtTime(.2, a.currentTime); g.gain.exponentialRampToValueAtTime(.001, a.currentTime + .6); o.start(); o.stop(a.currentTime + .6); } catch (e) {} }
+async function load(quiet) {
+  if (!LS.get('admkey', '')) return render();
+  try {
+    const j = await api('admin_list');
+    const maxO = Math.max(0, ...j.orders.map(o => o.id)), maxR = Math.max(0, ...j.requests.map(r => r.id));
+    if (data && (maxO > Math.max(0, ...data.orders.map(o => o.id)) || maxR > Math.max(0, ...data.requests.map(r => r.id)))) beep();
+    data = j; err = ''; lastAt = Date.now();
+  } catch (e) {
+    if (e.message === 'forbidden') { LS.set('admkey', ''); err = 'Неверный ключ'; data = null; }
+    else err = 'Нет связи с сервером: ' + e.message;
+  }
+  if (!quiet || !document.querySelector('textarea:focus,input:focus')) render();
+}
+setInterval(() => { if (!document.hidden) load(true); }, 15000);
+
+function render() {
+  if (!LS.get('admkey', '')) {
+    $('#tabs').innerHTML = ''; $('#live').innerHTML = '';
+    $('#m').innerHTML = `<div class="login"><b style="font-size:17px">Вход в админку</b><p class="mu">Ключ админки выдаётся владельцу. Хранится только в этом браузере.</p>
+      <input id="key" type="password" placeholder="dtl-…" onkeydown="if(event.key==='Enter')login()"><div style="margin-top:12px" class="row"><button class="btn" onclick="login()">Войти</button><span style="color:var(--bad)">${esc(err)}</span></div></div>`;
+    return;
+  }
+  if (!data) { $('#m').innerHTML = `<div class="empty">${err ? esc(err) : 'Загружаем…'}</div>`; return; }
+  const os = data.orders, rq = data.requests;
+  const newO = os.filter(o => o.id > seen.o).length, newR = rq.filter(r => !r.answer).length;
+  document.title = (newO + newR ? `(${newO + newR}) ` : '') + 'Detalka — админка';
+  const t = [['orders', 'Заказы', os.filter(o => o.step >= 0 && o.step < 4).length], ['req', 'Заявки', newR], ['agent', 'Агент', 0], ['price', 'Наценка', 0]];
+  $('#tabs').innerHTML = t.map(([k, n, c]) => `<button class="${tab === k ? 'on' : ''}" onclick="setTab('${k}')">${n}${c ? `<span class="n">${c}</span>` : ''}</button>`).join('') + `<button onclick="logout()" title="Выйти">⎋</button>`;
+  $('#live').innerHTML = err ? `<span style="color:#ffb4a8">${esc(err)}</span>` : `<i></i>обновлено ${new Date(lastAt).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}`;
+  const ok = os.filter(o => o.step >= 0);
+  const today = ok.filter(o => new Date(o.at).toDateString() === new Date().toDateString());
+  const prof = ok.reduce((a, o) => a + o.items.reduce((b, i) => b + (i.cost ? (i.price - i.cost) * i.qty : 0), 0), 0);
+  const stats = `<div class="stats"><div class="st"><b>${today.length}</b><span>заказов сегодня</span></div><div class="st"><b>${tg(ok.reduce((a, o) => a + o.total, 0))}</b><span>оборот всего</span></div>
+    <div class="st"><b>${tg(prof)}</b><span>ваша наценка всего</span></div><div class="st"><b>${newR}</b><span>заявок ждут ответа</span></div></div>`;
+  $('#m').innerHTML = stats + ({ orders: vOrders, req: vReq, agent: vAgent, price: vPrice })[tab]();
+  if (tab === 'orders' && os.length) { seen.o = Math.max(seen.o, ...os.map(o => o.id)); LS.set('seen', seen); }
+}
+function setTab(k) { tab = k; LS.set('atab', k); render(); }
+function login() { LS.set('admkey', $('#key').value.trim()); err = ''; data = null; render(); load(); }
+function logout() { LS.set('admkey', ''); data = null; render(); }
+
+function vOrders() {
+  const os = data.orders;
+  if (!os.length) return '<div class="empty">Заказов пока нет. Оформите тестовый заказ в приложении — он появится здесь сам.</div>';
+  return os.map(o => {
+    const cost = o.items.reduce((a, i) => a + (i.cost || 0) * i.qty, 0);
+    const next = D.ORDER_STEPS[o.step + 1];
+    const sup = [...new Set(o.items.map(i => i.supplier || 'склад'))];
+    const st = o.step < 0 ? '<span class="tag r">Отменён</span>' : `<span class="tag ${o.step >= 4 ? 'g' : o.step >= 2 ? 'o' : 'y'}">${D.ORDER_STEPS[o.step]}</span>`;
+    return `<div class="card ${o.id > seen.o ? 'new' : ''}"><div class="row"><b class="sp">№${o.id} · ${esc(o.car ? (o.car.brand + ' ' + o.car.model).trim() : 'машина не указана')}</b>${st}</div>
+      <div class="mu">${dt(o.at)} · <a href="tel:${esc(o.phone)}">${esc(o.phone)}</a> · <a href="https://wa.me/${esc(String(o.phone).replace(/\D/g, ''))}" target="_blank" rel="noopener">WhatsApp</a>${o.car && o.car.vin ? ' · VIN ' + esc(o.car.vin) : ''}</div>
+      <table style="margin-top:8px"><tr><th>Деталь</th><th>Бренд / номер</th><th>Кол.</th><th>Где брать</th><th>Закупка</th><th>Клиенту</th></tr>
+      ${o.items.map(i => `<tr><td>${esc(i.name)}</td><td>${esc(i.brand)} · ${esc(i.num)}</td><td>${i.qty}</td><td>${esc(i.supplier || '—')}<div class="mu">${D.ETA[i.eta] || ''}</div></td><td>${i.cost ? tg(i.cost * i.qty) : '—'}</td><td><b>${tg(i.price * i.qty)}</b></td></tr>`).join('')}</table>
+      <div class="route"><div><span class="mu">Забрать</span><b>${esc(sup.join(', '))}</b><span class="mu">${o.items.every(i => i.eta === 'today') ? 'привезут к вам сегодня' : 'часть — под заказ'}</span></div><div style="font-size:22px">→</div>
+        <div><span class="mu">Отвезти</span><b>${esc(o.delivery === 'pickup' ? DLV.pickup : o.addr)}</b><span class="mu">${DLV[o.delivery] || ''}</span></div></div>
+      <div class="row"><span class="mu sp">Товары ${tg(o.goods)} + доставка ${tg(o.delivery_price)} = <b style="color:var(--tx)">${tg(o.total)}</b> · закупка ${tg(cost)} · наценка ${tg(o.goods - cost)}</span>
+        ${o.step >= 0 && next ? `<button class="btn" onclick="setStep(${o.id},${o.step + 1},this)">→ ${next}</button>` : ''}
+        ${o.step >= 0 && o.step < 4 ? `<button class="btn bad" onclick="if(confirmCancel(${o.id}))setStep(${o.id},-1,this)">Отменить</button>` : ''}
+        ${o.step >= 4 ? '<span class="tag g">Готово</span>' : ''}${o.step < 0 ? `<button class="btn sec" onclick="setStep(${o.id},0,this)">Вернуть в работу</button>` : ''}</div></div>`;
+  }).join('');
+}
+function confirmCancel(id) { return window.confirm('Отменить заказ №' + id + '? Клиент увидит, что заказ отменён.'); }
+async function setStep(id, step, b) { b.disabled = true; try { await api('admin_update', { order: id, step }); await load(); } catch (e) { alert('Не сохранилось: ' + e.message); b.disabled = false; } }
+
+function vReq() {
+  const rq = data.requests;
+  if (!rq.length) return '<div class="empty">Заявок нет</div>';
+  return rq.map(r => `<div class="card ${r.answer ? '' : 'new'}"><div class="row"><b class="sp" style="white-space:pre-wrap">${esc(r.text)}</b><span class="tag ${r.answer ? 'g' : 'y'}">${r.answer ? 'отвечено' : 'ждёт ответа'}</span></div>
+    <div class="mu">${esc(r.car ? (r.car.brand + ' ' + r.car.model + (r.car.year ? ', ' + r.car.year : '')).trim() : 'машина не указана')}${r.car && r.car.vin ? ' · VIN ' + esc(r.car.vin) : ''} · <a href="tel:${esc(r.phone)}">${esc(r.phone)}</a> · ${dt(r.at)}</div>
+    ${r.photo ? `<img class="ph" src="${r.photo}" onclick="window.open().document.write('<img src=&quot;'+this.src+'&quot; style=max-width:100%>')">` : ''}
+    ${r.answer ? `<div style="margin-top:8px;padding:10px;background:#faf8f5;border-radius:10px;white-space:pre-wrap">${esc(r.answer)}</div><div class="mu">ответ ${dt(r.answered_at)}</div>` : `
+    <div class="row" style="margin-top:8px"><button class="btn sec" onclick="tryFind(${r.id})">Пробить в агенте</button><span class="mu" id="f${r.id}"></span></div>
+    <label>Ответ клиенту (придёт в приложение)</label><textarea id="a${r.id}" rows="3" placeholder="Есть: KYB 339382 — 47 000 ₸, привезём сегодня. Оригинал Toyota — 98 000 ₸, завтра.&#10;Найдите в приложении по номеру и добавьте в корзину."></textarea>
+    <div class="row" style="margin-top:8px"><button class="btn" onclick="answer(${r.id},this)">Отправить ответ</button><a class="btn sec" href="https://wa.me/${esc(String(r.phone).replace(/\D/g, ''))}" target="_blank" rel="noopener">WhatsApp</a></div>`}</div>`).join('');
+}
+async function tryFind(id) {
+  const r = data.requests.find(x => x.id === id), el = $('#f' + id); el.textContent = 'ищем…';
+  try {
+    const j = await D.agentSearch(r.text, r.car && r.car.brand ? r.car : null, LS.get('admkey', ''));
+    const lines = [];
+    for (const p of j.products.slice(0, 3)) for (const o of p.offers.slice(0, 3)) lines.push(`${p.name}: ${o.brand} ${o.num} — ${tg(o.price)}, ${o.stock > 0 ? D.ETA[o.eta].toLowerCase() : 'под заказ'}`);
+    el.textContent = lines.length ? 'нашли ' + lines.length + ' — вставили в ответ' : 'по описанию ничего, нужен номер детали';
+    if (lines.length) $('#a' + id).value = 'Нашли для вас:\n' + lines.join('\n') + '\n\nНайдите деталь в приложении по номеру и добавьте в корзину.';
+  } catch (e) { el.textContent = 'агент недоступен'; }
+}
+async function answer(id, b) { const t = $('#a' + id).value.trim(); if (!t) return; b.disabled = true; try { await api('admin_update', { request: id, answer: t }); await load(); } catch (e) { alert('Не отправилось: ' + e.message); b.disabled = false; } }
+
+/* ---- агент наличия ---- */
+let agentRes = null, agentBusy = false;
+function vAgent() {
+  let res = '';
+  if (agentBusy) res = '<div class="card mu">Опрашиваем поставщиков…</div>';
+  else if (agentRes && agentRes.error) res = `<div class="card" style="color:var(--bad)">${esc(agentRes.error)}</div>`;
+  else if (agentRes) res = `<div class="card"><b>Поставщики</b> <span class="mu">· всего ${agentRes.ms} мс</span><table style="margin-top:6px"><tr><th>Поставщик</th><th>Статус</th><th>Найдено</th><th>Время</th></tr>
+      ${agentRes.suppliers.map(s => `<tr><td>${esc(s.name)}</td><td>${s.ok ? `<span class="tag g">ok${s.cached ? ' · из кэша' : ''}</span>` : `<span class="tag y">${esc(s.error || 'ошибка')}</span>`}</td><td>${s.count ?? '—'}</td><td>${s.ms != null ? s.ms + ' мс' : '—'}</td></tr>`).join('')}</table></div>
+    ${agentRes.products.map(p => `<div class="card"><b>${esc(p.name)}</b><table style="margin-top:6px"><tr><th>Бренд / номер</th><th>Наличие</th><th>Закупка</th><th>Клиенту</th><th>Где лучше</th></tr>
+      ${p.offers.map(o => `<tr><td>${esc(o.brand)} · ${esc(o.num)} <span class="tag ${o.kind === 'оригинал' ? 'o' : ''}">${o.kind}</span></td><td>${o.stock > 0 ? o.stock + ' шт · ' + D.ETA[o.eta] : 'под заказ'}</td><td>${o.cost ? tg(o.cost) : '—'}</td><td><b>${tg(o.price)}</b></td><td>${esc(o.supplier || '')}${o.sources > 1 ? ` <span class="mu">(есть у ${o.sources})</span>` : ''}</td></tr>`).join('')}</table></div>`).join('') || '<div class="card mu">Ничего не нашли</div>'}`;
+  return `<div class="card"><b>Агент наличия</b><p class="mu">Один поиск — одновременно у всех подключённых поставщиков. Сейчас подключены демо-склады; Шате-М подключим, когда дадут доступ к кабинету.</p>
+    <div class="grid2"><div><label>Что ищем</label><input id="aq" placeholder="амортизатор или 339382" value="${esc(LS.get('aq', ''))}" onkeydown="if(event.key==='Enter')agentGo()"></div><div><label>Марка (необязательно)</label><input id="ab" placeholder="Toyota" value="${esc(LS.get('ab', ''))}"></div></div>
+    <div class="row" style="margin-top:12px"><button class="btn" onclick="agentGo()">Искать у всех</button></div></div>${res}`;
+}
+async function agentGo() {
+  const q = $('#aq').value.trim(), br = $('#ab').value.trim();
+  LS.set('aq', q); LS.set('ab', br);
+  agentBusy = true; agentRes = null; render();
+  try { agentRes = await D.agentSearch(q, br ? { brand: br } : null, LS.get('admkey', '')); }
+  catch (e) { agentRes = { error: 'Сервер агента недоступен: ' + e.message }; }
+  agentBusy = false; render();
+}
+
+/* ---- наценка ---- */
+function priceWith(c, s) { const pct = c <= s.cheapMax ? s.cheap : c >= s.expMin ? s.expensive : s.base; return Math.ceil(c * (1 + pct / 100) / 100) * 100; }
+function vPrice() {
+  const s = data.settings;
+  const ex = [3000, 25000, 42500, 120000];
+  return `<div class="card"><b>Наценка на закупку</b><p class="mu">Цена клиенту = цена склада + наценка, округление вверх до 100 ₸. Меняется у всех клиентов сразу.</p>
+    <div class="grid2"><div><label>Дешёвые детали, до (₸)</label><input id="cheapMax" type="number" value="${s.cheapMax}"><label>Наценка на дешёвые, %</label><input id="cheap" type="number" value="${s.cheap}"></div>
+    <div><label>Дорогие детали, от (₸)</label><input id="expMin" type="number" value="${s.expMin}"><label>Наценка на дорогие, %</label><input id="expensive" type="number" value="${s.expensive}"></div></div>
+    <label>Наценка на остальные, %</label><input id="base" type="number" value="${s.base}">
+    <div class="grid2"><div><label>Доставка по Алматы, ₸</label><input id="delivery" type="number" value="${s.delivery}"></div><div><label>Бесплатная доставка от, ₸</label><input id="freeFrom" type="number" value="${s.freeFrom}"></div></div>
+    <div class="row" style="margin-top:14px"><button class="btn" onclick="savePrice(this)">Сохранить</button></div></div>
+    <div class="card"><b>Пример</b><table style="margin-top:6px"><tr><th>Закупка</th><th>Клиенту</th><th>Ваша наценка</th></tr>${ex.map(c => `<tr><td>${tg(c)}</td><td><b>${tg(priceWith(c, s))}</b></td><td>${tg(priceWith(c, s) - c)}</td></tr>`).join('')}</table></div>
+    <div class="card"><b>Поставщики</b><table style="margin-top:6px"><tr><th>Поставщик</th><th>Статус</th><th>Доставка к вам</th></tr>
+      <tr><td>Шате-М</td><td><span class="tag y">ждём доступ к кабинету</span></td><td>в течение дня, бесплатно</td></tr>
+      <tr><td>Армтек</td><td><span class="tag">не подключён</span></td><td>—</td></tr>
+      <tr><td>Демо-склады А и Б</td><td><span class="tag g">для теста</span></td><td>отключатся сами, когда подключим настоящих</td></tr></table></div>`;
+}
+async function savePrice(b) {
+  const v = {}; ['cheapMax', 'cheap', 'expMin', 'expensive', 'base', 'delivery', 'freeFrom'].forEach(x => v[x] = +$('#' + x).value || 0);
+  b.disabled = true;
+  try { const r = await fetch(D.AGENT + '?action=settings', { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-admin': LS.get('admkey', '') }, body: JSON.stringify({ data: v }) }); if (!r.ok) throw new Error(r.status); data.settings = (await r.json()).settings; render(); }
+  catch (e) { alert('Не сохранилось: ' + e.message); b.disabled = false; }
+}
+render(); load();
+</script>
+</body>
+</html>

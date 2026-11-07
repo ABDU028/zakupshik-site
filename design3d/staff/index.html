@@ -434,6 +434,8 @@ function chatView(x) {
     ${o.length ? `<div class="reqs">${o.map(r => `<div class="req"><div class="tx"><b>${esc(KIND[r.kind] || r.kind)}</b> · ${tm(r.created_at)}${r.note ? `<br>${esc(r.note)}` : ''}${r.when_text ? `<br>когда: ${esc(r.when_text)}` : ''}${r.address ? `<br>${esc(r.city || '')} ${esc(r.address)}` : ''}</div><button class="lnk" data-st="done" data-id="${r.id}">✓ сделано</button></div>`).join('')}</div>` : ''}
     ${files.length ? `<details class="files" ${o.some(r => r.kind === 'obmer') ? 'open' : ''}><summary>📷 Фото рисунка (${files.reduce((a, r) => a + r.files.length, 0)})</summary><div class="thumbs">${files.map(r => r.files.map(f => `<img src="${f}" data-zoom="1" alt="">`).join('')).join('')}</div></details>` : ''}
    </div>`;
+  if (x.brief && Object.keys(x.brief).length) { const secs = Object.entries(x.brief); const n = secs.reduce((a, [, v]) => a + Object.keys(v || {}).length, 0);
+    h += `<details class="card" style="margin:12px 18px"><summary style="cursor:pointer"><b>📋 Анкета клиента · ${n} ответов</b></summary>${secs.map(([sec, v]) => `<div style="margin-top:10px"><b class="sm" style="color:var(--acc)">${esc(sec)}</b>${Object.entries(v || {}).map(([q, a]) => `<div class="sm" style="padding:4px 0;border-bottom:1px dashed var(--line)"><span class="mute">${esc(q)}</span><br><b>${esc(typeof a === 'object' ? JSON.stringify(a) : a)}</b></div>`).join('')}</div>`).join('')}</details>`; }
   if (parsed[x.pid]) h += preview(x.pid);
   if (x.work && x.work.stage) h += draftView(x);
   if (resUp && resUp.pid === x.pid) h += resPanel();
@@ -461,13 +463,80 @@ function draftView(x) {
   const d = x.draft, g = x.gen || {};
   if (g.state === 'running' && g.stage === x.work.stage) return `<div class="note" style="margin:12px 18px">🤖 ИИ сейчас делает ${(STG[x.work.stage] || '').toLowerCase()} — обычно 5–10 минут. Обновится само.</div>`;
   if (g.state === 'error') return `<div class="warn" style="margin:12px 18px">ИИ не смог сделать ${(STG[x.work.stage] || '').toLowerCase()}: ${esc(g.err || '')}. <button class="lnk" data-a="regen">Попробовать снова</button></div>`;
-  if (!d || d.sent || d.stage !== x.work.stage) return x.work.stage === 'plan' ? `<div class="note" style="margin:12px 18px">🤖 ИИ возьмёт планировки в работу в течение часа (проверка раз в час).</div>` : '';
+  if (!d || d.sent || d.stage !== x.work.stage) return `<div class="note" style="margin:12px 18px">🤖 ${x.work.stage === 'plan' ? 'ИИ возьмёт планировки' : 'Система подготовит «' + (STG[x.work.stage] || '').toLowerCase() + '»'} в течение часа (проверка раз в час).</div>`;
   const dr = drop[x.pid] || {};
   return `<div class="card" style="margin:12px 18px"><b>🤖 ИИ подготовил: ${esc(STG[d.stage] || d.stage)} — проверьте и отправьте клиенту</b>
    <div class="sm mute" style="margin:4px 0 8px">Лишний вариант можно убрать. Если всё плохо — «Переделать».</div>
-   <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px">${d.files.map((f, i) => { const n = (d.notes || [])[i] || {}; return `<div style="opacity:${dr[i] ? .35 : 1}"><img src="${esc(f.url)}" data-zoom="1" style="width:100%;border-radius:10px;border:1px solid var(--line);cursor:zoom-in"><div class="sm"><b>${esc(n.title || f.name)}</b><br>${esc(n.idea || '')}</div>${(n.errors || []).length ? `<div class="warn">Замечаний проверки: ${n.errors.length}<br><span class="sm">${esc(n.errors.slice(0, 3).join('; '))}</span></div>` : ''}<button class="lnk" data-a="dropv" data-k="${i}">${dr[i] ? 'Вернуть' : 'Убрать'}</button></div>`; }).join('')}</div>
+   <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px">${d.files.map((f, i) => { const n = (d.notes || [])[i] || {}; return `<div style="opacity:${dr[i] ? .35 : 1}"><img src="${esc(f.url)}" data-zoom="1" style="width:100%;border-radius:10px;border:1px solid var(--line);cursor:zoom-in"><div class="sm"><b>${esc(n.title || f.name)}</b><br>${esc(n.idea || '')}</div>${(n.errors || []).length ? `<div class="warn">Замечаний проверки: ${n.errors.length}<br><span class="sm">${esc(n.errors.slice(0, 3).join('; '))}</span></div>` : ''}${n.op3d ? `<button class="lnk" data-a="editv" data-k="${i}">✏️ Править${n.edited ? ' (исправлен)' : ''}</button> ` : ''}<button class="lnk" data-a="dropv" data-k="${i}">${dr[i] ? 'Вернуть' : 'Убрать'}</button></div>`; }).join('')}</div>
    <div class="row" style="margin-top:10px"><button class="btn ok" data-a="draftsend">✓ Отправить клиенту (${d.files.filter((_, i) => !dr[i]).length})</button><button class="btn ghost" data-a="regen">↻ Переделать</button></div></div>`;
 }
+/* ---- редактор планировки (openPlan3D, MIT) ---- */
+let editing = null;
+function editOpen(i) {
+  const x = projects.find(p => p.pid === sel); if (!x || !x.draft) return;
+  const n = (x.draft.notes || [])[i]; if (!n || !n.op3d) return;
+  try { localStorage.setItem('d3k_import', JSON.stringify(n.op3d)); } catch (e) { return alert('Не хватает памяти браузера: ' + e); }
+  editing = { pid: x.pid, i };
+  const w = window.open('../editor/editor/?d3k=1', 'd3k_editor');
+  if (!w) alert('Браузер заблокировал окно — разрешите всплывающие окна для этого сайта.');
+}
+const OP_NAME = { bed_queen: 'Кровать', bed_twin: 'Кровать 900', nightstand: 'Тумба', tv_stand: 'ТВ и тумба', television: 'ТВ', dresser: 'Комод', storage: 'Стеллаж', wardrobe: 'Шкаф', fridge: 'Холодильник', counter: 'Кухня', stove: 'Плита', sink_k: 'Мойка', dishwasher: 'Посудомойка', oven: 'Духовой шкаф', dining_table: 'Стол обеденный', table: 'Стол', dining_chair: 'Стул', sofa: 'Диван', loveseat: 'Диван', coffee_table: 'Журнальный стол', chair: 'Кресло', toilet: 'Унитаз', sink_b: 'Раковина', shower: 'Душ', bathtub: 'Ванна', washer_dryer: 'Стиральная машина', desk: 'Письменный стол', office_chair: 'Стул', bookshelf: 'Стеллаж', side_table: 'Столик', mirror: 'Зеркало', rug: 'Ковёр' };
+function opToV(proj, old) {
+  const fl = proj.floors.find(f => f.id === proj.activeFloorId) || proj.floors[0], mm = v => Math.round(v * 10);
+  const partitions = fl.walls.filter(w => !String(w.id).startsWith('ext-')).map(w => {
+    const p = { x1: mm(w.start.x), y1: mm(w.start.y), x2: mm(w.end.x), y2: mm(w.end.y), thick: mm(w.thickness || 10) };
+    const L = Math.hypot(p.x2 - p.x1, p.y2 - p.y1) || 1;
+    const ds = fl.doors.filter(d => d.wallId === w.id).map(d => ({ offset: Math.round(d.position * L - mm(d.width) / 2), width: mm(d.width), swing: d.swingDirection || 'left' }));
+    if (ds.length) p.doors = ds; return p;
+  });
+  const furniture = fl.furniture.map(f => {
+    const r = ((Math.round(f.rotation || 0) % 360) + 360) % 360, W = mm(f.width || 60), D = mm(f.depth || 60);
+    const [w, d] = (r === 90 || r === 270) ? [D, W] : [W, D];
+    return { room: '', name: (f.details && f.details.note) || OP_NAME[f.catalogId] || f.catalogId, x: mm(f.position.x) - w / 2, y: mm(f.position.y) - d / 2, w, d };
+  });
+  return Object.assign({}, old || {}, { partitions, furniture });
+}
+function opSvg(proj, title) {
+  const fl = proj.floors.find(f => f.id === proj.activeFloorId) || proj.floors[0];
+  const xs = [], ys = []; fl.walls.forEach(w => { xs.push(w.start.x, w.end.x); ys.push(w.start.y, w.end.y); });
+  const x0 = Math.min(...xs) - 60, y0 = Math.min(...ys) - 90, W = Math.max(...xs) - x0 + 60, H = Math.max(...ys) - y0 + 60;
+  const e = t => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;');
+  let g = `<rect x="${x0}" y="${y0}" width="${W}" height="${H}" fill="#fff"/><text x="${x0 + 30}" y="${y0 + 50}" font-size="34" font-family="Arial" font-weight="bold" fill="#1d1b19">${e(title)}</text>`;
+  fl.walls.forEach(w => { const ext = String(w.id).startsWith('ext-'); g += `<line x1="${w.start.x}" y1="${w.start.y}" x2="${w.end.x}" y2="${w.end.y}" stroke="${ext ? '#1d1b19' : '#b5532c'}" stroke-width="${w.thickness || 10}" stroke-linecap="square"/>`; });
+  const wl = id => fl.walls.find(w => w.id === id);
+  fl.windows.forEach(o => { const w = wl(o.wallId); if (!w) return; const L = Math.hypot(w.end.x - w.start.x, w.end.y - w.start.y) || 1, ux = (w.end.x - w.start.x) / L, uy = (w.end.y - w.start.y) / L, cx = w.start.x + ux * L * o.position, cy = w.start.y + uy * L * o.position;
+    g += `<line x1="${cx - ux * o.width / 2}" y1="${cy - uy * o.width / 2}" x2="${cx + ux * o.width / 2}" y2="${cy + uy * o.width / 2}" stroke="#7aa7e0" stroke-width="${(w.thickness || 20) * .8}"/>`; });
+  fl.doors.forEach(o => { const w = wl(o.wallId); if (!w) return; const L = Math.hypot(w.end.x - w.start.x, w.end.y - w.start.y) || 1, ux = (w.end.x - w.start.x) / L, uy = (w.end.y - w.start.y) / L, a = L * o.position - o.width / 2;
+    const hx = w.start.x + ux * a, hy = w.start.y + uy * a, s = o.swingDirection === 'right' ? -1 : 1, ex = hx - uy * s * o.width, ey = hy + ux * s * o.width;
+    g += `<line x1="${hx}" y1="${hy}" x2="${hx + ux * o.width}" y2="${hy + uy * o.width}" stroke="#fff" stroke-width="${(w.thickness || 10) + 2}"/><line x1="${hx}" y1="${hy}" x2="${ex}" y2="${ey}" stroke="#1d1b19" stroke-width="2.5"/><path d="M${ex} ${ey} A${o.width} ${o.width} 0 0 ${s > 0 ? 1 : 0} ${hx + ux * o.width} ${hy + uy * o.width}" fill="none" stroke="#888" stroke-width="1.2"/>`; });
+  fl.furniture.forEach(f => { const w = f.width || 60, d = f.depth || 60, nm = (f.details && f.details.note) || OP_NAME[f.catalogId] || f.catalogId, fs = Math.max(8, Math.min(16, Math.min(w, d) / 4));
+    g += `<g transform="translate(${f.position.x} ${f.position.y}) rotate(${f.rotation || 0})"><rect x="${-w / 2}" y="${-d / 2}" width="${w}" height="${d}" rx="3" fill="#fffdf8" stroke="#3a3632" stroke-width="1.5"/><line x1="${-w / 2}" y1="${-d / 2 + 3}" x2="${w / 2}" y2="${-d / 2 + 3}" stroke="#3a3632" stroke-width="4"/>${Math.min(w, d) >= 28 ? `<text y="${fs / 3}" font-size="${fs}" text-anchor="middle" font-family="Arial" fill="#3a3632">${e(nm.split(':')[0])}</text>` : ''}</g>`; });
+  fl.columns.forEach(c => { g += `<circle cx="${c.position.x}" cy="${c.position.y}" r="${(c.diameter || 11) / 2}" fill="#d8eef2" stroke="#4a78c2" stroke-width="1.5"/>`; });
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${x0} ${y0} ${W} ${H}" width="${Math.round(W * 2)}" height="${Math.round(H * 2)}">${g}</svg>`;
+}
+async function svgPng(svg, w) {
+  const img = new Image(); const url = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' }));
+  await new Promise((ok, bad) => { img.onload = ok; img.onerror = bad; img.src = url; });
+  const c = document.createElement('canvas'); c.width = w; c.height = Math.round(w * img.height / img.width);
+  const ctx = c.getContext('2d'); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height); ctx.drawImage(img, 0, 0, c.width, c.height); URL.revokeObjectURL(url);
+  return await new Promise(ok => c.toBlob(ok, 'image/png'));
+}
+window.addEventListener('message', async e => {
+  if (e.origin !== location.origin || !e.data || e.data.type !== 'd3k-save' || !editing) return;
+  const { pid, i } = editing, x = projects.find(p => p.pid === pid); if (!x || !x.draft) return;
+  try {
+    const d = JSON.parse(JSON.stringify(x.draft)), n = d.notes[i], proj = e.data.project;
+    n.v = opToV(proj, n.v); n.op3d = proj; n.edited = Date.now(); n.errors = [];
+    const blob = await svgPng(opSvg(proj, n.title || ('Вариант ' + (i + 1))), 2400);
+    const path = `${pid}/plan/edit_${Date.now()}_${i + 1}.png`;
+    const up = await SB.storage.from('d3k').upload(path, blob, { contentType: 'image/png', upsert: true });
+    if (up.error) throw up.error;
+    d.files[i] = Object.assign({}, d.files[i], { url: SB.storage.from('d3k').getPublicUrl(path).data.publicUrl });
+    const { error } = await SB.from('d3k_projects').update({ draft: d }).eq('pid', pid);
+    if (error) throw error;
+    x.draft = d; render();
+  } catch (err) { alert('Не сохранилось: ' + (err.message || err)); }
+});
 async function draftSend() {
   const x = projects.find(p => p.pid === sel); if (!x || !x.draft) return;
   const d = x.draft, dr = drop[x.pid] || {};
@@ -477,7 +546,9 @@ async function draftSend() {
   if (!confirm('Отправить клиенту ' + files.length + ' вариант(а)?')) return;
   const { error } = await SB.from('d3k_events').insert({ pid: x.pid, kind: 'result', data: { stage: d.stage, files, text } });
   if (error) return alert('Ошибка: ' + error.message);
-  await SB.from('d3k_projects').update({ work: null, draft: Object.assign({}, d, { sent: Date.now() }) }).eq('pid', x.pid);
+  const upd = { work: null, draft: Object.assign({}, d, { sent: Date.now() }) };
+  if (d.stage === 'plan') upd.plan = { variants: idx.map(i => ((d.notes || [])[i] || {}).v).filter(Boolean), titles: files.map(f => f.name), at: Date.now() };
+  await SB.from('d3k_projects').update(upd).eq('pid', x.pid);
   await SB.from('d3k_requests').update({ status: 'done' }).eq('pid', x.pid).eq('kind', 'manager');
   delete drop[x.pid]; alert('Отправлено клиенту.'); load();
 }
@@ -586,6 +657,7 @@ app.addEventListener('click', async e => {
   else if (t.dataset.a === 'resst') { resUp.stage = t.dataset.k; render(); }
   else if (t.dataset.a === 'rescancel') { resUp = null; render(); }
   else if (t.dataset.a === 'ressend') resSend();
+  else if (t.dataset.a === 'editv') editOpen(+t.dataset.k);
   else if (t.dataset.a === 'dropv') { const d = drop[sel] = drop[sel] || {}; d[t.dataset.k] = !d[t.dataset.k]; render(); }
   else if (t.dataset.a === 'draftsend') draftSend();
   else if (t.dataset.a === 'regen') regen();
