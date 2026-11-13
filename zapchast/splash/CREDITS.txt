@@ -1,0 +1,7 @@
+3D-модель автомобиля: "Car Concept" — Khronos Group, glTF Sample Assets
+https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/CarConcept
+Лицензия: CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
+Изменения: перекрашен кузов, скрыты логотипы, сжаты текстуры, добавлена анимация сборки.
+Исходная модель основана на "Free Concept Car 004" (Unity Fan, CC0).
+
+three.js r128 — MIT License, Copyright 2010-2021 three.js authors.

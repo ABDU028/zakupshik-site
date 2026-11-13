@@ -1024,7 +1024,7 @@ function sheetKp(r0, oid, isNew) {
       const at = Date.now(); const keep = !r.kp || ['work', 'done'].includes(r.status);
       const kpPatch = r.kp ? { kp: { ...r.kp, logi } } : {};
       if (!keep) {
-        await commit({ from: 'manager', kind: 'kp', text: 'Обновили доставку в КП', at }, { ...kpPatch, kp: { ...r.kp, logi, sentAt: at }, logiExact: lg.exact ? logi.cost : null, staffReadAt: at + 1000 });
+        await commit({ from: 'manager', kind: 'kp', text: 'Обновили доставку в КП', at }, { ...kpPatch, kp: { ...r.kp, logi, sentAt: at }, logiExact: lg.exact ? logi.cost : null, staffReadAt: at + 1000, ...(r.status === 'delivery' ? { status: 'kp' } : {}) });
       } else if (lg.exact) {
         const goods = pays(r).goods?.paid ? 0 : payAmount(r, 'goods');
         await commit({ from: 'sys', kind: 'exact', cost: logi.cost, weight: null, volume: null, total: goods + logi.cost, text: 'Точная стоимость доставки до Алматы: ' + money(logi.cost) + (goods ? '. Итого: ' + money(goods + logi.cost) : '') + '.', at }, { ...kpPatch, logiExact: logi.cost, staffReadAt: at + 1000 });

@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Запчасть Авто — заставка</title>
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@800&family=Manrope:wght@600;700&display=swap" rel="stylesheet">
+<style>
+:root{--ac:#ff6a1a}
+html,body{margin:0;height:100%;background:#07080b;overflow:hidden;-webkit-user-select:none;user-select:none}
+#sp{position:fixed;inset:0;background:radial-gradient(120% 70% at 50% 42%,#1c120c 0%,#0b0c10 55%,#050608 100%);transition:opacity .45s}
+#sp.out{opacity:0}
+canvas{position:absolute;inset:0;width:100%!important;height:100%!important}
+.txt{position:absolute;left:0;right:0;text-align:center;pointer-events:none}
+#logo{top:63%;font:800 clamp(30px,9vw,56px)/1 Unbounded,'Inter Display','Inter',sans-serif;color:#fff;letter-spacing:-1px}
+#logo span{display:inline-block;opacity:0;transform:translateY(18px) scale(.85)}
+#logo .a{color:var(--ac)}
+#slog{top:calc(63% + clamp(52px,14vw,84px));font:700 clamp(14px,4vw,18px)/1.3 Manrope,'Inter',sans-serif;color:#c9cdd8;opacity:0;letter-spacing:.2px}
+#bar{top:calc(63% + clamp(92px,23vw,128px));height:3px;width:120px;margin:0 auto;background:#20232c;border-radius:2px;overflow:hidden;opacity:0}
+#bar i{display:block;height:100%;width:0;background:var(--ac);box-shadow:0 0 12px var(--ac)}
+#fnd{bottom:calc(30px + env(safe-area-inset-bottom));font:600 12px/1.5 Manrope,'Inter',sans-serif;color:#7d8394;opacity:0;letter-spacing:.3px}
+#fnd b{display:block;color:#e9ebf0;font-size:15px;letter-spacing:.2px}
+#skip{position:absolute;top:calc(14px + env(safe-area-inset-top));right:16px;font:600 12px Manrope,'Inter',sans-serif;color:#6f7588;opacity:.8}
+</style>
+</head>
+<body>
+<div id="sp">
+  <div class="txt" id="logo"></div>
+  <div class="txt" id="slog">Подберём по VIN и доставим</div>
+  <div class="txt" id="bar"><i></i></div>
+  <div class="txt" id="fnd">Основатель<b>Абдурашид Зиаидинов</b></div>
+  <div class="txt" id="skip">нажмите, чтобы пропустить</div>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>window.THREE || document.write('<script src="three.min.js"><\/script>');</script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/environments/RoomEnvironment.js"></script>
+<script>THREE.GLTFLoader || document.write('<script src="GLTFLoader.js"><\/script><script src="RoomEnvironment.js"><\/script>');</script>
+<script>
+/* Запчасть Авто — заставка: машина собирается из деталей, вспыхивают фары, появляется логотип.
+   Длительность ~5 с, тап — пропустить. window.renderAt(t) — кадр в момент t (для записи видео). */
+(function () {
+  const T = THREE, DUR = 5.4;
+  const sp = document.getElementById('sp');
+  const W = () => sp.clientWidth, H = () => sp.clientHeight;
+  const renderer = new T.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
+  renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+  renderer.setSize(W(), H());
+  renderer.outputEncoding = T.sRGBEncoding;
+  renderer.toneMapping = T.ACESFilmicToneMapping; renderer.toneMappingExposure = 0.62;
+  sp.prepend(renderer.domElement);
+  const scene = new T.Scene();
+  const cam = new T.PerspectiveCamera(30, W() / H(), 0.1, 100);
+
+  /* свет */
+  scene.add(new T.HemisphereLight(0xffe2cc, 0x0b0c10, 0.35));
+  const key = new T.DirectionalLight(0xffffff, 1.0); key.position.set(4, 7, 5); scene.add(key);
+  const rim = new T.DirectionalLight(0xff8a3d, 1.6); rim.position.set(-5, 3, -4); scene.add(rim);
+  const fill = new T.DirectionalLight(0x8fb2ff, 0.5); fill.position.set(-3, 2, 6); scene.add(fill);
+  const sweep = new T.PointLight(0xffffff, 0, 6); scene.add(sweep);
+
+  const flashTex = (() => { const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d'); const g = x.createRadialGradient(32, 32, 0, 32, 32, 32); g.addColorStop(0, 'rgba(255,200,140,1)'); g.addColorStop(.3, 'rgba(255,120,40,.6)'); g.addColorStop(1, 'rgba(255,90,10,0)'); x.fillStyle = g; x.fillRect(0, 0, 64, 64); return new T.CanvasTexture(c); })();
+  /* окружение для реалистичных отражений */
+  const pmrem = new T.PMREMGenerator(renderer);
+  scene.environment = pmrem.fromScene(new T.RoomEnvironment(), 0.04).texture;
+  key.intensity = 0.7; rim.intensity = 1.2; fill.intensity = 0.3;
+
+  /* машина: Car Concept (Khronos glTF Sample Assets, CC-BY 4.0) */
+  const car = new T.Group(); scene.add(car);
+  const parts = [];
+  let ready = false, headMats = [], tailMats = [];
+  const PLAN = [   // имя узла, старт, откуда (в метрах относительно места), доворот
+    ['BodyUnderside', 0.15, [0, -2.2, 0], [0, 0, 0]],
+    ['Engine', 0.35, [0.6, 3.0, 0], [0.7, 0.5, 0]],
+    ['WheelFrontL', 0.55, [2.5, 0.3, 2.6], [0, 0, 6]], ['WheelFrontR', 0.62, [2.5, 0.3, -2.6], [0, 0, 6]],
+    ['WheelRearL', 0.69, [-2.5, 0.3, 2.6], [0, 0, -6]], ['WheelRearR', 0.76, [-2.5, 0.3, -2.6], [0, 0, -6]],
+    ['Axles', 0.5, [0, -1.5, 0], [0, 0, 0]],
+    ['BodyRearPanelsColor1', 0.95, [-3.2, 0.6, 0], [0, 0, 0.5]],
+    ['BodyPanelsColor2', 1.05, [0, -1.6, 0], [0, 0, 0]],
+    ['BodyPillars', 1.15, [0, 2.6, 0], [0, 0, 0]],
+    ['BodyDoorLColor1', 1.3, [0, 0.4, 3.0], [0, -0.6, 0]], ['BodyDoorRColor1', 1.42, [0, 0.4, -3.0], [0, 0.6, 0]],
+    ['BodyHood', 1.58, [2.6, 2.0, 0], [0, 0, -0.9]],
+    ['BodyRoofPanel', 1.74, [0, 3.2, 0], [0.4, 0, 0]],
+    ['BodyWindshield', 1.9, [1.4, 2.6, 0], [0, 0, -0.6]],
+    ['BodyWindshieldGasket', 1.9, [1.4, 2.6, 0], [0, 0, -0.6]],
+  ];
+  const loader = new T.GLTFLoader();
+  const CAR_URL = (document.currentScript && document.currentScript.dataset.car) || 'car.glb';
+  loader.load(CAR_URL, (g) => {
+    const m = g.scene;
+    m.traverse(o => {
+      if (o.name === 'License Plate' || o.name === 'InteriorSteeringEmblem') o.visible = false;   // без чужих логотипов
+      if (o.isMesh) {
+        const mats = Array.isArray(o.material) ? o.material : [o.material];
+        mats.forEach(mt => {
+          if (/^Paint 1/.test(mt.name)) { mt.map = null; mt.color.set(0xc63d06); mt.metalness = 0.7; mt.roughness = 0.3; if ('clearcoat' in mt) { mt.clearcoat = 1; mt.clearcoatRoughness = 0.05; } }
+          if (/^Paint 2/.test(mt.name)) { mt.color.set(0x16181d); }
+          if (mt.name === 'Headlight') { mt.emissive = new T.Color(0xfff0d8); headMats.push(mt); }
+          if (mt.name === 'Brakelight' || mt.name === 'Signallight') { mt.emissive = new T.Color(mt.name === 'Brakelight' ? 0xff1800 : 0xff8a00); tailMats.push(mt); }
+          if (mt.name === 'Glass' || mt.transmission > 0) { mt.transmission = 0; mt.transparent = true; mt.opacity = 0.55; mt.color = new T.Color(0x0a0d14); mt.metalness = 0.2; mt.roughness = 0.05; }
+          mt.envMapIntensity = 0.8; mt.needsUpdate = true;
+        });
+      }
+    });
+    // размер и ориентация: длина 4.6 м, перед (фары) — в сторону +x
+    const box = new T.Box3().setFromObject(m), size = box.getSize(new T.Vector3()), ctr = box.getCenter(new T.Vector3());
+    const longX = size.x >= size.z;
+    const k = 4.6 / Math.max(size.x, size.z);
+    m.scale.setScalar(k); m.position.set(-ctr.x * k, -box.min.y * k, -ctr.z * k);
+    const wrap = new T.Group(); wrap.add(m); car.add(wrap);
+    if (!longX) wrap.rotation.y = Math.PI / 2;
+    wrap.updateMatrixWorld(true);
+    const hl = m.getObjectByName('BodyHeadlights');
+    if (hl) { const p = new T.Box3().setFromObject(hl).getCenter(new T.Vector3()); if (p.x < 0) wrap.rotation.y += Math.PI; }
+    wrap.updateMatrixWorld(true);
+    // детали: «дом» и точка вылета в локальных координатах родителя
+    PLAN.forEach(([name, t0, from, rot]) => {
+      const o = m.getObjectByName(name); if (!o || !o.parent) return;
+      const hw = o.getWorldPosition(new T.Vector3());
+      const fw = hw.clone().add(new T.Vector3(...from));
+      const fp = o.parent.worldToLocal(fw.clone());
+      parts.push({ obj: o, t0, hp: o.position.clone(), hr: o.rotation.clone(), fp, fr: new T.Euler(o.rotation.x + rot[0], o.rotation.y + rot[1], o.rotation.z + rot[2]) });
+    });
+    flashes = parts.map(() => { const s = new T.Sprite(new T.SpriteMaterial({ map: flashTex, transparent: true, depthWrite: false, blending: T.AdditiveBlending, opacity: 0 })); scene.add(s); return s; });
+    // блики фар
+    const front = new T.Box3().setFromObject(car); 
+    flares = [0.62, -0.62].map(z => { const f = new T.Sprite(new T.SpriteMaterial({ map: flashTex, transparent: true, depthWrite: false, blending: T.AdditiveBlending, opacity: 0, color: 0xfff1dd })); f.position.set(front.max.x + 0.02, 0.62 + car.position.y, z); scene.add(f); return f; });
+    ready = true; window.__carReady = true;
+  }, undefined, (e) => { console.error('car load', e); window.__carReady = 'fail'; });
+  car.position.y = -0.55;
+  let flashes = [], flares = [];
+  /* пол: мягкая тень и отражение-свечение */
+  const cv = document.createElement('canvas'); cv.width = cv.height = 256; const cx = cv.getContext('2d');
+  const gr = cx.createRadialGradient(128, 128, 10, 128, 128, 128); gr.addColorStop(0, 'rgba(0,0,0,.85)'); gr.addColorStop(1, 'rgba(0,0,0,0)'); cx.fillStyle = gr; cx.fillRect(0, 0, 256, 256);
+  const shadow = new T.Mesh(new T.PlaneGeometry(6, 2.8), new T.MeshBasicMaterial({ map: new T.CanvasTexture(cv), transparent: true, depthWrite: false }));
+  shadow.rotation.x = -Math.PI / 2; shadow.position.y = -0.18; scene.add(shadow);
+  const cv2 = document.createElement('canvas'); cv2.width = cv2.height = 256; const c2 = cv2.getContext('2d');
+  const g2 = c2.createRadialGradient(128, 128, 0, 128, 128, 128); g2.addColorStop(0, 'rgba(255,106,26,.55)'); g2.addColorStop(.5, 'rgba(255,106,26,.12)'); g2.addColorStop(1, 'rgba(255,106,26,0)'); c2.fillStyle = g2; c2.fillRect(0, 0, 256, 256);
+  const glow = new T.Mesh(new T.PlaneGeometry(10, 6), new T.MeshBasicMaterial({ map: new T.CanvasTexture(cv2), transparent: true, depthWrite: false, blending: T.AdditiveBlending }));
+  glow.rotation.x = -Math.PI / 2; glow.position.y = -0.19; scene.add(glow);
+  // кольцо-сетка на полу
+  const ring = new T.Mesh(new T.RingGeometry(2.9, 2.93, 96), new T.MeshBasicMaterial({ color: 0xff6a1a, transparent: true, opacity: 0, side: T.DoubleSide }));
+  ring.rotation.x = -Math.PI / 2; ring.position.y = -0.17; scene.add(ring);
+  // вспышки при «стыковке» деталей
+  // лучи фар
+
+  /* время и кадры */
+  const ease = (x) => 1 - Math.pow(1 - x, 3);
+  const back = (x) => { const c1 = 1.5, c3 = c1 + 1; return 1 + c3 * Math.pow(x - 1, 3) + c1 * Math.pow(x - 1, 2); };
+  const cl = (x) => Math.max(0, Math.min(1, x));
+  const logo = document.getElementById('logo'), slog = document.getElementById('slog'), bar = document.getElementById('bar'), fnd = document.getElementById('fnd');
+  logo.innerHTML = 'Запчасть Авто'.split('').map((c, i) => c === ' ' ? '<span>&nbsp;</span>' : `<span class="${i >= 9 ? 'a' : ''}">${c}</span>`).join('');
+  const letters = [...logo.children];
+  const tmpV = new T.Vector3();
+
+  function frame(t) {
+    const portrait = H() > W();
+    // камера: облёт 3/4 спереди, к концу — приподнимается
+    const ang = 0.95 - 0.55 * ease(cl(t / 3.2)) + 0.05 * Math.sin(t * 0.6);
+    // портрет: машина целиком по ширине экрана и выше логотипа
+    const asp = W() / H();
+    cam.fov = portrait ? 2 * Math.atan(Math.tan(T.MathUtils.degToRad(13)) / asp) * 180 / Math.PI : 30;
+    const dist = (portrait ? 10.2 : 8.6) - 1.2 * ease(cl((t - 2.4) / 1.2));
+    cam.position.set(Math.cos(ang) * dist, 3.2 + 0.8 * ease(cl(t / 3)), Math.sin(ang) * dist);
+    cam.lookAt(0, portrait ? -1.25 : -0.3, 0);
+    cam.aspect = asp; cam.updateProjectionMatrix();
+    // детали летят и встают на место
+    parts.forEach((p, i) => {
+      const k = cl((t - p.t0) / 0.62), e = back(k);
+      p.obj.position.lerpVectors(p.fp, p.hp, e);
+      p.obj.rotation.set(p.fr.x + (p.hr.x - p.fr.x) * ease(k), p.fr.y + (p.hr.y - p.fr.y) * ease(k), p.fr.z + (p.hr.z - p.fr.z) * ease(k));
+      p.obj.visible = t > p.t0 - 0.02;
+      const f = flashes[i], fk = (t - p.t0 - 0.5) / 0.35;
+      if (fk > 0 && fk < 1) { p.obj.getWorldPosition(tmpV); f.position.copy(tmpV); const s = 0.4 + fk * 1.2; f.scale.set(s, s, 1); f.material.opacity = (1 - fk) * 0.9; } else f.material.opacity = 0;
+    });
+    // фары: вспышка и лучи
+    const on = cl((t - 2.55) / 0.25);
+    headMats.forEach(mt => mt.emissiveIntensity = on * (2.2 + 1.2 * Math.max(0, Math.sin((t - 2.55) * 14)) * (t < 2.9 ? 1 : 0)));
+    tailMats.forEach(mt => mt.emissiveIntensity = on * 2.5);
+    flares.forEach(f => { f.material.opacity = on * (0.45 + 0.15 * Math.sin(t * 9)); const s = 0.45 + 0.25 * on + (t < 2.95 ? 0.6 * Math.max(0, Math.sin((t - 2.55) * 8)) : 0); f.scale.set(s, s, 1); });
+    // световой проход по кузову
+    const sw = cl((t - 2.75) / 0.9); sweep.intensity = Math.sin(sw * Math.PI) * 6; sweep.position.set(2.6 - sw * 5.2, 2.0, 1.8);
+    ring.material.opacity = 0.5 * Math.sin(cl((t - 2.5) / 1.5) * Math.PI);
+    ring.scale.setScalar(0.85 + 0.25 * ease(cl((t - 2.5) / 1.5)));
+    glow.material.opacity = 0.35 + 0.65 * on;
+    // посадка: лёгкий «клевок» подвески и поворот
+    car.position.y = -0.55 + (t > 2.25 ? -0.03 * Math.sin(cl((t - 2.25) / 0.4) * Math.PI) : 0);
+    car.rotation.y = 0.18 * ease(cl((t - 3) / 2));
+    // текст
+    letters.forEach((l, i) => { const k = ease(cl((t - 3.05 - i * 0.06) / 0.45)); l.style.opacity = k; l.style.transform = `translateY(${(1 - k) * 18}px) scale(${0.85 + 0.15 * k})`; });
+    slog.style.opacity = ease(cl((t - 3.6) / 0.5));
+    bar.style.opacity = ease(cl((t - 3.7) / 0.3)); bar.firstChild.style.width = 100 * ease(cl((t - 3.7) / 1.3)) + '%';
+    fnd.style.opacity = ease(cl((t - 3.9) / 0.6));
+    renderer.setSize(W(), H(), false);
+    renderer.render(scene, cam);
+  }
+  window.renderAt = (t) => frame(t);
+  if (/[?&]still/.test(location.search)) return;   // режим записи видео: кадры задаются снаружи
+
+  let t0 = performance.now(), done = false;
+  function finish() { if (done) return; done = true; sp.classList.add('out'); setTimeout(() => { sp.style.display = 'none'; window.dispatchEvent(new Event('splashdone')); }, 460); }
+  sp.addEventListener('click', finish);
+  (function loop() {
+    if (done) return;
+    const t = (performance.now() - t0) / 1000;
+    frame(Math.min(t, DUR));
+    if (t >= DUR) finish(); else requestAnimationFrame(loop);
+  })();
+  addEventListener('resize', () => frame((performance.now() - t0) / 1000));
+})();
+</script>
+</body>
+</html>
