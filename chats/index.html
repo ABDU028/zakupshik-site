@@ -803,7 +803,8 @@ function menuEl(r) {
 }
 async function sendText(r, text) {
   const at = Date.now();
-  const extra = r.handoff && (r.kp || r.aiNote) ? { mode: 'ai' } : {};
+  // ИИ не включаем обратно сам: после передачи менеджеру он молчит, пока менеджер не нажмёт «ИИ отвечает»
+  const extra = {};
   await push(r, { from: 'manager', text, at }, { staffReadAt: Math.max(at, ...live(r).filter((m) => m.from === 'client').map((m) => m.at || 0)) + 1, handoff: false, handoffQuestion: null, ...extra, ...(r.assignee?.id ? {} : { assignee: { id: me.id, name: me.name } }) });
 }
 async function sendFiles(r, fs) {
