@@ -301,7 +301,7 @@ function stageText(key, r) {
 const live = (r) => (r.thread || []).filter((m) => !m.deleted);
 function lastTalk(r) { const th = live(r); for (let i = th.length - 1; i >= 0; i--) if (['client', 'manager', 'ai'].includes(th[i].from)) return th[i]; return null; }
 function lastItem(r) { const th = live(r); return th[th.length - 1] || null; }
-const aiOn = (r) => r.mode === 'ai' && r.service !== 'support' && (!!r.kp || !!r.aiNote) && !['rejected', 'done', 'declined'].includes(r.status);
+const aiOn = (r) => r.mode === 'ai' && r.service !== 'support' && (!!r.kp || !!r.aiNote) && r.status !== 'rejected';
 const wantsCall = (r) => !!(r.callback?.requested && !r.callback?.done);
 function needsReply(r) {
   if (r.status === 'rejected') return false;
@@ -622,7 +622,7 @@ function renderChat() {
     isMine(r) ? h('button', { class: 'pillb g', type: 'button', title: 'Клиент закреплён за вами. Нажмите, чтобы открепить', onclick: () => { if (confirm('Открепить клиента от себя?')) push(r, null, { assignee: null }); } }, '✓ Мой клиент')
       : r.assignee?.id ? h('button', { class: 'pillb', type: 'button', title: 'Забрать себе', onclick: () => { if (confirm('Клиента ведёт ' + r.assignee.name + '. Забрать себе?')) push(r, null, { assignee: { id: me.id, name: me.name } }); } }, 'Ведёт: ' + r.assignee.name.split(' ')[0])
       : h('button', { class: 'pillb a', type: 'button', title: 'Закрепить клиента за вами — другие менеджеры увидят, что его ведёте вы', onclick: () => push(r, null, { assignee: { id: me.id, name: me.name } }) }, 'Взять клиента себе'),
-    r.service === 'support' || ['done', 'declined', 'rejected'].includes(r.status) ? null : h('button', { class: 'pillb' + (aiOn(r) ? ' ai' : ''), type: 'button', 'aria-pressed': String(aiOn(r)), title: aiOn(r) ? 'ИИ сам отвечает клиенту. Нажмите — разговор перейдёт на вас' : 'Отвечаете вы. Нажмите — ИИ начнёт отвечать сам', onclick: () => toggleAi(r) }, h('span', { class: 'tg' + (aiOn(r) ? ' on' : '') }), aiOn(r) ? 'ИИ отвечает' : 'Отвечаю я'),
+    r.service === 'support' || r.status === 'rejected' ? null : h('button', { class: 'pillb' + (aiOn(r) ? ' ai' : ''), type: 'button', 'aria-pressed': String(aiOn(r)), title: aiOn(r) ? 'ИИ сам отвечает клиенту. Нажмите — разговор перейдёт на вас' : 'Отвечаете вы. Нажмите — ИИ начнёт отвечать сам', onclick: () => toggleAi(r) }, h('span', { class: 'tg' + (aiOn(r) ? ' on' : '') }), aiOn(r) ? 'ИИ отвечает' : 'Отвечаю я'),
     snoozeBtn(r),
     h('button', { class: 'ib infob', type: 'button', 'aria-label': 'Данные заявки', title: 'Данные заявки', onclick: () => { infoOpen = !infoOpen; renderInfo(); } }, ic('info', 18)));
   const th = r.thread || [];
