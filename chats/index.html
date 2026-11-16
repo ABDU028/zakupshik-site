@@ -932,7 +932,7 @@ function cbToKp(r, j, o) {
   const f = o.reply?.facts || {};
   const desc = [f.original && f.original !== 'неясно' ? f.original : '', f.material ? 'Материал: ' + f.material : '', f.setCount ? 'Комплект: ' + f.setCount : '', f.fits ? 'Подходит: ' + f.fits : ''].filter(Boolean).join('. ');
   const prevVars = (r.kp?.variants || []).length && !['work', 'done'].includes(r.status) ? r.kp.variants : [];
-  const v = { name: r.title || o.name || '', desc, media: [...(o.photos || [])], cny: num(f.priceCny) ? num(f.priceCny) / (j.qty || 1) : num(o.cny), qty: j.qty || 1, chinaShip: '', term: '' };
+  const v = { _pack: { size: f.packSize || '', weight: f.weight || '' }, name: r.title || o.name || '', desc, media: [...(o.photos || [])], cny: num(f.priceCny) ? num(f.priceCny) / (j.qty || 1) : num(o.cny), qty: j.qty || 1, chinaShip: '', term: '' };
   sheetKp(r, null, false, [...prevVars, v]);
   toast('Вариант от продавца добавлен в КП. Проверьте цену и доставку, потом отправьте');
 }
@@ -960,11 +960,13 @@ function cbBox(r) {
   }
   const link = (o) => 'https://mobile.pinduoduo.com/goods.html?goods_id=' + o.id;
   const picking = j.status === 'found';
-  const offers = (j.offers || []).map((o) => h('div', { style: 'display:flex;gap:10px;align-items:flex-start;padding:8px;border-radius:10px;background:var(--bg)' },
+  const offers = (j.offers || []).map((o) => h('div', { style: 'display:flex;gap:10px;align-items:flex-start;padding:8px;border-radius:10px;background:var(--bg)' + (o.fit === 'не то' && !o.askedAt ? ';opacity:.55' : '') },
     picking ? h('input', { type: 'checkbox', checked: !!o.picked, 'aria-label': 'Спросить этого продавца', style: 'width:20px;height:20px;margin-top:2px', onchange: (e) => { o.picked = e.target.checked; } }) : null,
     o.img ? h('img', { src: o.img, alt: '', style: 'width:56px;height:56px;object-fit:cover;border-radius:8px;flex-shrink:0' }) : null,
     h('div', { style: 'flex:1;min-width:0;display:flex;flex-direction:column;gap:4px' },
-      h('a', { href: link(o), target: '_blank', rel: 'noopener', lang: 'zh-CN', text: o.name, style: 'color:var(--fg)' }),
+      o.fit ? h('span', { style: 'display:flex;gap:6px;align-items:center;flex-wrap:wrap' }, h('span', { class: 'chip', style: o.fit === 'подходит' ? 'background:var(--grnBg);color:var(--grnT)' : o.fit === 'не то' ? 'background:var(--redBg);color:var(--redT)' : 'background:var(--s3);color:var(--fg)', text: o.fit === 'подходит' ? '✓ Подходит' : o.fit === 'не то' ? 'Не то' : 'Проверить' }), o.why ? h('span', { style: 'font-size:12px;color:var(--mut)', text: o.why }) : null) : null,
+      o.ru ? h('b', { style: 'font-size:13.5px', text: o.ru }) : null,
+      h('a', { href: link(o), target: '_blank', rel: 'noopener', lang: 'zh-CN', text: o.name, style: o.ru ? 'color:var(--mut);font-size:12px' : 'color:var(--fg)' }),
       h('span', { style: 'font-size:12.5px;color:var(--mut)', text: num(o.cny) + ' ¥ (≈ ' + money(Math.round(num(o.cny) * (num(rates?.cny) || 71))) + ')' + (o.sold ? ' · ' + o.sold : '') + (o.askedAt ? ' · спросили ' + ago(o.askedAt) : '') }),
       o.reply?.ru ? h('div', { style: 'white-space:pre-wrap;font-size:13px;padding:8px;border-radius:8px;background:var(--grnBg);color:var(--grnT)', text: 'Продавец: ' + o.reply.ru }) : o.askedAt ? h('span', { style: 'font-size:12.5px;color:var(--mut)', text: 'Ответа пока нет' }) : o.askError ? h('span', { style: 'font-size:12.5px;color:var(--redT)', text: 'Не получилось написать: ' + o.askError }) : null,
       o.reply?.facts ? h('span', { style: 'font-size:12.5px', text: [o.reply.facts.original, o.reply.facts.material, o.reply.facts.setCount && 'комплект ' + o.reply.facts.setCount,
@@ -1081,6 +1083,23 @@ function sheetKp(r0, oid, isNew, pre) {
   const yuanMode = kind === 'goods' || kind === 'buyout';
   const vars = (prev.length ? prev : [{ name: r.title || '' }]).map((v) => ({ name: v.name || '', desc: v.desc || '', media: [...(v.media || [])], cny: v.cny || '', qty: v.qty || 1, chinaShip: v.chinaShip || '', term: v.term || '', price: yuanMode && v.cny ? '' : (v.price || '') }));
   const lg = { method: r.kp?.logi?.method || r.shipping?.key || 'auto', cost: '', term: r.kp?.logi?.term || '' };
+  // габариты упаковки и вес: из ответа продавца (China-бот) или из прошлого КП; по ним считаем доставку по тарифам
+  { const d0 = r.kp?.logi?.dims || {}; const pk = (pre || []).find((x) => x._pack)?._pack || {};
+    const nums = String(pk.size || '').replace(/,/g, '.').match(/\d+(\.\d+)?/g) || [];
+    const kgm = String(pk.weight || '').replace(/,/g, '.').match(/(\d+(\.\d+)?)\s*(kg|кг|公斤|千克)?/i);
+    const g = String(pk.weight || '').match(/(\d+(\.\d+)?)\s*(g|г|克)\b/i) && !/kg|кг|公斤|千克/i.test(pk.weight || '');
+    lg.dl = d0.l || nums[0] || ''; lg.dw = d0.w || nums[1] || ''; lg.dh = d0.h || nums[2] || '';
+    lg.kg = d0.kg || (kgm ? String(g ? +kgm[1] / 1000 : kgm[1]) : '');
+    lg.fromSeller = !d0.l && !!(nums.length || kgm); lg.manual = false; }
+  const dimsCalc = () => {
+    const q = Math.max(1, num(vars[0]?.qty) || 1), l = num(lg.dl), w = num(lg.dw), hh = num(lg.dh), kg = num(lg.kg);
+    const m3 = l && w && hh ? (l * w * hh) / 1e6 * q : 0, wt = kg * q, volKg = l && w && hh ? (l * w * hh) / 6000 * q : 0;
+    let cost = 0;
+    if (lg.method === 'auto') cost = Math.max(wt * num(tariffs?.auto_kg), m3 * num(tariffs?.auto_m3));
+    else if (lg.method === 'air') cost = Math.max(wt, volKg) * num(tariffs?.air_kg);
+    return { q, m3, wt, volKg, cost: Math.round(cost / 100) * 100 };
+  };
+  if (!num(lg.cost) && dimsCalc().cost) lg.cost = String(dimsCalc().cost);
   if (!SHIP[lg.method]) lg.method = 'auto';
   lg.exact = false;
   // заказ уже оформлен клиентом: товар в нём менять нельзя, можно только отправить доставку; новый товар — это дозаказ
@@ -1122,14 +1141,24 @@ function sheetKp(r0, oid, isNew, pre) {
       showL() ? h('div', { class: 'box' }, h('b', { text: 'Доставка Китай → Алматы, ₸' }),
         h('div', { class: 'opts' }, h('button', { type: 'button', 'aria-pressed': String(!lg.exact), onclick: () => { lg.exact = false; draw(); } }, 'Примерно'), h('button', { type: 'button', 'aria-pressed': String(lg.exact), onclick: () => { lg.exact = true; draw(); } }, 'Точно — знаем сумму')),
         h('small', { style: 'color:var(--mut);font-size:12px', text: lg.exact ? 'Клиент увидит «Доставка до Алматы, точная» — без «≈» и без фразы про взвешивание.' : 'Клиент увидит «≈» и пояснение: точную сумму назовём после взвешивания на складе.' }),
-        h('div', { class: 'opts' }, Object.entries(SHIP).map(([k, l]) => h('button', { type: 'button', 'aria-pressed': String(lg.method === k), onclick: () => { lg.method = k; draw(); } }, l))),
-        h('div', { class: 'g2' }, fld(lg, 'cost', 'Стоимость, ₸', '300 000'), h('label', { class: 'lab' }, 'Срок', h('input', { class: 'inp', value: lg.term, placeholder: '10–14 дней', oninput: (e) => { lg.term = e.target.value; } })))) : null,
+        h('div', { class: 'opts' }, Object.entries(SHIP).map(([k, l]) => h('button', { type: 'button', 'aria-pressed': String(lg.method === k), onclick: () => { lg.method = k; if (!lg.manual && dimsCalc().cost) lg.cost = String(dimsCalc().cost); draw(); } }, l))),
+        (() => {
+          const out = h('small', { style: 'color:var(--mut);font-size:12px' });
+          const upd = () => { const c = dimsCalc(); out.textContent = c.m3 || c.wt ? (c.q > 1 ? c.q + ' шт · ' : '') + (c.m3 ? c.m3.toFixed(3) + ' м³' : '') + (c.wt ? ' · ' + c.wt.toLocaleString('ru-RU') + ' кг' : '') + (lg.method === 'air' && c.volKg > c.wt ? ' · объёмный вес ' + Math.round(c.volKg) + ' кг' : '') + (c.cost ? ' → по тарифу ' + money(c.cost) : lg.method === 'official' ? '' : (num(tariffs?.auto_kg) || num(tariffs?.air_kg) ? '' : ' · тарифы не заполнены (Настройки)')) : 'Впишите размеры коробки и вес — доставка посчитается по тарифам из настроек.'; };
+          const dim = (k, l, ph) => h('label', { class: 'lab' }, l, h('input', { class: 'inp', inputmode: 'decimal', value: lg[k], placeholder: ph, oninput: (e) => { lg[k] = e.target.value; const c = dimsCalc(); if (!lg.manual && c.cost) { lg.cost = String(c.cost); const ci = body.querySelector('[data-cost]'); if (ci) ci.value = lg.cost; } upd(); refresh(); } }));
+          upd();
+          return h('div', { style: 'display:flex;flex-direction:column;gap:6px' },
+            lg.fromSeller ? h('small', { style: 'color:var(--grnT);font-size:12px;font-weight:700', text: 'Габариты и вес — из ответа продавца. Проверьте.' }) : null,
+            h('div', { style: 'display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px' }, dim('dl', 'Длина, см', '70'), dim('dw', 'Ширина, см', '35'), dim('dh', 'Высота, см', '30'), dim('kg', 'Вес 1 шт, кг', '6')), out);
+        })(),
+        h('div', { class: 'g2' }, (() => { const el = fld(lg, 'cost', 'Стоимость, ₸', '300 000'); const i = el.querySelector('input'); i.setAttribute('data-cost', '1'); i.addEventListener('input', () => { lg.manual = true; }); return el; })(), h('label', { class: 'lab' }, 'Срок', h('input', { class: 'inp', value: lg.term, placeholder: '10–14 дней', oninput: (e) => { lg.term = e.target.value; } })))) : null,
       what === 'logi' && kind !== 'cargo' ? null : h('label', { class: 'lab' }, 'Условия и комментарий (необязательно)', h('textarea', { class: 'inp', value: extra.terms, placeholder: 'Предоплата 100%, гарантия 1 год', oninput: (e) => { extra.terms = e.target.value; } })),
       buildPrev());
   };
   draw();
   sheet(isNew ? 'Дозаказ для ' + (r.clientName || 'клиента') + ' (№' + r0.num + '-' + (ordersOf(r0).reduce((m, o) => Math.max(m, o.n || 1), 1) + 1) + ')' : locked ? 'Доставка для ' + (r.clientName || 'клиента') + ' · №' + r.num : r._order ? 'КП дозаказа №' + r.num : r.kp ? 'Новое КП для ' + (r.clientName || 'клиента') : 'КП для ' + (r.clientName || 'клиента'), body, (close) => [h('button', { class: 'bigb', type: 'button', onclick: async () => {
-    const logi = num(lg.cost) ? { method: lg.method, cost: num(lg.cost), term: lg.term.trim() } : null;
+    const dims = num(lg.dl) || num(lg.kg) ? { l: num(lg.dl) || null, w: num(lg.dw) || null, h: num(lg.dh) || null, kg: num(lg.kg) || null } : null;
+    const logi = num(lg.cost) ? { method: lg.method, cost: num(lg.cost), term: lg.term.trim(), ...(dims ? { dims } : {}) } : null;
     if (what === 'logi' && kind !== 'cargo') {
       if (!logi) { toast('Укажите стоимость доставки'); return; }
       close();
