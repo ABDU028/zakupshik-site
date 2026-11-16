@@ -932,6 +932,7 @@ function cbToKp(r, j, o) {
   const f = o.reply?.facts || {};
   const desc = [f.original && f.original !== 'неясно' ? f.original : '', f.material ? 'Материал: ' + f.material : '', f.setCount ? 'Комплект: ' + f.setCount : '', f.fits ? 'Подходит: ' + f.fits : ''].filter(Boolean).join('. ');
   const prevVars = (r.kp?.variants || []).length && !['work', 'done'].includes(r.status) ? r.kp.variants : [];
+  if (o.fit === 'не то' && !confirm('ИИ пометил этот товар как «не то»' + (o.why ? ': ' + o.why : '') + '. Всё равно добавить в КП?')) return;
   const v = { _pack: { size: f.packSize || '', weight: f.weight || '' }, name: r.title || o.name || '', desc, media: [...(o.photos || [])], cny: num(f.priceCny) ? num(f.priceCny) / (j.qty || 1) : num(o.cny), qty: j.qty || 1, chinaShip: '', term: '' };
   sheetKp(r, null, false, [...prevVars, v]);
   toast('Вариант от продавца добавлен в КП. Проверьте цену и доставку, потом отправьте');
@@ -1149,7 +1150,7 @@ function sheetKp(r0, oid, isNew, pre) {
           upd();
           return h('div', { style: 'display:flex;flex-direction:column;gap:6px' },
             lg.fromSeller ? h('small', { style: 'color:var(--grnT);font-size:12px;font-weight:700', text: 'Габариты и вес — из ответа продавца. Проверьте.' }) : null,
-            h('div', { style: 'display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px' }, dim('dl', 'Длина, см', '70'), dim('dw', 'Ширина, см', '35'), dim('dh', 'Высота, см', '30'), dim('kg', 'Вес 1 шт, кг', '6')), out);
+            h('div', { style: 'display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px' }, dim('dl', 'Длина, см', '—'), dim('dw', 'Ширина, см', '—'), dim('dh', 'Высота, см', '—'), dim('kg', 'Вес 1 шт, кг', '—')), out);
         })(),
         h('div', { class: 'g2' }, (() => { const el = fld(lg, 'cost', 'Стоимость, ₸', '300 000'); const i = el.querySelector('input'); i.setAttribute('data-cost', '1'); i.addEventListener('input', () => { lg.manual = true; }); return el; })(), h('label', { class: 'lab' }, 'Срок', h('input', { class: 'inp', value: lg.term, placeholder: '10–14 дней', oninput: (e) => { lg.term = e.target.value; } })))) : null,
       what === 'logi' && kind !== 'cargo' ? null : h('label', { class: 'lab' }, 'Условия и комментарий (необязательно)', h('textarea', { class: 'inp', value: extra.terms, placeholder: 'Предоплата 100%, гарантия 1 год', oninput: (e) => { extra.terms = e.target.value; } })),
