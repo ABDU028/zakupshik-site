@@ -857,6 +857,7 @@ function renderInfo() {
     !v._order && r.estimate ? f('Клиент видел примерную цену', [r.estimate.auto ? 'авто ' + money(r.estimate.auto) : '', r.estimate.air ? 'авиа ' + money(r.estimate.air) : ''].filter(Boolean).join(', ')) : null,
     !v._order && r.approvalPick && r.status === 'approval' ? h('div', { class: 'zh', style: 'background:var(--grnBg);color:var(--grnT)', text: 'Клиент выбрал для КП: ' + r.approvalPick }) : null,
     !v._order && r.service !== 'support' && r.service !== 'translate' ? zhBox(r) : null,
+    !v._order && ['purchase', 'buyout'].includes(r.service || 'purchase') ? cbBox(r) : null,
     f('Получение', r.delivery ? (r.delivery.method === 'door' ? 'Доставка: ' + (r.delivery.city || '') + (r.delivery.address ? ', ' + r.delivery.address : '') : 'Самовывоз из Алматы') : ''),
     f('Клиент', [r.clientCode, r.clientPhone, r.clientCompany].filter(Boolean).join(' · ')),
     (r.photos || []).length ? h('div', { class: 'media' }, r.photos.map((x) => h('img', { src: x.thumb, alt: 'Фото клиента', style: 'width:72px;height:72px', onclick: async () => { const { data } = await SB.from('request_files').select('data').eq('id', x.fileId).maybeSingle(); lightbox(data?.data || x.thumb); } }))) : null,
@@ -887,6 +888,110 @@ function zhBox(r) {
         } catch { toast('Не получилось перевести. Попробуйте ещё раз'); btn.disabled = false; btn.textContent = 'Перевести на китайский'; }
       } }, r.zh ? 'Перевести заново' : 'Перевести на китайский'),
       r.zh ? h('button', { class: 'pillb', type: 'button', onclick: async () => { try { await navigator.clipboard.writeText(r.zh); toast('Скопировано'); } catch { toast('Не получилось скопировать'); } } }, 'Скопировать') : null));
+}
+/* ===================== China-бот: поиск на Pinduoduo, вопросы продавцам, черновик КП ===================== */
+// Задание живёт в china_bot_jobs (читают только сотрудники). Сам бот — tools/china-bot, работает на компьютере офиса.
+// Клиенту бот ничего не пишет: менеджер переносит ответ продавца в окно КП и отправляет сам.
+const CB = {};
+const CB_LABEL = { queued: 'В очереди на поиск', searching: 'Ищет на Pinduoduo…', found: 'Нашёл товары — отметьте, кого спросить', ask: 'В очереди: написать продавцам',
+  asking: 'Пишет продавцам…', asked: 'Ждёт ответов продавцов', answered: 'Продавцы ответили', need_human: 'Pinduoduo просит проверку', error: 'Ошибка' };
+const CB_BUSY = ['queued', 'searching', 'ask', 'asking', 'asked', 'need_human'];
+let cbTimer = null;
+function cbQuestion(qty, car) {
+  return '您好！请问这款商品：1. 是原厂件还是副厂件？ 2. 是什么材质？ 3. ' + (car ? '适用' + car + '吗？' : '适用哪些车型？') +
+    ' 4. 可以发实物照片或视频吗？ 5. 买' + (qty || 1) + '件什么价格？ 6. 包装尺寸（长×宽×高）和重量是多少？ 谢谢！';
+}
+function cbCar(r) { const f = (r.fields || []).find((x) => /машин|авто|марк|модел/i.test(x.label)); return f ? f.value : ''; }
+async function cbLoad(id) {
+  const { data, error } = await SB.from('china_bot_jobs').select('*').eq('request_id', id).maybeSingle();
+  if (error) console.error('china_bot', error);
+  const was = JSON.stringify(CB[id] ?? null); CB[id] = error ? (CB[id] ?? null) : data || null;
+  if (sel === id && JSON.stringify(CB[id]) !== was) renderInfo();
+}
+async function cbSave(id, patch) {
+  const { error } = await SB.from('china_bot_jobs').upsert({ request_id: id, ...patch, updated_at: Date.now() });
+  if (error) { console.error(error); toast('Не сохранилось: ' + (error.message || 'ошибка')); return false; }
+  await cbLoad(id); return true;
+}
+function cbWatch(id) {
+  clearInterval(cbTimer);
+  cbTimer = setInterval(() => { if (sel !== id) { clearInterval(cbTimer); return; } if (CB_BUSY.includes(CB[id]?.status)) cbLoad(id); }, 8000);
+}
+async function cbSuggest(r, inp, btn) {
+  btn.disabled = true; btn.textContent = 'Подбираю…';
+  try {
+    const { data, error } = await SB.functions.invoke('ai', { body: { task: 'staff_text', prompt: 'Составь короткий поисковый запрос на китайском (упрощённые иероглифы) для Pinduoduo, 3–6 слов: марка и модель машины и название детали, как ищут китайские покупатели. Ответь только запросом, без кавычек.\n\n' + (r.zh || ((r.title ? 'Товар: ' + r.title + '\n' : '') + (r.fields || []).map((f) => f.label + ': ' + f.value).join('\n'))) } });
+    if (error || !data?.text) throw new Error('ai');
+    inp.value = data.text.trim().replace(/^["«“]|["»”]$/g, '');
+  } catch { toast('Не получилось подобрать запрос'); }
+  btn.disabled = false; btn.textContent = 'Подобрать запрос из заявки';
+}
+function cbToKp(r, j, o) {
+  const f = o.reply?.facts || {};
+  const desc = [f.original && f.original !== 'неясно' ? f.original : '', f.material ? 'Материал: ' + f.material : '', f.setCount ? 'Комплект: ' + f.setCount : '', f.fits ? 'Подходит: ' + f.fits : ''].filter(Boolean).join('. ');
+  const prevVars = (r.kp?.variants || []).length && !['work', 'done'].includes(r.status) ? r.kp.variants : [];
+  const v = { name: r.title || o.name || '', desc, cny: num(f.priceCny) ? num(f.priceCny) / (j.qty || 1) : num(o.cny), qty: j.qty || 1, chinaShip: '', term: '' };
+  sheetKp(r, null, false, [...prevVars, v]);
+  toast('Вариант от продавца добавлен в КП. Проверьте цену и доставку, потом отправьте');
+}
+function cbBox(r) {
+  if (!(r.id in CB)) { CB[r.id] = undefined; cbLoad(r.id); }
+  cbWatch(r.id);
+  const j = CB[r.id];
+  const wrap = (...kids) => h('div', { class: 'zh', style: 'display:flex;flex-direction:column;gap:8px' }, h('b', { text: 'Бот · поиск на Pinduoduo' }), ...kids);
+  if (j === undefined) return wrap(h('span', { style: 'color:var(--mut)', text: 'Загружаем…' }));
+  if (!j) {
+    const q = h('input', { class: 'inp', lang: 'zh-CN', placeholder: '理想L6 机油冷却器垫片', 'aria-label': 'Что искать на китайском' });
+    const n = h('input', { class: 'inp', type: 'number', min: '1', value: '1', style: 'width:80px', 'aria-label': 'Сколько штук' });
+    const car = h('input', { class: 'inp', value: cbCar(r), placeholder: 'Li Auto L6 2025', 'aria-label': 'Машина' });
+    const sug = h('button', { class: 'pillb', type: 'button', onclick: (e) => cbSuggest(r, q, e.currentTarget) }, 'Подобрать запрос из заявки');
+    return wrap(
+      h('span', { style: 'color:var(--mut);font-size:12.5px', text: 'Бот найдёт товары, по вашей команде спросит продавцов и покажет ответы по-русски. Клиенту он ничего не пишет.' }),
+      h('label', { class: 'lab' }, 'Что искать (по-китайски)', q),
+      h('div', { style: 'display:flex;gap:8px' }, h('label', { class: 'lab' }, 'Штук', n), h('label', { class: 'lab', style: 'flex:1' }, 'Машина (для вопроса продавцу)', car)),
+      h('span', { style: 'display:flex;gap:6px;flex-wrap:wrap' }, sug,
+        h('button', { class: 'pillb a', type: 'button', onclick: () => {
+          const qq = q.value.trim(); if (!qq) { toast('Напишите, что искать, или нажмите «Подобрать запрос»'); return; }
+          const qty = Math.max(1, Math.round(num(n.value) || 1)); const c = car.value.trim();
+          cbSave(r.id, { status: 'queued', query: qq, qty, car: c, question: cbQuestion(qty, c), offers: [], log: [], error: null, resume: null, created_at: Date.now() });
+        } }, 'Искать на Pinduoduo')));
+  }
+  const link = (o) => 'https://mobile.pinduoduo.com/goods.html?goods_id=' + o.id;
+  const picking = j.status === 'found';
+  const offers = (j.offers || []).map((o) => h('div', { style: 'display:flex;gap:10px;align-items:flex-start;padding:8px;border-radius:10px;background:var(--bg)' },
+    picking ? h('input', { type: 'checkbox', checked: !!o.picked, 'aria-label': 'Спросить этого продавца', style: 'width:20px;height:20px;margin-top:2px', onchange: (e) => { o.picked = e.target.checked; } }) : null,
+    o.img ? h('img', { src: o.img, alt: '', style: 'width:56px;height:56px;object-fit:cover;border-radius:8px;flex-shrink:0' }) : null,
+    h('div', { style: 'flex:1;min-width:0;display:flex;flex-direction:column;gap:4px' },
+      h('a', { href: link(o), target: '_blank', rel: 'noopener', lang: 'zh-CN', text: o.name, style: 'color:var(--fg)' }),
+      h('span', { style: 'font-size:12.5px;color:var(--mut)', text: num(o.cny) + ' ¥ (≈ ' + money(Math.round(num(o.cny) * (num(rates?.cny) || 71))) + ')' + (o.sold ? ' · ' + o.sold : '') + (o.askedAt ? ' · спросили ' + ago(o.askedAt) : '') }),
+      o.reply?.ru ? h('div', { style: 'white-space:pre-wrap;font-size:13px;padding:8px;border-radius:8px;background:var(--grnBg);color:var(--grnT)', text: 'Продавец: ' + o.reply.ru }) : o.askedAt ? h('span', { style: 'font-size:12.5px;color:var(--mut)', text: 'Ответа пока нет' }) : null,
+      o.reply?.facts ? h('span', { style: 'font-size:12.5px', text: [o.reply.facts.original, o.reply.facts.material, o.reply.facts.setCount && 'комплект ' + o.reply.facts.setCount,
+        o.reply.facts.priceCny && o.reply.facts.priceCny + ' ¥ за ' + (j.qty || 1) + ' шт', o.reply.facts.packSize && 'упаковка ' + o.reply.facts.packSize, o.reply.facts.weight && o.reply.facts.weight].filter(Boolean).join(' · ') }) : null,
+      o.reply?.ru ? h('button', { class: 'pillb a', type: 'button', style: 'align-self:flex-start', onclick: () => cbToKp(r, j, o) }, 'Добавить в КП') : null)));
+  const ask = picking && offers.length ? h('textarea', { class: 'inp', rows: '4', lang: 'zh-CN', 'aria-label': 'Вопрос продавцам', value: j.question || cbQuestion(j.qty, j.car) }) : null;
+  return wrap(
+    h('div', { style: 'display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap' }, h('b', { text: CB_LABEL[j.status] || j.status }), h('span', { lang: 'zh-CN', style: 'font-size:12.5px;color:var(--mut)', text: j.query + ' · ' + (j.qty || 1) + ' шт' })),
+    j.status === 'need_human' ? h('div', { style: 'padding:8px;border-radius:8px;background:var(--redBg);color:var(--redT);font-size:13px', text: 'Pinduoduo просит подтвердить, что это человек. На компьютере с ботом откройте окно браузера бота и отсканируйте QR приложением Pinduoduo — бот продолжит сам.' }) : null,
+    j.status === 'error' ? h('div', { style: 'padding:8px;border-radius:8px;background:var(--redBg);color:var(--redT);font-size:13px', text: j.error || 'Ошибка' }) : null,
+    CB_BUSY.includes(j.status) && Date.now() - (j.updated_at || 0) > 3 * 60000 && ['queued', 'ask'].includes(j.status) ? h('span', { style: 'font-size:12.5px;color:var(--redT)', text: 'Бот давно не брал задание. Проверьте, что на компьютере офиса он запущен.' }) : null,
+    offers.length ? offers : ['found', 'answered'].includes(j.status) ? h('span', { style: 'color:var(--mut)', text: 'Ничего не нашлось. Попробуйте другой запрос.' }) : null,
+    ask ? [h('label', { class: 'lab' }, 'Вопрос продавцам (уйдёт как есть, по-китайски)', ask),
+      h('button', { class: 'pillb a', type: 'button', onclick: () => {
+        const picked = (j.offers || []).filter((o) => o.picked).length;
+        if (!picked) { toast('Отметьте продавцов, которых спросить'); return; }
+        if (picked > 5) { toast('Не больше 5 продавцов за раз — иначе Pinduoduo может заблокировать аккаунт'); return; }
+        cbSave(r.id, { status: 'ask', offers: j.offers, question: ask.value.trim() });
+      } }, 'Спросить выбранных продавцов')] : null,
+    (j.log || []).length ? h('span', { style: 'font-size:12px;color:var(--mut)', text: (j.log || []).slice(-3).map((l) => ago(l.at) + ': ' + l.text).join(' · ') }) : null,
+    h('span', { style: 'display:flex;gap:6px;flex-wrap:wrap' },
+      j.status === 'error' ? h('button', { class: 'pillb', type: 'button', onclick: () => cbSave(r.id, { status: j.resume || 'queued', error: null }) }, 'Повторить') : null,
+      ['asked', 'answered'].includes(j.status) ? h('button', { class: 'pillb', type: 'button', onclick: () => cbSave(r.id, { status: 'asked', checked_at: 0 }) }, 'Проверить ответы сейчас') : null,
+      h('button', { class: 'pillb', type: 'button', onclick: async () => {
+        if (!confirm('Начать новый поиск? Найденные товары и ответы продавцов по этой заявке удалятся.')) return;
+        const { error } = await SB.from('china_bot_jobs').delete().eq('request_id', r.id);
+        if (error) { toast('Не удалилось'); return; }
+        CB[r.id] = null; renderInfo();
+      } }, 'Новый поиск')));
 }
 const REJ_REASONS = ['Не нашли такой товар у поставщиков', 'Такой товар запрещён к ввозу или требует спецразрешений', 'Не работаем с этой категорией товаров', 'Слишком маленький объём, выгоднее купить в Казахстане'];
 function rejectEl(r) {
@@ -945,7 +1050,7 @@ function sheetVariants(r) {
     toast('Отправлено на согласование');
   } }, 'Отправить клиенту')]);
 }
-function sheetKp(r0, oid, isNew) {
+function sheetKp(r0, oid, isNew, pre) {
   const r = isNew ? { ...r0, kp: null, decision: null, status: 'kp', logiExact: null, approvals: null, approvalPick: null, title: '', payments: null, stage: null } : viewOf(r0, oid);
   const kpText = (o) => oLabel(r0, o) + ': ' + ((o.kp?.variants || []).map((x) => (x.name || 'товар') + ' — ' + money(num(x.price))).join('; ') || 'товар') + (o.kp?.logi?.cost ? '. Доставка до Алматы ' + (o.logiExact ? '' : '≈ ') + money(num(o.kp.logi.cost)) : '') + '. Чтобы оформить — нажмите «Оформить» на карточке или напишите нам здесь.';
   const commit = async (item, fields) => {
@@ -966,7 +1071,7 @@ function sheetKp(r0, oid, isNew) {
   };
   const kind = KIND(r); const rate = num(rates?.cny) || 71;
   const fromApproval = (r.approvals || []).length ? (r.approvalPick ? r.approvals.filter((v, i) => r.approvalPick.includes('Вариант ' + (i + 1)) || (v.name && r.approvalPick.includes(v.name))) : r.approvals) : [];
-  const prev = r.kp?.variants?.length ? r.kp.variants : fromApproval;
+  const prev = pre?.length ? pre : r.kp?.variants?.length ? r.kp.variants : fromApproval;
   const yuanMode = kind === 'goods' || kind === 'buyout';
   const vars = (prev.length ? prev : [{ name: r.title || '' }]).map((v) => ({ name: v.name || '', desc: v.desc || '', media: [...(v.media || [])], cny: v.cny || '', qty: v.qty || 1, chinaShip: v.chinaShip || '', term: v.term || '', price: yuanMode && v.cny ? '' : (v.price || '') }));
   const lg = { method: r.kp?.logi?.method || r.shipping?.key || 'auto', cost: '', term: r.kp?.logi?.term || '' };
