@@ -855,6 +855,7 @@ function renderInfo() {
     !v._order && r.lang && r.lang !== 'ru' ? h('div', { class: 'zh', style: 'background:var(--bluBg);color:var(--bluT)' }, h('b', { text: 'Клиент пишет на ' + ({ kk: 'казахском', en: 'английском' }[r.lang] || r.lang) + '. Заявка выше переведена на русский.' }),
       r.orig ? h('details', {}, h('summary', { style: 'cursor:pointer', text: 'Оригинал' }), (r.orig.fields || []).map((x) => h('div', { text: x.label + ': ' + x.value }))) : null) : null,
     !v._order && r.estimate ? f('Клиент видел примерную цену', [r.estimate.auto ? 'авто ' + money(r.estimate.auto) : '', r.estimate.air ? 'авиа ' + money(r.estimate.air) : ''].filter(Boolean).join(', ')) : null,
+    !v._order && r.status === 'delivery' && r.chosenVariant != null && (r.kp?.variants || []).length > 1 ? h('div', { class: 'zh', style: 'background:var(--grnBg);color:var(--grnT)' }, h('b', { text: 'Клиент выбрал вариант ' + (r.chosenVariant + 1) + (r.kp.variants[r.chosenVariant]?.name ? ': ' + r.kp.variants[r.chosenVariant].name : '') }), h('span', { text: 'Посчитайте доставку для него: КП → «Только доставка». После отправки у клиента появится «Оформить».' })) : null,
     !v._order && r.approvalPick && r.status === 'approval' ? h('div', { class: 'zh', style: 'background:var(--grnBg);color:var(--grnT)', text: 'Клиент выбрал для КП: ' + r.approvalPick }) : null,
     !v._order && r.service !== 'support' && r.service !== 'translate' ? zhBox(r) : null,
     !v._order && ['purchase', 'buyout'].includes(r.service || 'purchase') ? cbBox(r) : null,
