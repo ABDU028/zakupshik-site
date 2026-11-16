@@ -905,8 +905,9 @@ function cbCar(r) { const f = (r.fields || []).find((x) => /машин|авто|
 async function cbLoad(id) {
   const { data, error } = await SB.from('china_bot_jobs').select('*').eq('request_id', id).maybeSingle();
   if (error) console.error('china_bot', error);
-  const was = JSON.stringify(CB[id] ?? null); CB[id] = error ? (CB[id] ?? null) : data || null;
-  if (sel === id && JSON.stringify(CB[id]) !== was) renderInfo();
+  const before = CB[id];
+  CB[id] = error ? (before ?? null) : data || null;
+  if (sel === id && (before === undefined || JSON.stringify(before) !== JSON.stringify(CB[id]))) renderInfo();
 }
 async function cbSave(id, patch) {
   const { error } = await SB.from('china_bot_jobs').upsert({ request_id: id, ...patch, updated_at: Date.now() });
