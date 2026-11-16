@@ -910,7 +910,8 @@ async function cbLoad(id) {
   if (sel === id && (before === undefined || JSON.stringify(before) !== JSON.stringify(CB[id]))) renderInfo();
 }
 async function cbSave(id, patch) {
-  const { error } = await SB.from('china_bot_jobs').upsert({ request_id: id, ...patch, updated_at: Date.now() });
+  const row = { ...patch, updated_at: Date.now() };
+  const { error } = CB[id] ? await SB.from('china_bot_jobs').update(row).eq('request_id', id) : await SB.from('china_bot_jobs').upsert({ request_id: id, ...row });
   if (error) { console.error(error); toast('Не сохранилось: ' + (error.message || 'ошибка')); return false; }
   await cbLoad(id); return true;
 }
