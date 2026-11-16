@@ -932,7 +932,7 @@ function cbToKp(r, j, o) {
   const f = o.reply?.facts || {};
   const desc = [f.original && f.original !== 'неясно' ? f.original : '', f.material ? 'Материал: ' + f.material : '', f.setCount ? 'Комплект: ' + f.setCount : '', f.fits ? 'Подходит: ' + f.fits : ''].filter(Boolean).join('. ');
   const prevVars = (r.kp?.variants || []).length && !['work', 'done'].includes(r.status) ? r.kp.variants : [];
-  const v = { name: r.title || o.name || '', desc, cny: num(f.priceCny) ? num(f.priceCny) / (j.qty || 1) : num(o.cny), qty: j.qty || 1, chinaShip: '', term: '' };
+  const v = { name: r.title || o.name || '', desc, media: [...(o.photos || [])], cny: num(f.priceCny) ? num(f.priceCny) / (j.qty || 1) : num(o.cny), qty: j.qty || 1, chinaShip: '', term: '' };
   sheetKp(r, null, false, [...prevVars, v]);
   toast('Вариант от продавца добавлен в КП. Проверьте цену и доставку, потом отправьте');
 }
@@ -969,7 +969,11 @@ function cbBox(r) {
       o.reply?.ru ? h('div', { style: 'white-space:pre-wrap;font-size:13px;padding:8px;border-radius:8px;background:var(--grnBg);color:var(--grnT)', text: 'Продавец: ' + o.reply.ru }) : o.askedAt ? h('span', { style: 'font-size:12.5px;color:var(--mut)', text: 'Ответа пока нет' }) : o.askError ? h('span', { style: 'font-size:12.5px;color:var(--redT)', text: 'Не получилось написать: ' + o.askError }) : null,
       o.reply?.facts ? h('span', { style: 'font-size:12.5px', text: [o.reply.facts.original, o.reply.facts.material, o.reply.facts.setCount && 'комплект ' + o.reply.facts.setCount,
         o.reply.facts.priceCny && o.reply.facts.priceCny + ' ¥ за ' + (j.qty || 1) + ' шт', o.reply.facts.packSize && 'упаковка ' + o.reply.facts.packSize, o.reply.facts.weight && o.reply.facts.weight].filter(Boolean).join(' · ') }) : null,
-      o.reply?.ru ? h('button', { class: 'pillb a', type: 'button', style: 'align-self:flex-start', onclick: () => cbToKp(r, j, o) }, 'Добавить в КП') : null)));
+      (o.photos || []).length ? h('div', { class: 'media' }, o.photos.map((x) => h('img', { src: x.url, alt: x.name || 'Фото', style: 'width:64px;height:64px', onclick: () => lightbox(x.url) }))) : null,
+      o.photosError ? h('span', { style: 'font-size:12.5px;color:var(--mut)', text: 'Фото: ' + o.photosError }) : o.askedAt && !o.photos && (o.reply?.ru || o.wantPhotos) && !o.photosTried ? h('span', { style: 'font-size:12.5px;color:var(--mut)', text: 'Бот готовит чистые фото…' }) : null,
+      h('span', { style: 'display:flex;gap:6px;flex-wrap:wrap' },
+        o.reply?.ru ? h('button', { class: 'pillb a', type: 'button', onclick: () => cbToKp(r, j, o) }, (o.photos || []).length ? 'Добавить в КП с фото' : 'Добавить в КП') : null,
+        o.askedAt && !(o.photos || []).length && !o.wantPhotos ? h('button', { class: 'pillb', type: 'button', onclick: () => { o.wantPhotos = true; o.photosTried = null; o.photosError = null; cbSave(r.id, { offers: j.offers, status: 'asked', checked_at: 0 }).then((ok) => ok && toast('Бот возьмёт фото из объявления и уберёт надписи — до пары минут')); } }, o.photosTried ? 'Взять фото ещё раз' : 'Взять фото') : null))));
   const ask = picking && offers.length ? h('textarea', { class: 'inp', rows: '4', lang: 'zh-CN', 'aria-label': 'Вопрос продавцам', value: j.question || cbQuestion(j.qty, j.car) }) : null;
   return wrap(
     h('div', { style: 'display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap' }, h('b', { text: CB_LABEL[j.status] || j.status }), h('span', { lang: 'zh-CN', style: 'font-size:12.5px;color:var(--mut)', text: j.query + ' · ' + (j.qty || 1) + ' шт' })),
