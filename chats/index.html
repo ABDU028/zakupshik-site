@@ -966,7 +966,7 @@ function cbBox(r) {
     h('div', { style: 'flex:1;min-width:0;display:flex;flex-direction:column;gap:4px' },
       h('a', { href: link(o), target: '_blank', rel: 'noopener', lang: 'zh-CN', text: o.name, style: 'color:var(--fg)' }),
       h('span', { style: 'font-size:12.5px;color:var(--mut)', text: num(o.cny) + ' ¥ (≈ ' + money(Math.round(num(o.cny) * (num(rates?.cny) || 71))) + ')' + (o.sold ? ' · ' + o.sold : '') + (o.askedAt ? ' · спросили ' + ago(o.askedAt) : '') }),
-      o.reply?.ru ? h('div', { style: 'white-space:pre-wrap;font-size:13px;padding:8px;border-radius:8px;background:var(--grnBg);color:var(--grnT)', text: 'Продавец: ' + o.reply.ru }) : o.askedAt ? h('span', { style: 'font-size:12.5px;color:var(--mut)', text: 'Ответа пока нет' }) : null,
+      o.reply?.ru ? h('div', { style: 'white-space:pre-wrap;font-size:13px;padding:8px;border-radius:8px;background:var(--grnBg);color:var(--grnT)', text: 'Продавец: ' + o.reply.ru }) : o.askedAt ? h('span', { style: 'font-size:12.5px;color:var(--mut)', text: 'Ответа пока нет' }) : o.askError ? h('span', { style: 'font-size:12.5px;color:var(--redT)', text: 'Не получилось написать: ' + o.askError }) : null,
       o.reply?.facts ? h('span', { style: 'font-size:12.5px', text: [o.reply.facts.original, o.reply.facts.material, o.reply.facts.setCount && 'комплект ' + o.reply.facts.setCount,
         o.reply.facts.priceCny && o.reply.facts.priceCny + ' ¥ за ' + (j.qty || 1) + ' шт', o.reply.facts.packSize && 'упаковка ' + o.reply.facts.packSize, o.reply.facts.weight && o.reply.facts.weight].filter(Boolean).join(' · ') }) : null,
       o.reply?.ru ? h('button', { class: 'pillb a', type: 'button', style: 'align-self:flex-start', onclick: () => cbToKp(r, j, o) }, 'Добавить в КП') : null)));
