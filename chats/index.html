@@ -894,7 +894,7 @@ function zhBox(r) {
 // Задание живёт в china_bot_jobs (читают только сотрудники). Сам бот — tools/china-bot, работает на компьютере офиса.
 // Клиенту бот ничего не пишет: менеджер переносит ответ продавца в окно КП и отправляет сам.
 const CB = {};
-const CB_LABEL = { queued: 'В очереди на поиск', searching: 'Ищет на Pinduoduo…', found: 'Нашёл товары — отметьте, кого спросить', ask: 'В очереди: написать продавцам',
+const CB_LABEL = { queued: 'В очереди на поиск', searching: 'Ищет на Pinduoduo, 1688, Taobao…', found: 'Нашёл товары', ask: 'В очереди: написать продавцам',
   asking: 'Пишет продавцам…', asked: 'Ждёт ответов продавцов', answered: 'Переписка закончена', stopped: 'Остановлено — бот не пишет и не проверяет', need_human: 'Pinduoduo просит проверку', error: 'Ошибка' };
 const CB_BUSY = ['queued', 'searching', 'ask', 'asking', 'asked', 'need_human'];
 let cbTimer = null;
@@ -968,7 +968,7 @@ function cbBox(r) {
   if (!(r.id in CB)) { CB[r.id] = undefined; cbLoad(r.id); }
   cbWatch(r.id);
   const j = CB[r.id];
-  const wrap = (...kids) => h('div', { class: 'zh', style: 'display:flex;flex-direction:column;gap:8px' }, h('b', { text: 'Бот · поиск на Pinduoduo' }), ...kids);
+  const wrap = (...kids) => h('div', { class: 'zh', style: 'display:flex;flex-direction:column;gap:8px' }, h('b', { text: 'Бот · поиск в Китае' }), ...kids);
   if (j === undefined) return wrap(h('span', { style: 'color:var(--mut)', text: 'Загружаем…' }));
   if (!j) {
     const q = h('input', { class: 'inp', lang: 'zh-CN', placeholder: '理想L6 机油冷却器垫片', 'aria-label': 'Что искать на китайском' });
@@ -976,7 +976,7 @@ function cbBox(r) {
     const car = h('input', { class: 'inp', value: cbCar(r), placeholder: 'Li Auto L6 2025', 'aria-label': 'Машина' });
     const sug = h('button', { class: 'pillb', type: 'button', onclick: (e) => cbSuggest(r, q, e.currentTarget) }, 'Подобрать запрос из заявки');
     return wrap(
-      h('span', { style: 'color:var(--mut);font-size:12.5px', text: 'Бот найдёт товары, по вашей команде спросит продавцов и покажет ответы по-русски. Клиенту он ничего не пишет.' }),
+      h('span', { style: 'color:var(--mut);font-size:12.5px', text: 'Бот ищет сразу на Pinduoduo, 1688 и Taobao и помечает, что подходит. Клиенту он ничего не пишет.' }),
       h('label', { class: 'lab' }, 'Что искать (по-китайски)', q),
       h('div', { style: 'display:flex;gap:8px' }, h('label', { class: 'lab' }, 'Штук', n), h('label', { class: 'lab', style: 'flex:1' }, 'Машина (для вопроса продавцу)', car)),
       h('span', { style: 'display:flex;gap:6px;flex-wrap:wrap' }, sug,
@@ -984,18 +984,20 @@ function cbBox(r) {
           const qq = q.value.trim(); if (!qq) { toast('Напишите, что искать, или нажмите «Подобрать запрос»'); return; }
           const qty = Math.max(1, Math.round(num(n.value) || 1)); const c = car.value.trim();
           cbSave(r.id, { status: 'queued', query: qq, qty, car: c, question: cbQuestion(qty, c), offers: [], log: [], error: null, resume: null, created_at: Date.now() });
-        } }, 'Искать на Pinduoduo')));
+        } }, 'Искать')));
   }
-  const link = (o) => 'https://mobile.pinduoduo.com/goods.html?goods_id=' + o.id;
+  const link = (o) => o.url || 'https://mobile.pinduoduo.com/goods.html?goods_id=' + o.id;
+  const isPdd = (o) => !o.src || o.src === 'pdd';
+  const SRC = { pdd: ['Pinduoduo', '#E02E24'], 1688: ['1688', '#FF6A00'], tb: ['Taobao', '#FF5000'] };
   const picking = j.status === 'found';
   const offers = (j.offers || []).map((o) => h('div', { style: 'display:flex;gap:10px;align-items:flex-start;padding:8px;border-radius:10px;background:var(--bg)' + (o.fit === 'не то' && !o.askedAt ? ';opacity:.55' : '') },
-    picking ? h('input', { type: 'checkbox', checked: !!o.picked, 'aria-label': 'Спросить этого продавца', style: 'width:20px;height:20px;margin-top:2px', onchange: (e) => { o.picked = e.target.checked; } }) : null,
+    picking && isPdd(o) ? h('input', { type: 'checkbox', checked: !!o.picked, 'aria-label': 'Спросить этого продавца', style: 'width:20px;height:20px;margin-top:2px', onchange: (e) => { o.picked = e.target.checked; } }) : null,
     o.img ? h('img', { src: o.img, alt: '', style: 'width:56px;height:56px;object-fit:cover;border-radius:8px;flex-shrink:0' }) : null,
     h('div', { style: 'flex:1;min-width:0;display:flex;flex-direction:column;gap:4px' },
-      o.fit ? h('span', { style: 'display:flex;gap:6px;align-items:center;flex-wrap:wrap' }, h('span', { class: 'chip', style: o.fit === 'подходит' ? 'background:var(--grnBg);color:var(--grnT)' : o.fit === 'не то' ? 'background:var(--redBg);color:var(--redT)' : 'background:var(--s3);color:var(--fg)', text: o.fit === 'подходит' ? '✓ Подходит' : o.fit === 'не то' ? 'Не то' : 'Проверить' }), o.why ? h('span', { style: 'font-size:12px;color:var(--mut)', text: o.why }) : null) : null,
+      o.fit || o.src ? h('span', { style: 'display:flex;gap:6px;align-items:center;flex-wrap:wrap' }, h('span', { class: 'chip', style: 'background:' + (SRC[o.src || 'pdd'] || SRC.pdd)[1] + ';color:#fff', text: (SRC[o.src || 'pdd'] || SRC.pdd)[0] }), o.fit ? h('span', { class: 'chip', style: o.fit === 'подходит' ? 'background:var(--grnBg);color:var(--grnT)' : o.fit === 'не то' ? 'background:var(--redBg);color:var(--redT)' : 'background:var(--s3);color:var(--fg)', text: o.fit === 'подходит' ? '✓ Подходит' : o.fit === 'не то' ? 'Не то' : 'Проверить' }) : null, o.why ? h('span', { style: 'font-size:12px;color:var(--mut)', text: o.why }) : null) : null,
       o.ru ? h('b', { style: 'font-size:13.5px', text: o.ru }) : null,
       h('a', { href: link(o), target: '_blank', rel: 'noopener', lang: 'zh-CN', text: o.name, style: o.ru ? 'color:var(--mut);font-size:12px' : 'color:var(--fg)' }),
-      h('span', { style: 'font-size:12.5px;color:var(--mut)', text: num(o.cny) + ' ¥ (≈ ' + money(Math.round(num(o.cny) * (num(rates?.cny) || 71))) + ')' + (o.sold ? ' · ' + o.sold : '') + (o.askedAt ? ' · спросили ' + ago(o.askedAt) : '') }),
+      h('span', { style: 'font-size:12.5px;color:var(--mut)', text: num(o.cny) + ' ¥ (≈ ' + money(Math.round(num(o.cny) * (num(rates?.cny) || 71))) + ')' + (o.sold ? ' · ' + o.sold : '') + (o.shop ? ' · ' + o.shop : '') + (o.askedAt ? ' · спросили ' + ago(o.askedAt) : '') }),
       o.askedAt ? cbBadge(o) : o.picked && j.status !== 'found' && !o.askError ? h('span', { class: 'chip', style: 'background:var(--s3);color:var(--mut);align-self:flex-start', text: 'В очереди' }) : null,
       o.reply?.ru ? h('div', { style: 'white-space:pre-wrap;font-size:13px;padding:8px;border-radius:8px;background:var(--grnBg);color:var(--grnT)', text: 'Продавец: ' + o.reply.ru }) : null,
       o.askError ? h('span', { style: 'font-size:12.5px;color:var(--redT)', text: 'Не получилось написать: ' + o.askError }) : null,
@@ -1004,16 +1006,16 @@ function cbBox(r) {
       (o.photos || []).length ? h('div', { class: 'media' }, o.photos.map((x) => h('img', { src: x.url, alt: x.name || 'Фото', style: 'width:64px;height:64px', onclick: () => lightbox(x.url) }))) : null,
       o.photosError ? h('span', { style: 'font-size:12.5px;color:var(--mut)', text: 'Фото: ' + o.photosError }) : o.askedAt && !o.photos && (o.reply?.ru || o.wantPhotos) && !o.photosTried ? h('span', { style: 'font-size:12.5px;color:var(--mut)', text: 'Бот готовит чистые фото…' }) : null,
       h('span', { style: 'display:flex;gap:6px;flex-wrap:wrap' },
-        o.reply?.ru ? h('button', { class: 'pillb a', type: 'button', onclick: () => cbToKp(r, j, o) }, (o.photos || []).length ? 'Добавить в КП с фото' : 'Добавить в КП') : null,
+        o.reply?.ru ? h('button', { class: 'pillb a', type: 'button', onclick: () => cbToKp(r, j, o) }, (o.photos || []).length ? 'Добавить в КП с фото' : 'Добавить в КП') : h('button', { class: 'pillb', type: 'button', onclick: () => cbToKp(r, j, o) }, 'В КП'),
         o.askedAt && !(o.photos || []).length && !o.wantPhotos ? h('button', { class: 'pillb', type: 'button', onclick: () => { o.wantPhotos = true; o.photosTried = null; o.photosError = null; cbSave(r.id, { offers: j.offers, status: 'asked', checked_at: 0 }).then((ok) => ok && toast('Бот возьмёт фото из объявления и уберёт надписи — до пары минут')); } }, o.photosTried ? 'Взять фото ещё раз' : 'Взять фото') : null))));
-  const ask = picking && offers.length ? h('textarea', { class: 'inp', rows: '4', lang: 'zh-CN', 'aria-label': 'Вопрос продавцам', value: j.question || cbQuestion(j.qty, j.car) }) : null;
+  const ask = picking && (j.offers || []).some(isPdd) ? h('textarea', { class: 'inp', rows: '4', lang: 'zh-CN', 'aria-label': 'Вопрос продавцам', value: j.question || cbQuestion(j.qty, j.car) }) : null;
   return wrap(
     h('div', { style: 'display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap' }, h('b', { text: (CB_LABEL[j.status] || j.status) + cbSum(j) }), h('span', { lang: 'zh-CN', style: 'font-size:12.5px;color:var(--mut)', text: j.query + ' · ' + (j.qty || 1) + ' шт' })),
     j.status === 'need_human' ? h('div', { style: 'padding:8px;border-radius:8px;background:var(--redBg);color:var(--redT);font-size:13px', text: 'Pinduoduo просит подтвердить, что это человек. На компьютере с ботом откройте окно браузера бота и отсканируйте QR приложением Pinduoduo — бот продолжит сам.' }) : null,
     j.status === 'error' ? h('div', { style: 'padding:8px;border-radius:8px;background:var(--redBg);color:var(--redT);font-size:13px', text: j.error || 'Ошибка' }) : null,
     CB_BUSY.includes(j.status) && Date.now() - (j.updated_at || 0) > 3 * 60000 && ['queued', 'ask'].includes(j.status) ? h('span', { style: 'font-size:12.5px;color:var(--redT)', text: 'Бот давно не брал задание. Проверьте, что на компьютере офиса он запущен.' }) : null,
     offers.length ? offers : ['found', 'answered'].includes(j.status) ? h('span', { style: 'color:var(--mut)', text: 'Ничего не нашлось. Попробуйте другой запрос.' }) : null,
-    ask ? [h('label', { class: 'lab' }, 'Первый вопрос продавцу (по-китайски, коротко). Дальше бот переписывается сам', ask),
+    ask ? [h('label', { class: 'lab' }, 'Если нужно спросить продавцов Pinduoduo — отметьте их и нажмите «Спросить» (необязательно)', ask),
       h('button', { class: 'pillb a', type: 'button', onclick: () => {
         const picked = (j.offers || []).filter((o) => o.picked).length;
         if (!picked) { toast('Отметьте продавцов, которых спросить'); return; }
