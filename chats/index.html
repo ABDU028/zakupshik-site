@@ -899,8 +899,8 @@ const CB_LABEL = { queued: 'В очереди на поиск', searching: 'Ищ
 const CB_BUSY = ['queued', 'searching', 'ask', 'asking', 'asked', 'need_human'];
 let cbTimer = null;
 function cbQuestion(qty, car) {
-  return '您好！请问这款商品：1. 是原厂件还是副厂件？ 2. 是什么材质？ 3. ' + (car ? '适用' + car + '吗？' : '适用哪些车型？') +
-    ' 4. 可以发实物照片或视频吗？ 5. 买' + (qty || 1) + '件什么价格？ 6. 包装尺寸（长×宽×高）和重量是多少？ 谢谢！';
+  // коротко, как пишет живой человек; остальное (цену, размер, фото) бот уточнит по ходу
+  return '有货吗？' + (car ? '适用' + car + '吗？' : '') + '原厂的还是副厂的？' + ((qty || 1) > 1 ? '要' + qty + '个。' : '');
 }
 function cbCar(r) { const f = (r.fields || []).find((x) => /машин|авто|марк|модел/i.test(x.label)); return f ? f.value : ''; }
 async function cbLoad(id) {
@@ -996,7 +996,7 @@ function cbBox(r) {
       o.ru ? h('b', { style: 'font-size:13.5px', text: o.ru }) : null,
       h('a', { href: link(o), target: '_blank', rel: 'noopener', lang: 'zh-CN', text: o.name, style: o.ru ? 'color:var(--mut);font-size:12px' : 'color:var(--fg)' }),
       h('span', { style: 'font-size:12.5px;color:var(--mut)', text: num(o.cny) + ' ¥ (≈ ' + money(Math.round(num(o.cny) * (num(rates?.cny) || 71))) + ')' + (o.sold ? ' · ' + o.sold : '') + (o.askedAt ? ' · спросили ' + ago(o.askedAt) : '') }),
-      o.askedAt ? cbBadge(o) : null,
+      o.askedAt ? cbBadge(o) : o.picked && j.status !== 'found' && !o.askError ? h('span', { class: 'chip', style: 'background:var(--s3);color:var(--mut);align-self:flex-start', text: 'В очереди' }) : null,
       o.reply?.ru ? h('div', { style: 'white-space:pre-wrap;font-size:13px;padding:8px;border-radius:8px;background:var(--grnBg);color:var(--grnT)', text: 'Продавец: ' + o.reply.ru }) : null,
       o.askError ? h('span', { style: 'font-size:12.5px;color:var(--redT)', text: 'Не получилось написать: ' + o.askError }) : null,
       o.reply?.facts ? h('span', { style: 'font-size:12.5px', text: [o.reply.facts.original, o.reply.facts.material, o.reply.facts.setCount && 'комплект ' + o.reply.facts.setCount,
@@ -1013,13 +1013,14 @@ function cbBox(r) {
     j.status === 'error' ? h('div', { style: 'padding:8px;border-radius:8px;background:var(--redBg);color:var(--redT);font-size:13px', text: j.error || 'Ошибка' }) : null,
     CB_BUSY.includes(j.status) && Date.now() - (j.updated_at || 0) > 3 * 60000 && ['queued', 'ask'].includes(j.status) ? h('span', { style: 'font-size:12.5px;color:var(--redT)', text: 'Бот давно не брал задание. Проверьте, что на компьютере офиса он запущен.' }) : null,
     offers.length ? offers : ['found', 'answered'].includes(j.status) ? h('span', { style: 'color:var(--mut)', text: 'Ничего не нашлось. Попробуйте другой запрос.' }) : null,
-    ask ? [h('label', { class: 'lab' }, 'Вопрос продавцам (уйдёт как есть, по-китайски)', ask),
+    ask ? [h('label', { class: 'lab' }, 'Первый вопрос продавцу (по-китайски, коротко). Дальше бот переписывается сам', ask),
       h('button', { class: 'pillb a', type: 'button', onclick: () => {
         const picked = (j.offers || []).filter((o) => o.picked).length;
         if (!picked) { toast('Отметьте продавцов, которых спросить'); return; }
         if (picked > 5) { toast('Не больше 5 продавцов за раз — иначе Pinduoduo может заблокировать аккаунт'); return; }
         cbSave(r.id, { status: 'ask', offers: j.offers, question: ask.value.trim() });
-      } }, 'Спросить выбранных продавцов')] : null,
+      } }, 'Спросить по очереди'),
+      ask ? h('small', { style: 'color:var(--mut);font-size:12px', text: 'Бот пишет продавцам по одному: следующему — когда с текущим всё ясно (есть / нет) или он молчит 2 часа.' }) : null] : null,
     (j.log || []).length ? h('span', { style: 'font-size:12px;color:var(--mut)', text: (j.log || []).slice(-3).map((l) => ago(l.at) + ': ' + l.text).join(' · ') }) : null,
     h('span', { style: 'display:flex;gap:6px;flex-wrap:wrap' },
       j.status === 'error' ? h('button', { class: 'pillb', type: 'button', onclick: () => cbSave(r.id, { status: j.resume || 'queued', error: null }) }, 'Повторить') : null,
