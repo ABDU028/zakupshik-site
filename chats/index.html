@@ -923,9 +923,13 @@ function cbWatch(id) {
 async function cbSuggest(r, inp, btn) {
   btn.disabled = true; btn.textContent = 'Подбираю…';
   try {
-    const { data, error } = await SB.functions.invoke('ai', { body: { task: 'staff_text', prompt: 'Составь короткий поисковый запрос на китайском (упрощённые иероглифы) для Pinduoduo, 3–6 слов: марка и модель машины и название детали, как ищут китайские покупатели. Ответь только запросом, без кавычек.\n\n' + (r.zh || ((r.title ? 'Товар: ' + r.title + '\n' : '') + (r.fields || []).map((f) => f.label + ': ' + f.value).join('\n'))) } });
+    const { data, error } = await SB.functions.invoke('ai', { body: { task: 'staff_text', prompt: 'Составь короткий поисковый запрос на китайском (упрощённые иероглифы) для Pinduoduo, 3–6 слов: марка и модель машины и название детали, как ищут китайские покупатели. В ответе — ТОЛЬКО сам запрос одной строкой, без объяснений, без русского текста и кавычек.\n\n' + (r.zh || ((r.title ? 'Товар: ' + r.title + '\n' : '') + (r.fields || []).map((f) => f.label + ': ' + f.value).join('\n'))) } });
     if (error || !data?.text) throw new Error('ai');
-    inp.value = data.text.trim().replace(/^["«“]|["»”]$/g, '');
+    // ИИ иногда отвечает рассуждением — берём только последний кусок из иероглифов (сам запрос)
+    const parts = data.text.split(/\n|Ответ:|Запрос:|запрос:|→|—|:/).map((x) => x.replace(/[А-Яа-яЁё"«»“”.,()]+/g, ' ').replace(/\s+/g, ' ').trim()).filter((x) => /[\u4e00-\u9fff]/.test(x));
+    const best = parts.length ? parts[parts.length - 1] : '';
+    if (!best) throw new Error('ai');
+    inp.value = best.slice(0, 40);
   } catch { toast('Не получилось подобрать запрос'); }
   btn.disabled = false; btn.textContent = 'Подобрать запрос из заявки';
 }
