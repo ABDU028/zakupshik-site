@@ -992,7 +992,7 @@ function cbBox(r) {
   const picking = j.status === 'found';
   const offers = (j.offers || []).map((o) => h('div', { style: 'display:flex;gap:10px;align-items:flex-start;padding:8px;border-radius:10px;background:var(--bg)' + (o.fit === 'не то' && !o.askedAt ? ';opacity:.55' : '') },
     picking && isPdd(o) ? h('input', { type: 'checkbox', checked: !!o.picked, 'aria-label': 'Спросить этого продавца', style: 'width:20px;height:20px;margin-top:2px', onchange: (e) => { o.picked = e.target.checked; } }) : null,
-    o.img ? h('img', { src: o.img, alt: '', style: 'width:56px;height:56px;object-fit:cover;border-radius:8px;flex-shrink:0' }) : null,
+    o.img ? h('img', { referrerpolicy: 'no-referrer', loading: 'lazy', src: o.img, alt: '', onerror: (e) => { e.target.style.visibility = 'hidden'; }, style: 'width:56px;height:56px;object-fit:cover;border-radius:8px;flex-shrink:0' }) : null,
     h('div', { style: 'flex:1;min-width:0;display:flex;flex-direction:column;gap:4px' },
       o.fit || o.src ? h('span', { style: 'display:flex;gap:6px;align-items:center;flex-wrap:wrap' }, h('span', { class: 'chip', style: 'background:' + (SRC[o.src || 'pdd'] || SRC.pdd)[1] + ';color:#fff', text: (SRC[o.src || 'pdd'] || SRC.pdd)[0] }), o.fit ? h('span', { class: 'chip', style: o.fit === 'подходит' ? 'background:var(--grnBg);color:var(--grnT)' : o.fit === 'не то' ? 'background:var(--redBg);color:var(--redT)' : 'background:var(--s3);color:var(--fg)', text: o.fit === 'подходит' ? '✓ Подходит' : o.fit === 'не то' ? 'Не то' : 'Проверить' }) : null, o.why ? h('span', { style: 'font-size:12px;color:var(--mut)', text: o.why }) : null) : null,
       o.ru ? h('b', { style: 'font-size:13.5px', text: o.ru }) : null,
