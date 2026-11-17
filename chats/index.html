@@ -895,7 +895,7 @@ function zhBox(r) {
 // Клиенту бот ничего не пишет: менеджер переносит ответ продавца в окно КП и отправляет сам.
 const CB = {};
 const CB_LABEL = { queued: 'В очереди на поиск', searching: 'Ищет на Pinduoduo…', found: 'Нашёл товары — отметьте, кого спросить', ask: 'В очереди: написать продавцам',
-  asking: 'Пишет продавцам…', asked: 'Ждёт ответов продавцов', answered: 'Продавцы ответили', need_human: 'Pinduoduo просит проверку', error: 'Ошибка' };
+  asking: 'Пишет продавцам…', asked: 'Ждёт ответов продавцов', answered: 'Переписка закончена', stopped: 'Остановлено — бот не пишет и не проверяет', need_human: 'Pinduoduo просит проверку', error: 'Ошибка' };
 const CB_BUSY = ['queued', 'searching', 'ask', 'asking', 'asked', 'need_human'];
 let cbTimer = null;
 function cbQuestion(qty, car) {
@@ -912,6 +912,10 @@ async function cbLoad(id) {
 }
 async function cbSave(id, patch) {
   const row = { ...patch, updated_at: Date.now() };
+  // в offers бот хранит счётчики переписки — не затираем их старой копией из панели
+  if (row.offers) { const { data: cur } = await SB.from('china_bot_jobs').select('offers').eq('request_id', id).maybeSingle();
+    const keep = ['botTurns', 'sent', 'lastBotAt', 'done', 'saidBye', 'needHuman', 'reply', 'chatUrl', 'askedAt', 'photos', 'photosTried'];
+    row.offers = row.offers.map((o) => { const c = (cur?.offers || []).find((x) => x.id === o.id); if (!c) return o; const m = { ...o }; for (const k of keep) if (c[k] !== undefined && k !== 'photosTried') m[k] = c[k]; return m; }); }
   const { error } = CB[id] ? await SB.from('china_bot_jobs').update(row).eq('request_id', id) : await SB.from('china_bot_jobs').upsert({ request_id: id, ...row });
   if (error) { console.error(error); toast('Не сохранилось: ' + (error.message || 'ошибка')); return false; }
   await cbLoad(id); return true;
@@ -1001,6 +1005,8 @@ function cbBox(r) {
     (j.log || []).length ? h('span', { style: 'font-size:12px;color:var(--mut)', text: (j.log || []).slice(-3).map((l) => ago(l.at) + ': ' + l.text).join(' · ') }) : null,
     h('span', { style: 'display:flex;gap:6px;flex-wrap:wrap' },
       j.status === 'error' ? h('button', { class: 'pillb', type: 'button', onclick: () => cbSave(r.id, { status: j.resume || 'queued', error: null }) }, 'Повторить') : null,
+      ['queued', 'found', 'ask', 'asking', 'asked', 'need_human'].includes(j.status) ? h('button', { class: 'pillb', type: 'button', style: 'background:var(--redBg);color:var(--redT)', onclick: () => { if (confirm('Остановить бота по этой заявке? Он перестанет писать продавцам и проверять ответы. Найденное и ответы останутся.')) cbSave(r.id, { status: 'stopped', resume: j.status === 'need_human' ? j.resume : j.status }).then((ok) => ok && toast('Бот остановлен по этой заявке')); } }, 'Остановить') : null,
+      j.status === 'stopped' ? h('button', { class: 'pillb', type: 'button', onclick: () => cbSave(r.id, { status: ['found', 'queued'].includes(j.resume) ? j.resume : 'asked', checked_at: 0 }) }, 'Возобновить') : null,
       ['asked', 'answered'].includes(j.status) ? h('button', { class: 'pillb', type: 'button', disabled: j.checked_at === 0, onclick: async (e) => { const b = e.currentTarget; b.disabled = true; b.textContent = 'Проверяем…'; if (await cbSave(r.id, { status: 'asked', checked_at: 0 })) toast('Бот проверит ответы в течение минуты'); } }, j.checked_at === 0 ? 'Проверяем… (до минуты)' : 'Проверить ответы сейчас') : null,
       h('button', { class: 'pillb', type: 'button', onclick: async () => {
         if (!confirm('Начать новый поиск? Найденные товары и ответы продавцов по этой заявке удалятся.')) return;
