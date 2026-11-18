@@ -952,6 +952,11 @@ const CB_ST = {
   yes: ['Есть', 'var(--grnBg)', 'var(--grnT)'], no: ['Нет', 'var(--redBg)', 'var(--redT)'],
   silent: ['Не ответил', 'var(--s3)', 'var(--mut)'], manager: ['Нужен менеджер', 'var(--redBg)', 'var(--redT)'],
 };
+// ссылка на объявление для ручной переписки: Pinduoduo — та, что открывается в приложении PDD на телефоне
+function cbShare(o) {
+  if (!o.src || o.src === 'pdd') return 'https://mobile.yangkeduo.com/goods.html?goods_id=' + o.id;
+  return o.url || (o.src === '1688' ? 'https://detail.1688.com/offer/' + o.id + '.html' : 'https://item.taobao.com/item.htm?id=' + o.id);
+}
 function cbStOf(o) { return o.st || (o.needHuman ? 'manager' : o.done ? (o.reply?.ru ? 'yes' : 'no') : o.botTurns ? 'talk' : 'wait'); }
 function cbBadge(o) {
   const st = cbStOf(o), [t, bg, fg] = CB_ST[st] || CB_ST.wait;
@@ -1007,6 +1012,7 @@ function cbBox(r) {
       o.photosError ? h('span', { style: 'font-size:12.5px;color:var(--mut)', text: 'Фото: ' + o.photosError }) : (o.wantPhotos || (o.askedAt && !o.photos && o.reply?.ru)) && !o.photosTried ? h('span', { style: 'font-size:12.5px;color:var(--mut)', text: 'Бот готовит чистые фото…' }) : null,
       h('span', { style: 'display:flex;gap:6px;flex-wrap:wrap' },
         o.reply?.ru ? h('button', { class: 'pillb a', type: 'button', onclick: () => cbToKp(r, j, o) }, (o.photos || []).length ? 'Добавить в КП с фото' : 'Добавить в КП') : h('button', { class: 'pillb', type: 'button', onclick: () => cbToKp(r, j, o) }, 'В КП'),
+        h('button', { class: 'pillb', type: 'button', onclick: async () => { const u = cbShare(o); try { await navigator.clipboard.writeText(u); toast('Ссылка скопирована — вставьте в чат с продавцом или в поиск приложения'); } catch { prompt('Скопируйте ссылку:', u); } } }, 'Скопировать ссылку'),
         !(o.photos || []).length && !o.wantPhotos ? h('button', { class: 'pillb', type: 'button', onclick: () => { o.wantPhotos = true; o.photosTried = null; o.photosError = null; cbSave(r.id, o.askedAt ? { offers: j.offers, status: 'asked', checked_at: 0 } : { offers: j.offers }).then((ok) => ok && toast('Бот возьмёт фото из объявления и уберёт надписи — до пары минут')); } }, o.photosTried ? 'Взять фото ещё раз' : 'Взять фото') : null))));
   const ask = picking && (j.offers || []).some(isPdd) ? h('textarea', { class: 'inp', rows: '4', lang: 'zh-CN', 'aria-label': 'Вопрос продавцам', value: j.question || cbQuestion(j.qty, j.car) }) : null;
   return wrap(
